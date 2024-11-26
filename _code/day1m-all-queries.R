@@ -2,10 +2,6 @@ library(tidyverse)
 library(epidatr)
 library(epiprocess)
 
-enlist <- function(...) {
-  rlang::dots_list(..., .homonyms = "error", .named = TRUE, .check_assign = TRUE)
-}
-
 
 # -------------------------------------------------------------------------
 
