@@ -20,6 +20,8 @@ library(grid)
 library(epidatasets)
 library(epipredict)
 library(epidatr)
+# source(here::here("_code", "day1m-all-queries.R"))
+load(here::here("_data", "day1m_queries.rda"))
 ```
 
 ## Outline
@@ -83,66 +85,23 @@ library(epidatr)
 
 * For example: The estimated percentage of outpatient doctor visits that are COVID-related in WA from Dec. 2021 to Feb. 2022 ([docs](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html)):
 ```{r panel-wa-ex}
-#| echo: false
-x1 <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  geo_type = "state",
-  time_type = "day",
-  geo_values = "wa", # Just for WA to keep it simple (& to go with the case data by test date for that state)
-  time_value = epirange(20211201, 20220201), 
-  issues = epirange(20211201, 20220201)
-)
-
-x <- x1 |>
-  select(geo_value, time_value,
-         version = issue,
-         percent_cli = value
-  ) |>
-  as_epi_archive(compactify = FALSE)
-
-head(epix_as_of(x, max_version = max(x$DT$version)))
+head(epix_as_of(dv_wa, max_version = max(dv_wa$DT$version)))
 ```
 
 ## Examples of panel data - COVID-19 cases
 
 [[**JHU CSSE COVID cases per 100k **]{.primary}](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/jhu-csse.html) estimates the daily number of new confirmed COVID-19 cases per 100,000 population, averaged over the past 7 days.
 
-```{r examples-panel-covid}
-#| echo: false
-#| eval: false
-SOURCES <- c("jhu-csse", "chng", "chng", "hhs")
-SIGNALS <- c("confirmed_7dav_incidence_prop",
-             "smoothed_adj_outpatient_cli",
-             "smoothed_adj_outpatient_covid",
-             "confirmed_admissions_covid_1d_prop_7dav")
-
-data_list <- list()
-
-for (i in seq_along(SOURCES)) {
-  data_list[[i]] <- pub_covidcast(
-    source = SOURCES[i],
-    signals = SIGNALS[i],
-    geo_type = "state",
-    geo_values = c("ca", "fl", "nc", "wa"), 
-    time_type = "day",
-    time_values = epirange(20210915, 20220915)
-  )
-}
-saveRDS(data_list, "_data/four_covidcast_signals.rds")
-```
 
 ```{r examples-panel-covid2}
 #| echo: false
-data_list <- read_rds("_data/four_covidcast_signals.rds")
-colors <- c("black", scales::hue_pal()(4))
 names <- c("COVID-19 cases", "CHNG-CLI", "CHNG-COVID", "COVID-19 hospital admissions")
 units <- c("Reported cases per 100k people",
            "% doctor's visits due to CLI",
            "% doctor's visits due to COVID-19",
            "Hospital admissions per 100k people")
 
-as_epi_df(data_list[[1]]) %>%
+as_epi_df(panel_data[[1]]) %>%
   autoplot("value") +
   scale_color_delphi() +
   theme(legend.title = element_blank()) +
@@ -165,7 +124,7 @@ as_epi_df(data_list[[1]]) %>%
 
 ```{r examples-chng-cli}
 #| echo: false
-as_epi_df(data_list[[2]]) %>%
+as_epi_df(panel_data[[2]]) %>%
   autoplot("value") +
   scale_color_delphi() +
   theme(legend.title = element_blank()) +
@@ -179,7 +138,7 @@ as_epi_df(data_list[[2]]) %>%
 
 ```{r examples-chng-covid}
 #| echo: false
-as_epi_df(data_list[[3]]) %>%
+as_epi_df(panel_data[[3]]) %>%
   autoplot("value") +
   scale_color_delphi() +
   theme(legend.title = element_blank()) +
@@ -197,7 +156,7 @@ as_epi_df(data_list[[3]]) %>%
 
 ```{r examples-hhs-admissions}
 #| echo: false
-as_epi_df(data_list[[4]]) %>%
+as_epi_df(panel_data[[4]]) %>%
   autoplot("value") +
   scale_color_delphi() +
   theme(legend.title = element_blank()) +
@@ -211,8 +170,9 @@ Example: gathering different signals + visualizing panel data
 
 ```{r multiple-signals-unscale}
 #| echo: false
+#| eval: false
 # turn list into dataframe
-df <- list_rbind(data_list)
+df <- list_rbind(panel_data)
 df$signal <- factor(df$signal, labels = names)
 
 ggplot(df, aes(x = time_value, y = value, color = signal)) +
@@ -229,8 +189,8 @@ ggplot(df, aes(x = time_value, y = value, color = signal)) +
 Example: gathering different signals + **scaling** + visualizing panel data
 
 ```{r multiple-signals-scale}
-#| echo: FALSE
-#| include: FALSE
+#| echo: false
+#| eval: false
 # HIDE THIS: function that rescales signal value according to specified range
 epi_rescale_signal = function(df, variable, scale_to = c(0, 1)) {
   Min <- function(x) min(x, na.rm = TRUE)
@@ -248,6 +208,7 @@ epi_rescale_signal = function(df, variable, scale_to = c(0, 1)) {
 
 ```{r scaled-signals}
 #| echo: false
+#| eval: false
 # minimum and maximum of cases (used to rescale data)
 case_min <- min(data_list[[1]]$value)
 case_max <- max(data_list[[1]]$value)
@@ -294,7 +255,7 @@ ggplot(ca |>
     name = "Incident cases per 100k people", 
     limits = range1,
     sec.axis = sec_axis(
-      trans = trans12, 
+      transform = trans12, 
       name = "Incident deaths per 100k people")) +
   labs(x = "Date") +
   theme(legend.position = "right", legend.title = element_blank()) 
@@ -308,8 +269,7 @@ ggplot(ca |>
 * Now, we add a second time index to indicate the data version...
 ```{r versioned-wa-ex}
 #| echo: false
-states <- c("fl", "ca", "ny", "tx")
-head(x$DT) |> as_tibble()
+head(dv_wa$DT) |> as_tibble()
 ```
 
 * Note that this feature can be indicated in different ways (ex. `version`, `issue`, `release`, `as_of`). 
@@ -318,36 +278,12 @@ head(x$DT) |> as_tibble()
 Estimated percentage of outpatient visits due to CLI in [FL]{.primary} across multiple issue dates, 
 with updates and revisions to past data as new issue dates are released:
 
-```{r versioned-panel-multi-states-ex}
-#| echo: false
-#| eval: false
-dv <- pub_covidcast(source = "doctor-visits", 
-                    signals = "smoothed_adj_cli", 
-                    geo_type = "state", 
-                    geo_values = "fl,ca,ny,tx", 
-                    time_type = "day",
-                    time_values = epirange(20200601, 20211201),
-                    issues = epirange(20200601, 20211201)
-) |>
-  select(time_value, geo_value, percent_cli = value, version = issue)
-dv_final <- pub_covidcast(source = "doctor-visits", 
-                    signals = "smoothed_adj_cli", 
-                    geo_type = "state", 
-                    geo_values = "fl,ca,ny,tx", 
-                    time_type = "day",
-                    time_values = epirange(20200601, 20211201)
-) |>
-  select(time_value, geo_value, percent_cli = value, version = issue)
-write_rds(list(dv_version = dv, dv_final = dv_final), 
-          "slides/_data/four-state-dv-all-versions.rds")
-```
 
 
 ```{r versioned-panel-multi-states-ex-2}
-dvall <- read_rds("_data/four-state-dv-all-versions.rds")
-dv_archive <- dvall[["dv_version"]] |>
+dv_archive <- dv_versioned_panel |>
   as_epi_archive(compactify = TRUE)
-dv_final <- dvall[["dv_final"]]
+dv_final <- dv_versioned_panel_final
 max_version <- max(dv_archive$DT$version)
 versions <- seq(as.Date("2020-06-01"), max_version - 1, by = "1 week")
 weekly_snapshots <- map(versions, function(v) {
@@ -366,8 +302,6 @@ weekly_snapshots |>
   theme_bw() +
   theme(legend.position = "none") +
   scale_color_viridis_d() 
-
-#ggsave("fig_covidcast_signals/dv_as_of.pdf", width = 5, height = 4)
 ```
 
 ## Latency and revision in signals
@@ -388,7 +322,7 @@ weekly_snapshots |>
 
 ```{r latency-wa-ex}
 #| echo: false
-x_dt_with_diff = x$DT |> mutate(version_time_diff = version - time_value) 
+x_dt_with_diff = dv_wa$DT |> mutate(version_time_diff = version - time_value) 
 head(x_dt_with_diff |> group_by(time_value) |> slice(1) |> ungroup()) 
 ```
 
@@ -413,29 +347,7 @@ head(x_dt_with_diff) |> as_tibble()
 #| fig-format: png
 #| fig-width: 8
 #| fig-height: 4.5
-dv_cli <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_cli",
-  geo_type = "state",
-  time_type = "day",
-  geo_values = "wa",
-  time_values = epirange(20211201, 20220201),
-  issues = epirange(20211201, 20220201)
-) |>
-  select(time_value, value, issue)
-
-dv_cli_finalized <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_cli",
-  geo_type = "state",
-  time_type = "day",
-  geo_values = "wa",
-  time_values = epirange(20211201, 20220201),
-  as_of = "2022-02-01"
-) |>
-  select(time_value, final_value = value)
-
-dv_cli <- left_join(dv_cli, dv_cli_finalized, by = join_by(time_value)) |>
+dv_cli <- left_join(dv_wa_versioned, dv_wa_finalized, by = join_by(time_value)) |>
   mutate(value = zoo::rollmeanr(value, k = 7, na.pad = TRUE), 
          final_value = zoo::rollmeanr(final_value, k = 7, na.pad = TRUE),
          .by = issue)
@@ -514,30 +426,7 @@ Many data sources are subject to revisions:
 ```{r fig1-McDonald}
 #| echo: false
 # This is Figure 1 from https://www.pnas.org/doi/pdf/10.1073/pnas.2111453118
-
-as_ofs <- seq(as.Date("2020-09-28"), as.Date("2020-10-19"), by = "week")
-cases_as_of <- map_dfr(as_ofs, function(as_of) {
-  pub_covidcast(source = "jhu-csse", 
-                signals = "confirmed_7dav_incidence_prop",
-                geo_type = "hrr", 
-                time_type = "day",
-                geo_values = "311",
-                as_of = as_of,
-                time_values = epirange(20200815, 20200926)) |>
-    mutate(as_of = as_of)
-})
-dv_as_of <-  map_dfr(as_ofs, function(as_of) {
-  pub_covidcast(source = "doctor-visits", 
-                signals = "smoothed_adj_cli", # Estimated % of outpatient doctor visits primarily about COVID-related symptoms
-                geo_type = "hrr",
-                time_type = "day",
-                geo_values = "311", 
-                as_of = as_of,
-                time_values = epirange(20200815, 20200926)) |>
-    mutate(as_of = as_of)
-})
-  
-p1 <- dv_as_of |>
+p1 <- dv_311_as_of |>
   mutate(as_of = fct_relabel(factor(as_of), function(x) strftime(x, "%b %d"))) |>
   ggplot(aes(x = time_value, y = value)) + 
   geom_line(aes(color = factor(as_of))) + 
@@ -548,7 +437,7 @@ p1 <- dv_as_of |>
   scale_color_viridis_d(end = .9, begin = .1) +
   guides(color = guide_legend(nrow = 1))
 
-p2 <- cases_as_of |>
+p2 <- cases_311_as_of |>
   mutate(as_of = fct_relabel(factor(as_of), function(x) strftime(x, "%b %d"))) |>
   ggplot(aes(x = time_value, y = value)) + 
   geom_line(aes(color = factor(as_of))) + 
@@ -559,38 +448,7 @@ p2 <- cases_as_of |>
   scale_color_viridis_d(end = .9, begin = .1) +
   guides(color = guide_legend(nrow = 1))
 
-# From https://github.com/tidyverse/ggplot2/wiki/Share-a-legend-between-two-ggplot2-graphs
-grid_arrange_shared_legend <- function(...,
-                                       ncol = length(list(...)),
-                                       nrow = 1,
-                                       position = c("bottom", "right")) {
-
-  plots <- list(...)
-  position <- match.arg(position)
-  g <- ggplotGrob(plots[[1]] + theme(legend.position = position))$grobs
-  legend <- g[[which(sapply(g, function(x) x$name) == "guide-box")]]
-  lheight <- sum(legend$height)
-  lwidth <- sum(legend$width)
-  gl <- lapply(plots, function(x) x + theme(legend.position="none"))
-  gl <- c(gl, ncol = ncol, nrow = nrow)
-
-  combined <- switch(position,
-                     "bottom" = arrangeGrob(do.call(arrangeGrob, gl),
-                                            legend,
-                                            ncol = 1,
-                                            heights = unit.c(unit(1, "npc") - lheight, lheight)),
-                     "right" = arrangeGrob(do.call(arrangeGrob, gl),
-                                           legend,
-                                           ncol = 2,
-                                           widths = unit.c(unit(1, "npc") - lwidth, lwidth)))
-
-  grid.newpage()
-  invisible(grid.draw(combined))
-
-  # return gtable invisibly
-  invisible(combined)
-
-}
+source(here::here("_code", "grid_arrange_shared_legend.R"))
 
 p3 <- grid_arrange_shared_legend(p1, p2)
 invisible(p3)
@@ -620,26 +478,17 @@ invisible(p3)
 #| fig-width: 6.5
 #| fig-height: 3
 
-# Figure 4 from https://www.pnas.org/doi/10.1073/pnas.2111452118
-sa_fips <- "48029"
-sa_start <- "2020-06-15"
-sa_end <- "2020-08-15"
+# Similar to Figure 4 from https://www.pnas.org/doi/10.1073/pnas.2111452118
+
 sa_anomaly_date <- as.Date("2020-07-16")
-sources <- c("jhu-csse", "fb-survey", "doctor-visits", "google-symptoms", "chng")
-signals <- c("confirmed_7dav_incidence_num", "smoothed_whh_cmnty_cli",
-             "smoothed_adj_cli", "sum_anosmia_ageusia_smoothed_search", 
-             "smoothed_adj_outpatient_cli")
-reinhart <- map2(sources, signals, 
-                 ~ pub_covidcast(.x, .y, time_type = "day", geo_type = "county",
-                                 time_values = epirange(sa_start, sa_end),
-                                 geo_values = sa_fips) |>
-                   select(source, time_value, value))
 sa_cross <- reinhart[[1]]$value[33]
 sa_scale <- sd(reinhart[[1]]$value, na.rm = TRUE)
 reinhart[-1] <- map(
   reinhart[-1], 
   ~ mutate(.x, value = (value - value[33]) / sd(value, na.rm = TRUE) *
-             sa_scale + sa_cross))
+             sa_scale + sa_cross
+  )
+)
 reinhart <- list_rbind(reinhart)
 
 g1 <- ggplot(reinhart |> filter(source == "jhu-csse"), aes(x = time_value, y = value)) +
@@ -661,7 +510,7 @@ g2 <- reinhart |>
   filter(source != "jhu-csse") |>
   ggplot(aes(x = time_value, y = value, color = source)) +
   geom_vline(xintercept = sa_anomaly_date, color = "gray", linetype = "dashed",
-             size = 0.75, alpha = 0.75) +
+             alpha = 0.75) +
   geom_line() +
   scale_color_delphi(labels = labels, name = "") +
   labs(x = "", y = "Signal value (rescaled)", title = "Auxiliary signals") +
@@ -683,7 +532,6 @@ cowplot::plot_grid(g1, g2, ncol = 2, rel_widths = c(.35, .65))
 
 ## Goals of Delphi Epidata platform and repository
 
-<div style="font-size: 0.9em;">
 1. **Be the one-stop shop for aggregated epi-surveillance time-series ("epi-signals")**
     + Hence: include also signals available elsewhere, especially if they don't keep data revisions - E.g. CDC's own NSSP, NWSS
     + Be the national historical repository of record & preserve the raw data
@@ -697,7 +545,6 @@ cowplot::plot_grid(g1, g2, ncol = 2, rel_widths = c(.35, .65))
 
 4. **Be the focal point for community-wide efforts to open up privately held data**
     + Better positioned than government or industry
-</div>
 
 
 ## The bigger goal
@@ -822,7 +669,7 @@ or the development version
 #| eval: false
 #| echo: true
 # Install the development version from the GitHub dev branch
-# pak::pkg_install("cmu-delphi/epidatr@dev")
+pak::pkg_install("cmu-delphi/epidatr@dev")
 ```
 
 The CRAN listing is [here](https://cran.r-project.org/package=epidatr/index.html).
@@ -855,10 +702,16 @@ The following shows how to import the library and fetch all confirmed influenza 
 
 ```{r hhs-influenza-pub-covidcast}
 #| echo: true
+#| eval: false
 library(epidatr)
-res <- pub_covidcast('hhs', 'confirmed_admissions_influenza_1d', 'state', 'day', geo_values = 'nc',
+hhs_flu_nc <- pub_covidcast('hhs', 'confirmed_admissions_influenza_1d', 'state', 'day', geo_values = 'nc',
                      time_values = c(20240401, 20240405:20240414))
-head(res, n = 3)
+head(hhs_flu_nc, n = 3)
+```
+
+```{r hhs-influenza-pub-covidcast-2}
+#| echo: false
+head(hhs_flu_nc, n = 3)
 ```
 
 <br>
@@ -1022,10 +875,11 @@ head(covid_sources$sources, n = 2) # head(list, n = 2) will print the first two 
 
 ```{r us-jhu-pub-covidcast}
 #| echo: true
+#| eval: false
 library(epidatr)
 library(dplyr)
 
-epidata <- pub_covidcast(
+jhu_us_cases <- pub_covidcast(
   source = "jhu-csse",
   signals = "confirmed_7dav_incidence_prop", 
   geo_type = "nation",
@@ -1036,8 +890,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-us-jhu-pub-covidcast}
-#| echo = FALSE 
-head(epidata, n = 3) |> select(geo_value, signal, source, geo_type, time_value, issue, lag, value)
+#| echo: false 
+head(jhu_us_cases, n = 3) |> 
+  select(geo_value, signal, source, geo_type, time_value, issue, lag, value)
 ```
 Here `value` is the requested signal – in this case, the number of daily new confirmed COVID-19 cases per 100,000 population from January to April 2021. <!-- (and standard error if it is applicable to the metric). -->
 
@@ -1076,9 +931,10 @@ Crucially—and unlike most other sources of COVID-19 data—our API reports two
 
 ```{r state-jhu-pub-covidcast}
 #| echo: true
+#| eval: false
 # Obtain the most up-to-date version of the smoothed covid-like illness (CLI)
 # signal from the COVID-19 Trends and Impact survey for all states
-state_epidata <- pub_covidcast(
+jhu_state_cases <- pub_covidcast(
   source = "jhu-csse",
   signals = "confirmed_7dav_incidence_prop",
   geo_type = "state",
@@ -1089,8 +945,9 @@ state_epidata <- pub_covidcast(
 ```
 
 ```{r head-state-jhu-pub-covidcast}
-#| echo = FALSE 
-head(state_epidata) |> select(geo_value, signal, source, geo_type, time_value, issue, lag, value)
+#| echo: false
+head(jhu_state_cases) |> 
+  select(geo_value, signal, source, geo_type, time_value, issue, lag, value)
 ```
 
 
@@ -1099,7 +956,8 @@ County `geo_values` are [FIPS codes](https://en.wikipedia.org/wiki/List_of_Unite
 
 ```{r county-jhu-pub-covid}
 #| echo: true
-jhu_county_data <- pub_covidcast(
+#| eval: false
+jhu_county_cases <- pub_covidcast(
   source = "jhu-csse",
   signals = "confirmed_7dav_incidence_prop",
   geo_type = "county",
@@ -1110,8 +968,9 @@ jhu_county_data <- pub_covidcast(
 ```
 
 ```{r head-county-jhu-pub-covid}
-#| echo = FALSE 
-head(jhu_county_data) |> select(geo_value, signal, source, geo_type, time_value, issue, lag, value)
+#| echo: false
+head(jhu_county_cases) |>
+  select(geo_value, signal, source, geo_type, time_value, issue, lag, value)
 ```
 
 ::: {.callout-important icon="false"}
@@ -1226,7 +1085,8 @@ To give a specific example, let's consider the estimate for PA on May 1, 2020:
 
 ```{r pa-may-1st-as-of}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_pa_as_of <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1238,8 +1098,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-pa-may-1st-as-of}
-#| echo = FALSE 
-head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value)
+#| echo: false
+head(dv_pa_as_of) |> 
+  select(geo_value, signal, source, time_value, issue, lag, value)
 ```
 
 * Initial estimate was *issued* on May 7, 2020 (due to delay from aggregation and ingestion by the API).
@@ -1250,7 +1111,8 @@ head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value
 
 ```{r pa-may-1st-most-recent}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_pa_final <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1261,8 +1123,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-pa-may-1st-most-recent}
-#| echo = FALSE 
-head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
+#| echo: false
+head(dv_pa_final) |> 
+  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 
 * [**Substantial Estimate Change**]{.primary}:
@@ -1277,7 +1140,8 @@ By using the `issues` argument, we can request all issues in a certain time peri
 
 ```{r pa-multiple-issues}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_pa_issues <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1289,8 +1153,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-pa-multiple-issues}
-#| echo = FALSE 
-head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
+#| echo: false 
+head(dv_pa_issues) |> 
+  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 
 ## Obtaining multiple issues for one state
@@ -1299,7 +1164,8 @@ To ensure that you've captured all issues up to a specific date (e.g., "2020-05-
 
 ```{r extreme-lb-multiple-issues}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_pa_issues_sub <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1311,8 +1177,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-extreme-lb-multiple-issues}
-#| echo = FALSE 
-head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
+#| echo: false
+head(dv_pa_issues_sub) |> 
+  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 
 * This doesn't change anything here, but it may matter for other types of data where you don't know the latency or reporting lag.
@@ -1328,7 +1195,8 @@ to find the earliest date available.
 
 ```{r extreme-lb-ub-multiple-issues}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_pa_issues_all <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1340,8 +1208,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-extreme-lb-ub-multiple-issues}
-#| echo = FALSE 
-tail(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
+#| echo: false
+tail(dv_pa_issues_all) |> 
+  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 
 * We caution against starting queries with too late a minimum issue or too early maximum issue, as it could lead to incorrect or misleading results. You're safest bet to capture all issues is on the next slide...
@@ -1354,7 +1223,8 @@ The fast way to obtain all available issues for PA, set `issues` to be `*`:
 
 ```{r pa-all-issues}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_pa_issues_star <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1366,8 +1236,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-pa-all-issues}
-#| echo = FALSE 
-head(epidata, n = 8) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
+#| echo: false
+head(dv_pa_issues_star, n = 8) |> 
+  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 
 ## Obtaining all issues for all states
@@ -1376,7 +1247,8 @@ A very useful feature is the ability to extract all `geo_values` and `issues` by
 
 ```{r all-the-states-and-issues}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_state_issues_star <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1388,8 +1260,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-all-the-states-and-issues}
-#| echo = FALSE 
-head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
+#| echo: false
+head(dv_state_issues_star) |> 
+  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 
 So, now we obtain all available issues for all states (not just PA) for the specified date range. Neat!
@@ -1405,7 +1278,8 @@ So, now we obtain all available issues for all states (not just PA) for the spec
 
 ```{r do-nothing}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_state_default <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1421,7 +1295,8 @@ epidata <- pub_covidcast(
 
 ```{r one-issue-all-states}
 #| echo: true
-epidata <- pub_covidcast(
+#| eval: false
+dv_state_default <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
   time_type = "day",
@@ -1431,8 +1306,9 @@ epidata <- pub_covidcast(
 ```
 
 ```{r head-one-issue-all-states}
-#| echo = FALSE 
-head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
+#| echo: false
+head(dv_state_default) |> 
+  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 
 We get the [**most recent issue**]{.primary} for [**all states**]{.primary}!
@@ -1445,7 +1321,8 @@ We get the [**most recent issue**]{.primary} for [**all states**]{.primary}!
 * **Example**: Request  a lag of 7 days fetches only data issued exactly 7 days after the corresponding `time_value`:
 
 ```{r specific lag}
-#| echo: true
+#| echo: false
+#| eval: false
 epidata <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
@@ -1458,7 +1335,8 @@ epidata <- pub_covidcast(
 ```
 
 ```{r}
-#| echo = FALSE 
+#| echo: false
+#| eval: false
 head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 </div>
@@ -1470,7 +1348,8 @@ head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value
 * Results for those dates appear only if updates are issued on the corresponding lag day (e.g., May 10).
 
 ```{r query results exclusion}
-#| echo: true
+#| echo: false
+#| eval: false
 epidata <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
@@ -1483,7 +1362,8 @@ epidata <- pub_covidcast(
 ```
 
 ```{r}
-#| echo = FALSE 
+#| echo: false
+#| eval: false
 head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 </div>
