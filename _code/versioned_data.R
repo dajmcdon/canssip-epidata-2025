@@ -15,6 +15,18 @@ if (!file.exists(file_path)) {
     arrange(geo_value, time_value) %>%
     as_epi_archive(compactify = FALSE)
 
+  #hosp_archive <- pub_covidcast(
+  #  source = "hhs",
+  #  signals = "confirmed_admissions_covid_1d_prop",
+  #  time_type = "day",
+  #  geo_type = "state",
+  #  time_values = epirange(20200401, 20230401),
+  #  geo_values = states,
+  #  issues = epirange(20200401, 20230401)) %>%
+  #  select(geo_value, time_value, version = issue, hosp_rate = value) %>%
+  #  arrange(geo_value, time_value) %>%
+  #  as_epi_archive(compactify = FALSE)
+
   deaths_archive <- pub_covidcast(
     source = "jhu-csse",
     signals = "deaths_incidence_prop",
@@ -28,6 +40,7 @@ if (!file.exists(file_path)) {
     as_epi_archive(compactify = FALSE)
 
   data_archive <- epix_merge(cases_archive, deaths_archive, sync = "locf")
+  #data_archive <- epix_merge(hosp_archive, deaths_archive, sync = "locf")
   saveRDS(data_archive, file = file_path)
 } else {
   data_archive <- readRDS(file_path)
