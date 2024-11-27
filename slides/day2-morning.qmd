@@ -10,6 +10,10 @@ format: revealjs
 
 {{< include _titleslide.qmd >}}
 
+```{r ggplot-theme}
+#| cache: false
+ggplot2::theme_set(ggplot2::theme_bw())
+```
 
 
 ## Outline
@@ -99,36 +103,41 @@ $$y_{t+28} = \text{deaths at time } t+28 \quad\quad x_{t} = \text{cases at time 
 ## Example: COVID cases and deaths in California 
 
 ::: flex
-::: w-50
+
+::: w-65
 
 ```{r plot-ca-cases-deaths}
-#| fig-width: 8
-#| fig-height: 5
+#| out-width: "100%"
 source(here::here("_code/ca_cases_deaths.R"))
 ggplot(ca |> 
          mutate(deaths = trans21(deaths)) |>
          pivot_longer(cols = c(cases, deaths), names_to = 'name'),
        aes(x = time_value, y = value)) + 
-  geom_line(aes(color = name)) +
-  scale_color_manual(values = palette()[c(2,4)]) +
+  geom_line(aes(color = name), key_glyph = "timeseries") +
+  scale_color_delphi() +
   scale_y_continuous(
-    name = "Reported Covid-19 cases per 100k people", 
+    expand = expansion(c(0, 0.05)),
+    name = "Incident cases per 100k people",
     limits = range1,
     sec.axis = sec_axis(
       trans = trans12, 
-      name = "Reported Deaths per 100k people")) +
-  labs(title = "Covid-19 cases and deaths in California", x = "Date") +
-  theme(legend.position = "bottom", legend.title = element_blank()) 
+      name = "Incident deaths per 100k people")) +
+  labs(x = "Date") +
+  theme(legend.position = "bottom", legend.title = element_blank(),
+        axis.title = element_text(size = 10)) 
 ```
 
 :::
-::: w-50
+
+::: w-35
 
 ```{r ca data}
 #| echo: true
 head(ca)
 ```
+
 :::
+
 :::
 
 ::: {.callout-important icon="false"}
@@ -156,9 +165,10 @@ t0 <- nrow(train)  #split index
 
 # look at cases and deaths (where we move deaths forward by 1, 2, ..., 35 days)
 lags = 1:35
-cor_deaths_cases <- lapply(lags, 
-                             function(x) epi_cor(train, deaths, cases, 
-                                                 cor_by = geo_value, dt1 = x))
+cor_deaths_cases <- lapply(
+  lags, 
+  function(x) epi_cor(train, deaths, cases, cor_by = geo_value, dt1 = x)
+)
 
 cor_deaths_cases <- list_rbind(cor_deaths_cases, names_to = 'Lag') 
 
@@ -167,10 +177,10 @@ k <- 28 # selected lag
 
 cor_deaths_cases |>
   ggplot(aes(Lag, cor)) +
-  geom_point() +
-  geom_line() +
+  geom_vline(xintercept = k, color = base) +
+  geom_point(color = primary) +
+  geom_line(color = primary) +
   labs(x = "Lag", y = "Correlation") +
-  geom_vline(xintercept = k) +
   ggtitle('Correlation between cases and deaths by lag')
 ```
 
@@ -185,11 +195,8 @@ $$\hat y_{t+28} = \hat\beta + \hat\beta_0 x_{t}$$
 
 ```{r lag-cases}
 #| echo: true
-# Add column with cases lagged by k
-ca$lagged_cases <- dplyr::lag(ca$cases, n = k)
-
-# Split into train and test (before/after t0_date)
-t0_date <- as.Date('2021-04-01')
+ca$lagged_cases <- dplyr::lag(ca$cases, n = k)     # Add column with cases lagged by k
+t0_date <- as.Date('2021-04-01')                   # Split into train and test (before/after t0_date)
 train <- ca |> filter(time_value <= t0_date)
 test <- ca |> filter(time_value > t0_date)
 ```
@@ -198,9 +205,8 @@ Check if `deaths` is approximately linear in `lagged_cases`:
 
 ```{r plot-lag-cases}
 ggplot(train, aes(lagged_cases, deaths)) + 
-  geom_point(alpha = .5) +
-  labs(x = "Lagged cases", y = "Deaths") + 
-  ggtitle("Deaths vs cases lagged by 28 days")
+  geom_point(alpha = .5, color = primary, shape = 16) +
+  labs(x = "Cases", y = "Deaths 28 days later")
 ```
 
 ## Fitting lagged linear regression in R
@@ -212,13 +218,10 @@ coef(reg_lagged)
 ```
 
 ```{r plot-linear-fit}
-ggplot(train, aes(lagged_cases, deaths)) +
-  geom_point(alpha = .5) +
-  geom_abline(intercept = coef(reg_lagged)[1], slope = coef(reg_lagged)[2],
-              col = 'red') +
-  labs(x = "Lagged cases", y = "Deaths") +
-  ggtitle("Deaths vs cases lagged by 28 days with regression line")
-
+ggplot(train, aes(lagged_cases, deaths)) + 
+  geom_point(alpha = .5, color = primary, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, color = base) +
+  labs(x = "Cases", y = "Deaths 28 days later")
 ```
 
 # Evaluation
@@ -265,9 +268,7 @@ Fahrenheit or Celsius to measure temperature will lead to different MAPE)
 
 ## Comparing MAE and MAPE
 
-::: {.callout-important icon="false"}
-## Note
-
+::: {.callout-important}
 There are situations when MAPE is problematic!
 :::
 
@@ -275,28 +276,36 @@ There are situations when MAPE is problematic!
 ::: w-70
 
 ```{r mae-mape-example}
-#| fig-width: 10
-#| fig-height: 6
+#| out-width: "100%"
 set.seed(0)
-x = 1:50
-y = rpois(n = 50, lambda = c(rep(5, 25), 5 + exp(0:24 * 0.2)))
-yhat1 = c(rep(6.5, 25), 6.5 + exp(0:24 * 0.2))
-yhat2 = c(rep(5, 25), 5 + exp(0:24 * 0.18))
+fake_upswing <- tibble(
+  x = 1:50,
+  y = rpois(n = 50, lambda = c(rep(5, 25), 5 + exp(0:24 * 0.2))),
+  yhat1 = c(rep(6.5, 25), 6.5 + exp(0:24 * 0.2)),
+  yhat2 = c(rep(5, 25), 5 + exp(0:24 * 0.18))
+) 
 
-plot(x, y, xlab = '')
-lines(x, yhat1, col = 2)
-lines(x, yhat2, col = 4)
-legend("topleft", c("yhat1", "yhat2"), lty = 1, col = c(2, 4))
+fake_upswing |>
+  pivot_longer(starts_with("yhat")) |>
+  ggplot(aes(x)) +
+  geom_point(aes(y = y), color = tertiary, shape = 16) +
+  geom_line(aes(y = value, color = name)) +
+  scale_color_delphi(name = "") +
+  theme(legend.position = "inside", legend.position.inside = c(.1, .9),
+        legend.background = element_blank())
 ```
 
 :::
 
-::: {.w-30 .align-end}
+::: {.w-30}
 
 ```{r mae-mape-error}
-data.frame("MAE"= c(mean(abs(y - yhat1)), mean(abs(y - yhat2))), 
-           "MAPE" = c(mean(abs(y - yhat1) / y), mean(abs(y - yhat2) / y)) * 100, 
-           row.names = c('yhat1', 'yhat2'))
+with(fake_upswing,
+     data.frame("MAE"= c(mean(abs(y - yhat1)), mean(abs(y - yhat2))), 
+                "MAPE" = c(mean(abs(y - yhat1) / y), mean(abs(y - yhat2) / y)) * 100, 
+                row.names = c('yhat1', 'yhat2')) 
+) |>
+  knitr::kable(digits = 3)
 ```
 
 :::
@@ -323,27 +332,32 @@ which always predicts the last observation.
 ## Comparing MAE, MAPE and MASE
 
 ::: flex
-::: w-65
+::: w-70
 
 ```{r mae-mape-mase-example}
-#| fig-width: 10
-#| fig-height: 7
-#| fig-align: 'left'
-plot(x, y, xlab = '')
-lines(x, yhat1, col = 2)
-lines(x, yhat2, col = 4)
-legend("topleft", c("yhat1", "yhat2"), lty = 1, col = c(2, 4))
+#| out-width: "100%"
+fake_upswing |>
+  pivot_longer(starts_with("yhat")) |>
+  ggplot(aes(x)) +
+  geom_point(aes(y = y), color = tertiary, shape = 16) +
+  geom_line(aes(y = value, color = name)) +
+  scale_color_delphi(name = "") +
+  theme(legend.position = "inside", legend.position.inside = c(.1, .9),
+        legend.background = element_blank())
 ```
 :::
 
 ::: w-35
 
 ```{r mae-mape-mase-error}
-data.frame("MAE"= c(mean(abs(y - yhat1)), mean(abs(y - yhat2))), 
-           "MAPE" = c(mean(abs(y - yhat1) / y), mean(abs(y - yhat2) / y)) * 100, 
-           "MASE" = c(mean(abs(y - yhat1)), 
-                      mean(abs(y - yhat2))) / mean(abs(diff(y))) * 100,
-           row.names = c('yhat1', 'yhat2'))
+with(fake_upswing, data.frame(
+  "MAE" = c(mean(abs(y - yhat1)), mean(abs(y - yhat2))), 
+  "MAPE" = c(mean(abs(y - yhat1) / y), mean(abs(y - yhat2) / y)) * 100, 
+  "MASE" = c(mean(abs(y - yhat1)), 
+             mean(abs(y - yhat2))) / mean(abs(diff(y))) * 100,
+  row.names = c('yhat1', 'yhat2'))
+) |>
+  knitr::kable(digits = 3)
 ```
 
 :::
@@ -402,27 +416,30 @@ pred_train <- predict(reg_lagged)
 ```
 
 ```{r plot-train-predictions}
-#| fig-align: left
+#| fig-width: 7
 ca |>
   mutate(observed = deaths, 
          predicted = c(rep(NA, k), pred_train, rep(NA, nrow(test)))) |>
   pivot_longer(cols = c(predicted, observed), names_to = 'Deaths') |>
   ggplot(aes(time_value, value, col = Deaths)) + 
-  geom_line(aes(alpha = ifelse(time_value < t0_date, 1, .5))) + 
+  geom_line(aes(alpha = ifelse(time_value < t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    
   labs(x = "", y = "Deaths per 100k people") + 
-  theme(legend.position = "bottom", legend.title = element_blank()) +
+  theme(legend.title = element_blank()) +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  scale_color_delphi() +
   scale_alpha_identity()
-
 ```
 
 ```{r function errors}
 getErrors <- function(truth, prediction, type) {
-  return(data.frame(#"MSE" = MSE(truth, prediction), 
-                    "MAE"= MAE(truth, prediction), 
-                    #"MAPE" = MAPE(truth, prediction), 
-                    "MASE" = MASE(truth, prediction), 
-                    row.names = type))
+  data.frame(
+    #"MSE" = MSE(truth, prediction), 
+    "MAE"= MAE(truth, prediction), 
+    #"MAPE" = MAPE(truth, prediction), 
+    "MASE" = MASE(truth, prediction), 
+    row.names = type
+  )
 }
 ```
 
@@ -480,18 +497,20 @@ pred_test <- predict(reg_lagged, newdata = test_h)
 ```
 
 ```{r plot-test-predictions}
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(observed = deaths, predicted = c(rep(NA, h), pred_train, 
                                           rep(NA, h-1), pred_test)) |>
   pivot_longer(cols = c(predicted, observed), names_to = 'Deaths') |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_alpha_identity() +
+  scale_color_delphi()
 ```
 
 
@@ -518,22 +537,23 @@ the two [changes]{.primary} over time.
 
 
 ```{r plot-ca-cases-deaths-again}
+#| fig-width: 7
 ggplot(ca |> 
          mutate(deaths = trans21(deaths)) |>
          pivot_longer(cols = c(cases, deaths), names_to = 'name'),
        aes(x = time_value, y = value)) + 
-  geom_line(aes(color = name)) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + h, lty = 2) +
-  scale_color_manual(values = palette()[c(2,4)]) +
+  geom_line(aes(color = name), key_glyph = "timeseries") +
+  scale_color_delphi() +
   scale_y_continuous(
-    name = "Covid-19 cases per 100k people", 
+    expand = expansion(c(0, 0.05)),
+    name = "Incident cases per 100k people",
     limits = range1,
     sec.axis = sec_axis(
       trans = trans12, 
-      name = "Deaths per 100k people")) +
-  labs(title = "Covid-19 cases and deaths in California", x = "") +
-  theme(legend.position = "bottom", legend.title = element_blank()) 
+      name = "Incident deaths per 100k people")) +
+  labs(x = "Date") +
+  theme(legend.title = element_blank(),
+        axis.title = element_text(size = 10)) 
 ```
 
 
@@ -587,18 +607,20 @@ With the current model, we can only predict $k$ days ahead (where $k$ = number o
 #### Linear regression of COVID deaths on lagged cases
 
 ```{r plot-cv-predictions}
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(observed = deaths, 
          `predicted (CV)` = pred_all_past) |>
   pivot_longer(cols = c(observed, `predicted (CV)`), names_to = 'Deaths') |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5))) +
+  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") +
   geom_vline(xintercept = t0_date) +   
   geom_vline(xintercept = t0_date + h, lty = 2) +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_alpha_identity() +
+  scale_color_delphi()
 ```
 
 ```{r cv-error}
@@ -676,7 +698,7 @@ for (t in t0:(n-h)) {
 #### Linear regression of COVID deaths on lagged cases
 
 ```{r plot-cv-predictions-trailing}
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(observed = deaths, 
          `predicted (CV)` = pred_all_past, 
@@ -684,12 +706,14 @@ ca |>
   pivot_longer(cols = c(observed, `predicted (CV)`, `predicted (trailing + CV)`), 
                names_to = 'Deaths') |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-    scale_alpha_identity()
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.title = element_blank()) +
+  scale_alpha_identity() +
+  scale_color_delphi()
 ```
 
 
@@ -766,8 +790,9 @@ ca |>
          predicted = c(rep(NA, k), pred_train, pred_test)) |>
   pivot_longer(cols = c(predicted, observed), names_to = 'Deaths') |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line() + 
-  geom_vline(xintercept = t0_date) +    geom_vline(xintercept = t0_date + h, lty = 2) +
+  geom_line(key_glyph = "timeseries") + 
+  geom_vline(xintercept = t0_date) +    
+  geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
   theme(legend.position = "bottom", legend.title = element_blank())
 ```
@@ -801,7 +826,7 @@ for (t in t0:(n-h)) {
 ```
 
 ```{r arx-lm-plot-cv-predictions}
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(observed = deaths, 
          `lm on lagged cases` = pred_trailing, 
@@ -810,20 +835,22 @@ ca |>
   mutate(Deaths = factor(Deaths, 
                          levels = c("observed", "lm on lagged cases", "ARX(1)"))) |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_alpha_identity() +
+  scale_color_delphi()
 ```
 
 
 ```{r arx-cv-error}
-rbind(getErrors(test_h$deaths, pred_arx1[!is.na(pred_arx1)],
-                "ARX(1)"),
-      getErrors(test_h$deaths, pred_trailing[!is.na(pred_trailing)],
-                "lm on lagged cases"))
+rbind(
+  getErrors(test_h$deaths, pred_arx1[!is.na(pred_arx1)], "ARX(1)"),
+  getErrors(test_h$deaths, pred_trailing[!is.na(pred_trailing)], "lm on lagged cases")
+)
 ```
 
 ::: {.notes}
@@ -835,7 +862,7 @@ Errors under both metrics are smaller than with previous model.
 Regression on a trailing window can be quite sensitive to data issues.
 
 ```{r warning-cv-predictions}
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(`observed deaths` = deaths, 
          `observed cases` = cases / 200,
@@ -844,14 +871,18 @@ ca |>
   mutate(name = factor(name, 
                        levels = c("observed deaths", "observed cases", "ARX(1)"))) |>  
   ggplot(aes(time_value, value)) +
-  geom_line(aes(alpha = ifelse(time_value > as.Date("2021-09-13")-2*h-w &
-                                 time_value < as.Date("2021-09-13") &
-                                 name != "ARX(1)", 1, .5), col = name)) + 
+  geom_line(aes(
+    alpha = ifelse(time_value > as.Date("2021-09-13")-2*h-w &
+                     time_value < as.Date("2021-09-13") &
+                     name != "ARX(1)", 1, .5), col = name), 
+    key_glyph = "timeseries") + 
   geom_point(aes(x = as.Date("2021-09-13"), y = 0), size = 1, shape = 3, col = 'darkblue') + 
-  geom_vline(xintercept = as.Date("2021-09-13")-2*h-w, lty = 3, col = 'darkred') +  
-  geom_vline(xintercept = as.Date("2021-09-13")-h, lty = 3, col = 'darkred') +  
+  geom_vline(xintercept = as.Date("2021-09-13")-2*h-w, lty = 3) +  
+  geom_vline(xintercept = as.Date("2021-09-13")-h, lty = 3) +  
   labs(x = "", y = "") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
+  theme(legend.title = element_blank()) +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  scale_color_delphi() +
   scale_alpha_identity()
 ```
 
@@ -946,19 +977,19 @@ for (t in forecast_time) {
 ## Predictions for different $h$, `lm` on lagged cases
 
 ```{r plot-m1}
-#| fig-width: 10
-#| fig-height: 5
-#| fig-align: left
+#| fig-width: 8
+#| fig-height: 4.5
 pred_m1 |>
   ggplot(aes(target_date, prediction, group = forecast_date)) +
   geom_line(data = ca_lags, aes(x = time_value, y = deaths), 
-            inherit.aes = FALSE, col = 'gray50') + 
-  geom_line(col = 'blue') +
-  geom_point(col = 'blue') +
+            inherit.aes = FALSE, col = base) + 
+  geom_line(col = primary) +
+  geom_point(col = primary) +
   geom_vline(xintercept = ca_lags$time_value[forecast_time], 
              lty = 2, col = 'gray50') +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank())
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.title = element_blank())
 ```
 
 ```{r m1-error}
@@ -969,19 +1000,19 @@ getErrors((ca |> filter(time_value %in% pred_m1$target_date))$deaths,
 ## Predictions for different $h$, ARX(1)
 
 ```{r plot-m2}
-#| fig-width: 10
-#| fig-height: 5
-#| fig-align: left
+#| fig-width: 8
+#| fig-height: 4.5
 pred_m2 |>
   ggplot(aes(target_date, prediction, group = forecast_date)) +
   geom_line(data = ca_lags, aes(x = time_value, y = deaths), 
-            inherit.aes = FALSE, col = 'gray50') + 
-  geom_line(col = 'red') +
-  geom_point(col = 'red') +
+            inherit.aes = FALSE, col = base) + 
+  geom_line(col = secondary) +
+  geom_point(col = secondary) +
   geom_vline(xintercept = ca_lags$time_value[forecast_time], 
              lty = 2, col = 'gray50') +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank())
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.title = element_blank())
 ```
 
 ```{r m2-error}
@@ -1027,9 +1058,8 @@ for (t in sundays) {
 ```
 
 ```{r plot-by-h}
-#| fig-width: 10
-#| fig-height: 5
-#| fig-align: left
+#| fig-width: 8
+#| fig-height: 4.5
 ca_lags |> 
   ggplot() +
   geom_line(aes(x = time_value, y = deaths), col = 'gray50', alpha = .6) +
@@ -1040,7 +1070,7 @@ ca_lags |>
   geom_vline(xintercept = ca_lags$time_value[sundays[1]]) +
   labs(x = "", y = "Deaths per 100k people") +
   scale_colour_viridis_d(option = "inferno", end = .8) +
-  theme(legend.position = "bottom")
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 # Overfitting and Regularization
@@ -1098,7 +1128,7 @@ for (t in t0:(n-h)) {
 ## Time-Series CV (trailing): ARX(1), ARX(2), and ARX(3) 
 
 ```{r arx-2-and-3-plot-cv-predictions}
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(observed = deaths, 
          `ARX(1)` = pred_arx1,
@@ -1109,13 +1139,15 @@ ca |>
   mutate(Deaths = factor(Deaths, 
                          levels = c("observed", "ARX(1)", "ARX(2)", "ARX(3)"))) |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
   geom_vline(xintercept = as.Date("2022-03-31")) +    
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_color_delphi() +
+  scale_alpha_identity() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 
@@ -1209,16 +1241,18 @@ pred_test <- predict(reg, newdata = X_test)   #get test predictions
 ```
 
 ```{r overfit-plot-train-test, eval=FALSE}
-#| fig-align: left
+#| fig-width: 6
 ca |> 
   mutate(observed = deaths, 
          predicted = c(rep(NA, max(lags)), pred_train, rep(NA, h-1), pred_test)) |>
   pivot_longer(cols = c(predicted, observed), names_to = 'Deaths') |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line() + 
-  geom_vline(xintercept = t0_date) +    geom_vline(xintercept = t0_date + h, lty = 2) +
+  geom_line(key_glyph = "timeseries") + 
+  geom_vline(xintercept = t0_date) +
+  geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank())
+  theme(legend.title = element_blank()) +
+  scale_color_delphi()
 
 ```
 
@@ -1230,17 +1264,19 @@ errors
 
 
 ```{r overfit-plot-train-test-trunc}
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(observed = deaths, 
          predicted = c(rep(NA, max(lags)), pred_train, rep(NA, h-1), pmax(0, pred_test))) |>
   pivot_longer(cols = c(predicted, observed), names_to = 'Deaths') |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line() + 
-  geom_vline(xintercept = t0_date) +    geom_vline(xintercept = t0_date + h, lty = 2) +
+  geom_line(key_glyph = "timeseries") + 
+  geom_vline(xintercept = t0_date) +
+  geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank())
-
+  theme(legend.title = element_blank()) +
+  scale_color_delphi() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 ```{r overfit-train-test-error-trunc}
@@ -1358,7 +1394,7 @@ data.frame('x'= 1:nrow(beta_lasso),
 
 ```{r shrinkage-sparsity, eval=FALSE}
 ## Predictions: ARX + ridge/lasso (train and test set)
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(observed = deaths, 
          `predicted (ridge)` = c(rep(NA, 42), pred_train_ridge, 
@@ -1368,10 +1404,13 @@ ca |>
   pivot_longer(cols = c(observed, `predicted (ridge)`, 
                         `predicted (lasso)`), names_to = 'Deaths') |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line() + 
-  geom_vline(xintercept = t0_date) +    geom_vline(xintercept = t0_date + h, lty = 2) +
+  geom_line(key_glyph = "timeseries") + 
+  geom_vline(xintercept = t0_date) +
+  geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank())
+  theme(legend.title = element_blank()) +
+  scale_color_delphi() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 
@@ -1419,7 +1458,7 @@ for (t in t0:(n-h)) {
 ## Predictions: time-series CV (trailing) for ARX(1) + ridge/lasso 
 
 ```{r regularize-arx-1}
-#| fig-align: left
+#| fig-width: 7
 X_arx1 <- as_tibble(ca_lags) |> select(ends_with("_28"))
 X_arx1_train <- X_arx1[29:t0, ]
 y_arx1_train <- y[29:t0]
@@ -1472,13 +1511,15 @@ ca |>
   mutate(Deaths = factor(Deaths, levels = c("observed", "ARX(1)",
                                             "ARX(1) + ridge", "ARX(1) + lasso"))) |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
   ylim(0, max(pred_arx3, na.rm = T)) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_alpha_identity() +
+  scale_color_delphi() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 
 ```
 
@@ -1492,7 +1533,7 @@ rbind(getErrors(y_test, pred_arx1[!is.na(pred_arx1)], "ARX(1)"),
 ## Predictions: time-series CV (trailing) for ARX(2) + ridge/lasso 
 
 ```{r regularize-arx-2}
-#| fig-align: left
+#| fig-width: 7
 X_arx2 <- as_tibble(ca_lags) |> select(ends_with("_28"), ends_with("_35"))
 X_arx2_train <- X_arx2[36:t0, ]
 y_arx2_train <- y[36:t0]
@@ -1545,14 +1586,15 @@ ca |>
   mutate(Deaths = factor(Deaths, levels = c("observed", "ARX(2)",
                                             "ARX(2) + ridge", "ARX(2) + lasso"))) |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
   ylim(0, max(pred_arx3, na.rm = T)) +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
-
+  theme(legend.title = element_blank()) +
+  scale_color_delphi() +
+  scale_alpha_identity() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 ```{r errors-arx2-regularized}
@@ -1566,7 +1608,7 @@ rbind(getErrors(y_test, pred_arx2[!is.na(pred_arx2)], "ARX(2)"),
 ## Predictions: time-series CV (trailing) for ARX(3) + ridge/lasso 
 
 ```{r plot-arx3-regularization-cv}
-#| fig-align: left
+#| fig-width: 7
 ca |> 
   mutate(observed = deaths, 
          `ARX(3)` = pred_arx3,
@@ -1578,13 +1620,15 @@ ca |>
   mutate(Deaths = factor(Deaths, levels = c("observed", "ARX(1)", "ARX(3)",
                                             "ARX(3) + ridge", "ARX(3) + lasso"))) |>
   ggplot(aes(time_value, value, col = Deaths)) +
-  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_line(aes(alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
   ylim(0, max(pred_arx3, na.rm = T)) +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_color_delphi() +
+  scale_alpha_identity() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 
@@ -1654,6 +1698,7 @@ head(pred_test_ci)
 
 
 ```{r plot-arx-intervals, eval=FALSE}
+#| fig-width: 6
 ca |> 
   mutate(observed = deaths, 
          predicted = c(rep(NA, nrow(train)), pred_test_ci[, 1]), 
@@ -1661,12 +1706,15 @@ ca |>
          upper = c(rep(NA, nrow(train)), pred_test_ci[, 3])) |>
   pivot_longer(cols = c(predicted, observed), names_to = 'Deaths') |>
   ggplot(aes(time_value, value)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = "#00BFC4") +
-  geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5))) + 
-  geom_vline(xintercept = t0_date) +    geom_vline(xintercept = t0_date + h, lty = 2) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = primary) +
+  geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
+  geom_vline(xintercept = t0_date) +
+  geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_color_delphi() +
+  scale_alpha_identity() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 ## Prediction intervals for ARX (CV, trailing window)
@@ -1691,6 +1739,7 @@ for (t in t0:(n-h)) {
 ## Prediction intervals for ARX (CV, trailing window)
 
 ```{r plot arx-intervals-cv-trailing}
+#| fig-width: 7
 lm_pred_trailing <- cbind(ca, pred_trailing)
 
 lm_pred_trailing |>
@@ -1699,12 +1748,15 @@ lm_pred_trailing |>
   pivot_longer(cols = c(observed, `predicted (CV + trailing)`), 
                names_to = 'Deaths') |>
   ggplot(aes(time_value, value)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = "#00BFC4") +
-  geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5))) + 
-  geom_vline(xintercept = t0_date) +    geom_vline(xintercept = t0_date + h, lty = 2) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = primary) +
+  geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
+  geom_vline(xintercept = t0_date) +
+  geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-    scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_color_delphi() +
+  scale_alpha_identity() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 ```{r lm-errors-arx}
@@ -1748,7 +1800,7 @@ coefs_sorted
 
 
 ```{r q-reg-training, eval=FALSE}
-# Predict on test set
+#| fig-width: 7
 pred_test <- predict(q_reg, newdata = test)
 
 ca |> 
@@ -1758,12 +1810,14 @@ ca |>
          upper = c(rep(NA, nrow(train)), pred_test[, 3]))|>
   pivot_longer(cols = c(predicted, observed), names_to = 'Deaths') |>
   ggplot(aes(time_value, value)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = "#00BFC4") +
-  geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = primary) +
+  geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) +
+  scale_color_delphi() +
+  scale_alpha_identity() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 ## Predictions via quantile regression (CV, trailing)
@@ -1792,6 +1846,7 @@ for (t in t0:(n-h)) {
 ## Predictions via quantile regression (CV, trailing)
 
 ```{r q-reg-plot-cv-predictions-trailing}
+#| fig-width: 7
 rq_pred_trailing <- cbind(ca, pred_trailing)
 
 rq_pred_trailing |>
@@ -1800,12 +1855,14 @@ rq_pred_trailing |>
   pivot_longer(cols = c(`predicted (CV + trailing)`, observed), 
                names_to = 'Deaths') |>
   ggplot(aes(time_value, value)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = "#00BFC4") +
-  geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5))) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = primary) +
+  geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5)), key_glyph = "timeseries") + 
   geom_vline(xintercept = t0_date) +    geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank()) + 
-  scale_alpha_identity()
+  theme(legend.title = element_blank()) + 
+  scale_color_delphi() +
+  scale_alpha_identity() +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 ```{r qr-errors-arx}

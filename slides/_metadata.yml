@@ -17,6 +17,7 @@ format:
     link-external-icon: true
     link-external-newwindow: true
     code-overflow: wrap
+    code-block-height: 800px
     lang: en-CA
     footer: "{{< meta talk-short-title >}} --- {{< meta repo-address >}}"
 
