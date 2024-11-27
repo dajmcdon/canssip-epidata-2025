@@ -1877,12 +1877,13 @@ about 80\% of the times. Is this actually true in practice?
 * The actual coverage of each predictive interval is lower:
 
 ```{r lm-coverage-all-past}
-data.frame("lm trailing" = mean(ca$deaths >= lm_pred_trailing$lower & 
-                                  ca$deaths <= lm_pred_trailing$upper, na.rm = T), 
-           "rq trailing" = mean(ca$deaths >= rq_pred_trailing$lower & 
-                                  ca$deaths <= rq_pred_trailing$upper, na.rm = T), 
-           row.names = 'Coverage')
-
+data.frame(
+  "lm trailing" = mean(ca$deaths >= lm_pred_trailing$lower & 
+                         ca$deaths <= lm_pred_trailing$upper, na.rm = T), 
+  "rq trailing" = mean(ca$deaths >= rq_pred_trailing$lower & 
+                         ca$deaths <= rq_pred_trailing$upper, na.rm = T), 
+  row.names = 'Coverage'
+)
 ```
 
 
@@ -1942,7 +1943,6 @@ lm_pred_trailing |>
     mutate(wis = WIS(deaths, c(lower, median, upper), quantiles)) |>
     ungroup() |>
     summarise(`Mean WIS rq` = mean(wis, na.rm = T)))
-
 ```
 
 
@@ -2061,14 +2061,16 @@ pred_aware <- pred_aware |>
 
 
 ```{r plot-versioned-cv-trailing}
+#| fig-width: 7
 pred_aware |>
   ggplot(aes(x = target_date)) +
-  geom_line(aes(y = deaths), col = 'gray50') + 
-  geom_point(aes(y = median), col = 'blue') +
-  geom_linerange(aes(ymin = lower, ymax = upper), col = 'blue', alpha = .6) +
   geom_vline(xintercept = fc_time_values, lty = 2, col = 'gray50') +
+  geom_line(aes(y = deaths), col = 'gray50') + 
+  geom_linerange(aes(ymin = pmax(lower, 0), ymax = upper), col = primary) +
+  geom_point(aes(y = median), col = primary) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank())
+  theme(legend.title = element_blank()) +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 
@@ -2161,6 +2163,7 @@ for (fc_date in fc_time_values) {
 ## Geo-pooled predictions for California
 
 ```{r plot-geo-pooling}
+#| fig-width: 7
 # geo-pooled predictions for California
 pred_ca <- pred_geo_pool |>
   filter(geo_value == 'ca') |>
@@ -2172,12 +2175,13 @@ pred_ca <- pred_geo_pool |>
 
 pred_ca |>
   ggplot(aes(x = target_date)) +
-  geom_line(aes(y = deaths), col = 'gray50') + 
-  geom_point(aes(y = median), col = 'purple') +
-  geom_linerange(aes(ymin = lower, ymax = upper), col = 'purple', alpha = .6) +
   geom_vline(aes(xintercept = forecast_date), lty = 2, col = 'gray50') +
+  geom_line(aes(y = deaths), col = 'gray50') + 
+  geom_point(aes(y = median), col = secondary) +
+  geom_linerange(aes(ymin = pmax(lower, 0), ymax = upper), col = secondary) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank())
+  theme(legend.title = element_blank()) +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
 ```{r geo-pool-cv-errors}
@@ -2257,6 +2261,7 @@ for (fc_date in fc_time_values) {
 ## Partially geo-pooled predictions for California
 
 ```{r plot-partial-geo-pooling}
+#| fig-width: 7
 # partially geo-pooled predictions for California
 pred_ca_partial <- pred_geo_pool_partial |>
   filter(geo_value == 'ca') |>
@@ -2268,12 +2273,13 @@ pred_ca_partial <- pred_geo_pool_partial |>
 
 pred_ca_partial |>
   ggplot(aes(x = target_date)) +
-  geom_line(aes(y = deaths), col = 'gray50') + 
-  geom_point(aes(y = median), col = 'darkgreen') +
-  geom_linerange(aes(ymin = lower, ymax = upper), col = 'darkgreen', alpha = .6) +
   geom_vline(aes(xintercept = forecast_date), lty = 2, col = 'gray50') +
+  geom_line(aes(y = deaths), col = 'gray50') + 
+  geom_point(aes(y = median), col = tertiary) +
+  geom_linerange(aes(ymin = pmax(lower, 0), ymax = upper), col = tertiary) +
   labs(x = "", y = "Deaths per 100k people") +
-  theme(legend.position = "bottom", legend.title = element_blank())
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.title = element_blank())
 ```
 
 ```{r partial-geo-pool-cv-errors}
