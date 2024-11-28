@@ -2,8 +2,6 @@
 talk-title: "Signal Discovery, Data Fetching, & Panel Data"
 talk-short-title: "Panel Data"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
-author: "Ailce Cima, Rachel Lobay, Daniel McDonald, Ryan Tibshirani"
-repo-address: "cmu-delphi/insightnet-workshop-2024"
 talk-date: "11 December -- Morning"
 format: revealjs
 ---
@@ -21,7 +19,6 @@ library(epidatr)
 ggplot2::theme_set(ggplot2::theme_bw())
 ```
 
-```
 
 ## Outline
 

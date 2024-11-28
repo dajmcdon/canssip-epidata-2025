@@ -2,8 +2,6 @@
 talk-title: "Data Cleaning, Versioning, and Nowcasting"
 talk-short-title: "Nowcasting"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
-author: "Ailce Cima, Rachel Lobay, Daniel McDonald, Ryan Tibshirani"
-repo-address: "cmu-delphi/insightnet-workshop-2024"
 talk-date: "11 December -- Afternoon"
 format: revealjs
 ---
@@ -723,7 +721,7 @@ Represents a [snapshot]{.primary} that
 contains the most [up-to-date values]{.primary} of the signal variables, [as of]{.primary} a given time.
 :::
 
-# `epi_df`: Snapshot of a dataset
+## `epi_df`: Snapshot of a dataset
 
 * Consider the same dataset we just encountered on JHU daily COVID-19 cases and deaths rates from all states [as of]{.primary} May 31, 2022.
 
