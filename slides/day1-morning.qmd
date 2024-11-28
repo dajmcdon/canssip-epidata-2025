@@ -10,16 +10,17 @@ format: revealjs
 
 {{< include _titleslide.qmd >}}
 
-
-
-
 ```{r theme-load-pkg}
+#| cache: false
 library(tidymodels)
 library(gridExtra)
 library(grid)
 library(epidatasets)
 library(epipredict)
 library(epidatr)
+ggplot2::theme_set(ggplot2::theme_bw())
+```
+
 ```
 
 ## Outline
