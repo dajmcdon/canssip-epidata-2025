@@ -2,8 +2,6 @@
 talk-title: "Forecasting with `{epipredict}`"
 talk-short-title: "Forecasting"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
-author: "Ailce Cima, Rachel Lobay, Daniel McDonald, Ryan Tibshirani"
-repo-address: "cmu-delphi/insightnet-workshop-2024"
 talk-date: "12 December -- Afternoon"
 format: revealjs
 ---
@@ -26,6 +24,8 @@ format: revealjs
 1. Forecasting with Versioned Data
 
 1. Building a Forecaster
+
+1. A Flu Forecaster
 
 # `{epipredict}` 
 
@@ -72,9 +72,9 @@ Basic and easy to use ["canned" forecasters]{.primary}:
   
   
 
-# Preprocessing
+# Pre-processing
 
-## Examples of preprocessing{.smaller}
+## Examples of pre-processing{.smaller}
 
 ::: {.fragment .fade-in-then-semi-out}
 
@@ -152,6 +152,7 @@ df <- left_join(
            deaths = deaths / pop * 1e5) |> 
     select(-pop)
 ```
+
 
 ## Scaled COVID cases and deaths 
 
@@ -303,11 +304,11 @@ epi_arx$epi_workflow
 
 Contains information on 
 
-* [Preprocessing]{.primary} steps automatically performed by `arx_forecaster` (e.g. compute lags of the predictors)
+* [Pre-processing]{.primary} steps automatically performed by `arx_forecaster` (e.g. compute lags of the predictors)
 
 * [Fitted model]{.primary} 
 
-* [Postprocessing]{.primary} steps automatically performed by `arx_forecaster` (e.g. compute quantiles)
+* [Post-processing]{.primary} steps automatically performed by `arx_forecaster` (e.g. compute quantiles)
 
 ## Extract predictions
 
@@ -576,9 +577,9 @@ arx_args_list(
 
 ## Modifying the ARX forecaster
 
-### Add hospitalizations as a predictor
+### Change predictors: hospitalizations instead of cases
 
-```{r get-fb-data}
+```{r get-hhs-data}
 #| echo: true
 hhs <- pub_covidcast(
   source = "hhs",
@@ -597,7 +598,7 @@ ca_extend <- df_extend |> filter(geo_value == "ca")
 
 ## Modifying the ARX forecaster
 
-### Add hospitalizations as a predictor
+### Change predictors: hospitalizations instead of cases
 
 ```{r arx-with-hospital}
 #| echo: true
@@ -611,7 +612,7 @@ pred_arx_hosp <- ca_extend |>
   epi_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("cases", "deaths", "hospitalizations"), 
+                     predictors = c("deaths", "hospitalizations"), 
                      trainer = linear_reg() |> set_engine("lm"),
                      args_list = arx_args_list(lags = 0, ahead = 28,
                                                quantile_levels = c(0.1, 0.9))
@@ -622,7 +623,7 @@ pred_arx_hosp <- ca_extend |>
 )
 ```
 
-## Predictions (hospitalizations added as a predictor)
+## Predictions (hospitalizations instead of cases in predictor set)
 
 ```{r arx-with-hospital-plot}
 #| fig-align: left
@@ -644,7 +645,7 @@ ca_extend |>
 
 ```{r error-arx-with-hospital}
 getErrors((ca_extend |> filter(time_value %in% pred_arx_hosp$target_date))$deaths,
-          pred_arx_hosp$.pred, "time series CV + trailing")
+          pred_arx_hosp$.pred, "")
 ```
 
 
@@ -654,18 +655,15 @@ getErrors((ca_extend |> filter(time_value %in% pred_arx_hosp$target_date))$death
 
 ```{r arx-with-more-lags}
 #| echo: true
-#| code-line-numbers: "8-11"
+#| code-line-numbers: "8"
 pred_arx_more_lags <- ca_extend |>
   epi_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("cases", "deaths", "hospitalizations"), 
+                     predictors = c("deaths", "hospitalizations"), 
                      trainer = linear_reg() |> set_engine("lm"),
                      args_list = arx_args_list(
-                       lags = list(
-                         cases = c(0:4, 7, 14), 
-                         deaths = c(0, 7, 14), 
-                         hospitalizations = c(0:7, 14)),
+                       lags = c(0, 7, 14),
                        ahead = 28,
                        quantile_levels = c(0.1, 0.9))
                      )$predictions |>
@@ -697,7 +695,7 @@ ca_extend |>
 
 ```{r error-arx-more-lags}
 getErrors((ca_extend |> filter(time_value %in% pred_arx_more_lags$target_date))$deaths,
-          pred_arx_more_lags$.pred, "time series CV + trailing")
+          pred_arx_more_lags$.pred, "")
 ```
 
 
@@ -712,12 +710,11 @@ pred_arx_rf <- ca_extend |>
   epi_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("cases", "deaths", "hospitalizations"), 
+                     predictors = c("deaths", "hospitalizations"), 
                      trainer = parsnip::rand_forest(mode = "regression"),
-                     args_list = arx_args_list(lags = list(
-                       cases = c(0:4, 7, 14), 
-                       deaths = c(0, 7, 14), 
-                       hospitalizations = c(0:7, 14)),
+                     args_list = arx_args_list(
+                       lags = 0, 
+                       #lags = c(0, 7, 14),  # worse predictions
                        ahead = 28,
                        quantile_levels = c(0.1, 0.9))
                      )$predictions |>
@@ -750,7 +747,7 @@ ca_extend |>
 
 ```{r error-arx-random-forests}
 getErrors((ca_extend |> filter(time_value %in% pred_arx_rf$target_date))$deaths,
-          pred_arx_rf$.pred, "time series CV + trailing")
+          pred_arx_rf$.pred, "")
 ```
 
 
@@ -760,12 +757,14 @@ getErrors((ca_extend |> filter(time_value %in% pred_arx_rf$target_date))$deaths,
 
 ```{r arx-geo-pooling, eval=FALSE}
 #| echo: true
-#| code-line-numbers: "6"
+#| code-line-numbers: "1"
 pred_arx_geo_pool <- df_extend |>
+  filter(time_value > as.Date("2020-06-01") & 
+           !geo_value %in% c("as", "gu", "mp")) |>
   epi_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("cases", "deaths", "hospitalizations"), 
+                     predictors = c("deaths", "hospitalizations"), 
                      trainer = linear_reg() |> set_engine("lm"),
                      args_list = arx_args_list(
                        lags = 0,
@@ -784,7 +783,8 @@ pred_arx_geo_pool <- df_extend |>
 ```{r arx-geo-pooling-plot, eval=FALSE}
 #| fig-align: left
 df_extend |> 
-  full_join(pred_arx_geo_pool |> select(!c(cases, deaths, time_value)), 
+  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+  left_join(pred_arx_geo_pool |> select(!c(cases, deaths, time_value)), 
             join_by(time_value == target_date, geo_value == geo_value)) |>
   mutate(observed = deaths, 
          predicted = .pred) |>
@@ -794,6 +794,7 @@ df_extend |>
   geom_line(aes(col = Deaths, alpha = ifelse(time_value > t0_date, 1, .5))) + 
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
+  facet_wrap(vars(geo_value)) +
   labs(x = "", y = "Deaths per 100k people") +
   theme(legend.position = "bottom", legend.title = element_blank()) +
   scale_alpha_identity()
@@ -802,15 +803,59 @@ df_extend |>
 
 ```{r error-arx-geo-pooling, eval=FALSE}
 getErrors((ca_extend |> filter(time_value %in% pred_arx_geo_pool$target_date))$deaths,
-          pred_arx_geo_pool$.pred, "time series CV + trailing")
+          pred_arx_geo_pool$.pred, "")
 ```
 
 
 
 ## Modifying the ARX forecaster
 
-### Multiple horizon
+### Multiple horizons
 
+```{r arx-multiple-h}
+#| echo: true
+#| code-line-numbers: "1-2,11,18|19-20"
+fc_time_values <- seq(from = t0_date, to = as.Date("2023-02-01"), by = "1 month")
+pred_h_days_ahead <- function(epi_df, ahead = 7) {
+  epi_df |>
+    epi_slide(
+      ~ arx_forecaster(epi_data = .x,
+                       outcome = "deaths", 
+                       predictors = c("deaths", "hospitalizations"), 
+                       trainer = linear_reg() |> set_engine("lm"),
+                       args_list = arx_args_list(
+                         lags = 0,  
+                         ahead = ahead,
+                         quantile_levels = c(0.1, 0.9))
+      )$predictions |> 
+        pivot_quantiles_wider(.pred_distn),
+  .window_size = w, 
+  .ref_time_values = fc_time_values
+  )
+}
+h <- c(7, 14, 21, 28)
+forecasts <- bind_rows(map(h, ~ pred_h_days_ahead(ca_extend, ahead = .x)))
+```
+
+## Predictions (multiple horizons)
+
+```{r arx-multiple-h-plot}
+#| fig-width: 10
+#| fig-height: 5
+ggplot(data = forecasts, aes(x = target_date, group = time_value)) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`, fill = factor(forecast_date)), 
+              alpha = 0.4) +
+  geom_vline(aes(xintercept = forecast_date, color = factor(forecast_date)), 
+             lty = 2) +
+  geom_line(data = ca_extend,
+    aes(x = time_value, y = deaths),
+    inherit.aes = FALSE, na.rm = TRUE, alpha = .5
+  ) +
+  geom_line(aes(y = .pred, color = factor(forecast_date))) +
+  geom_point(aes(y = .pred, color = factor(forecast_date))) +
+  labs(x = "", y = "Deaths per 100k people") +
+  theme(legend.position = "none")
+```
 
 
 # Forecasting with Versioned Data
@@ -945,14 +990,13 @@ to automatically perform [more pre-processing]{.primary}, [training]{.primary}, 
 
 
 ::: {.callout-important icon="false"}
-## 
-What if we want more direct control on each single step?
+## What if we want more direct control on each single step?
 
 :::
 
 ## Fit a forecaster from scratch
 
-```{r}
+```{r forecaster-from-scratch}
 #| echo: true
 #| eval: false
 #| code-line-numbers: "1-6|8-9|11-16|18-20|21-29"
@@ -966,7 +1010,7 @@ r <- epi_recipe(ca) |>
 # Training engine
 e <- quantile_reg(quantile_levels = c(.1, .5, .9))
 
-# A postprocessing routine describing what to do to the predictions
+# A post-processing routine describing what to do to the predictions
 f <- frosting() |>
   layer_predict() |>
   layer_threshold(.pred, lower = 0) |> # predictions / intervals should be non-negative
@@ -988,3 +1032,76 @@ preds <- trained_ewf |> predict(new_data = latest)
 ```
 
 
+# A Flu Forecaster
+
+## Get the data
+
+```{r get-flu-data}
+#| echo: true
+flu <- pub_covidcast(
+  source = "hhs",
+  signals = "confirmed_admissions_influenza_1d_prop",
+  time_type = "day",
+  geo_type = "state",
+  time_values = epirange(20200101, 20241231)
+  #issues = epirange(20200101, 20241231)
+) |> 
+  select(geo_value, time_value, hosp = value) |>
+  as_epi_df()
+
+```
+
+## Build forecaster
+
+```{r forecaster-flu}
+#| echo: true
+# A preprocessing "recipe" that turns raw data into features / response
+r <- epi_recipe(flu) |>
+  #drop_non_seasons() |>
+  step_population_scaling(
+    hosp,
+    df = epidatasets::state_census,
+    df_pop_col = "pop",
+    create_new = FALSE,
+    rate_rescaling = 1e5,
+    by = c("geo_value" = "abbr")) |>
+  step_epi_lag(hosp, lag = c(0, 7, 14)) |>
+  step_epi_ahead(hosp, ahead = 14) |>
+  step_epi_naomit()
+
+# Training engine
+e <- quantile_reg(quantile_levels = c(0.01, 0.025, 1:19 / 20, 0.975, 0.99)) # 23 ForecastHub quantiles
+
+# A post-processing routine describing what to do to the predictions
+f <- frosting() |>
+  layer_predict() |>
+  layer_threshold(.pred, lower = 0) |> # predictions / intervals should be non-negative
+  layer_population_scaling(
+    .pred, 
+    df = epidatasets::state_census,
+    df_pop_col = "pop",
+    create_new = FALSE,
+    rate_rescaling = 1e5,
+    by = c("geo_value" = "abbr")) |>
+  layer_add_target_date() |>
+  layer_add_forecast_date()
+
+# Bundle up the preprocessor, training engine, and postprocessor
+# We use quantile regression
+ewf <- epi_workflow(r, e, f)
+
+# Fit it to data (we could fit this to ANY data that has the same format)
+trained_ewf <- ewf |> fit(flu)
+
+# examines the recipe to determine what we need to make the prediction
+latest <- get_test_data(r, flu)
+
+# we could make predictions using the same model on ANY test data
+preds <- trained_ewf |> predict(new_data = latest)
+```
+
+## Predictions
+
+```{r}
+preds |> pivot_quantiles_wider(.pred)
+```
