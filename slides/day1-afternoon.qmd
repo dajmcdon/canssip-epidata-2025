@@ -58,20 +58,17 @@ theme_set(theme_bw())
 
 ## Introduction to `dplyr`
 
-![](gfx/dplyr.png){style="height: 450px"}
-
-To load `dplyr` you may simply load the `tidyverse` package:
+To load `dplyr`, you may simply load the `tidyverse` package:
 
 ```{r load-tidyverse}
 #| echo: true
 # install.packages("tidyverse")
-library(tidyverse)  # Load tidyverse, which includes dplyr & tidyr
+library(tidyverse)  
 ```
 
-## Introduction to `dplyr`
 Our focus will be on basic operations like selecting and filtering data.
 
-![](gfx/dplyr_and_fun.png){style="width: 70%;"}
+![](gfx/dplyr_and_fun.png){style="width: 60%;"}
 <div style="text-align: center;">
 <small>[Source](https://towardsdatascience.com/data-manipulation-in-r-with-dplyr-3095e0867f75)</small>
 </div>
@@ -132,7 +129,7 @@ Use `glimpse()` to get a compact overview of the dataset.
 glimpse(cases_df)
 ```
 
-## Creating tibbles
+<!-- ## Creating tibbles
 
 * [**Tibbles**]{.primary}: Modern data frames with enhanced features.
 * Rows represent [**observations**]{.primary} (or cases).
@@ -143,6 +140,7 @@ glimpse(cases_df)
 #| echo: true
 tibble(x = letters, y = 1:26)
 ```
+-->
 
 ## Selecting columns with `select()`
 
@@ -162,7 +160,7 @@ You can exclude columns by prefixing the column names with a minus sign `-`.
 select(cases_df, -raw_cases)  # Exclude the 'raw_cases' column from the dataset
 ```
 
-## Extracting columns with `pull()`
+<!-- ## Extracting columns with `pull()`
 
 * `pull()`: Extract a column as a vector.
 * Let's try this with the `cases` column...
@@ -171,6 +169,7 @@ select(cases_df, -raw_cases)  # Exclude the 'raw_cases' column from the dataset
 #| echo: true
 pull(cases_df, raw_cases) 
 ```
+-->
 
 ## Subsetting rows with `filter()`
 
@@ -221,10 +220,12 @@ cases_df |>
 ## Key practices in `dplyr`
 
 * Use [**tibbles**]{.primary} for easier data handling.
-* Use `select()` and `filter()` for data manipulation.
-* Use `pull()` to extract columns as vectors.
 * Use `head()`, `tail()`, and `glimpse()` for quick data inspection.
+* Use `select()` and `filter()` for data manipulation.
 * Chain functions with `|>` for cleaner code.
+
+<!-- * Use `pull()` to extract columns as vectors. --> 
+
 
 ## Grouping data with `group_by()`
 
@@ -261,7 +262,7 @@ ny_subset |>
   head()
 ```
 
-## Creating new columns with `mutate()`
+<!-- ## Creating new columns with `mutate()`
 
 * `mutate()` can create multiple new columns in one step.
 * Logical comparisons (e.g., `over_5000 = raw_cases > 5000`) can be used within `mutate()`.
@@ -273,6 +274,7 @@ ny_subset |>
          cumulative_cases = cumsum(raw_cases)) |> 
   head()
 ```
+-->
 
 ## Combining `group_by()` and `mutate()`
 
@@ -289,7 +291,7 @@ cases_df |>
   head()
 ```
 
-## Conditional calculations with `if_else()`
+<!-- ## Conditional calculations with `if_else()`
 * `if_else()` allows conditional logic within `mutate()`.
 * Perform different operations depending on conditions, like "high" or "low."
 
@@ -301,6 +303,7 @@ cases_df |>
   mutate(high_low_cases = if_else(raw_cases > t, "high", "low")) |> 
   head()
 ```
+-->
 
 ## Summarizing data with `summarise()`
 * `summarise()` reduces data to summary statistics (e.g., mean, median).
@@ -378,7 +381,7 @@ head(cases_df)
 </div>
 
 ## Making data wider with `pivot_wider()`
-* To convert data from long format to wide/messy format use`pivot_wider()`.
+* To convert data from long format to wide/messy format use `pivot_wider()`.
 * For example, let's try creating a column for each time value in `cases_df`:
 
 <!-- Example. Spreadsheet from hell -->
@@ -425,72 +428,6 @@ identical(tidy_cases_df |> arrange(time_value), cases_df)
 ```
 
 Great. That was a success!
-
-## Missing data
-* Sometimes you may have missing data in your time series.
-* Can be due to actual missing data, or it can be due to the fact that the data is only reported on certain days. 
-* Let's create a dataset with missing data & consider each of those cases:
-
-```{r slice-to-subset}
-#| echo: true
-ca_missing <- cases_df |>
-  filter(geo_value == "ca") |>
-  slice(1:2, 4:6) # Subset rows 1 to 2 and 4 to 6; ie. omit 2022-03-03
-
-ca_missing
-```
-
-## `complete()` and `fill()` to handle missing data
-
-A simple workflow to handle missing data relies on one or both of these functions:
-
-1. `complete()`: Adds missing rows for combinations of label variables (e.g.,
-   `geo_value`, `time_value`). Can replace gaps or gaps+NAs in value columns with
-   some constant.
-
-2. `fill()`: Replaces NAs in value columns, typically from previous or next available values (default is LOCF).
-
-## Data only reported on certain days
-
-* If the data is only reported on certain days, it is often useful to fill in the missing data with explicit zeros. 
-* `complete()` is enough to handle this:
-
-```{r complete-zero-ex}
-#| echo: true
-# First, use complete() to add missing time_value (2022-03-03)
-ca_complete <- ca_missing |>
-  complete(geo_value, time_value = full_seq(time_value, period = 1),
-           fill = list(raw_cases = 0), explicit = FALSE)
-ca_complete
-```
-<!-- Using complete(time_value) doesn't work as expected because it doesn't automatically generate a sequence of missing dates between the min and max values of time_value. Instead, it simply tries to match the unique values in time_value and doesn't infer a complete range. To ensure complete() does what you want for time, it is best practice to explicitly create a sequence of dates that covers the entire range of time_value. -->
-
-## Data is genuinely missing
-
-* If the data is truly missing, then there are multiple options (ex. omission, single imputation, multiple imputation).
-* A common single imputation method  used to handle missing data in time series or longitudinal datasets is LOCF.
-* We can easily perform LOCF using `complete()` followed by `fill()`.
-* Start with `complete()`:
-
-```{r complete-NA-ex}
-#| echo: true
-# First, use complete() to add missing time_value (2022-03-03)
-ca_complete <- ca_missing |>
-  complete(geo_value, time_value = full_seq(time_value, period = 1))
-head(ca_complete, n = 4) # notice no fill with 0s this time, NA by default
-```
-
-## Data is genuinely missing
-Then, use `fill()` to fill the counts using LOCF (default):
-
-```{r fill-ex}
-#| echo: true
-ca_complete <- ca_complete |>
-  group_by(geo_value) |>
-  fill(raw_cases) |>
-  ungroup()
-ca_complete
-```
 
 ## Introduction to joins in `dplyr`
 * Joining datasets is a powerful tool for combining info. from multiple sources.
@@ -552,7 +489,7 @@ cases_sub_right_join <- cases_df_sub |>
 head(cases_sub_right_join)
 ```
 
-## Inner Join: Only keeping matching rows
+## Inner Join: Only keep matching rows
 * An [**inner join**]{.primary} will only keep rows where there is a match in both datasets.
 * So, if a state in `state_census` does not have a corresponding entry in `cases_df_sub`, then that row will be excluded.
 ```{r inner-join}
@@ -564,7 +501,7 @@ cases_sub_inner_join <- cases_df_sub |>
 cases_sub_inner_join
 ```
 
-## Full Join: Keeping all rows from both datasets
+## Full Join: Keep all rows from both datasets
 
 * A [**full join**]{.primary} will keep all rows from both datasets.
 * If a state in either dataset has no match in the other, the missing values will be filled with NA.
@@ -589,17 +526,18 @@ head(cases_sub_full_join)
 <small>[Source](https://ohi-science.org/data-science-training/dplyr.html)</small>
 </div>
 
-## Final thoughts on joins
+<!-- ## Final thoughts on joins
 * Joins are an essential part of data wrangling in R.
 * The choice of join depends on the analysis you need to perform:
     + Use [**left joins**]{.primary} when you want to keep all data from the first dataset.
     + Use [**right joins**]{.primary} when you want to keep all data from the second dataset.
     + Use [**inner joins**]{.primary} when you're only interested in matching rows.
     + Use [**full joins**]{.primary} when you want to preserve all information from both datasets.
+-->
 
-## Three review questions
+## Two review questions
 
-**Q1)**: Now, what join function should you use if your goal is to scale the cases by population in `cases_df`?
+**Q1)**: What join function should you use if your goal is to scale the cases by population in `cases_df`?
 ```{r question-2}
 #| echo: true
 #| code-fold: true
@@ -617,7 +555,7 @@ cases_inner_join <- cases_df |>
 cases_inner_join
 ```
 
-**Q2)**: Finally, please create a new column in `cases_df` where you scale the cases by population and multiply by `1e5` to get cases / 100k.
+**Q2)**: Lastly, please create a new column in `cases_df` where you scale the cases by population and multiply by `1e5` to get cases / 100k.
 ```{r question-3}
 #| echo: true
 #| code-fold: true
@@ -626,6 +564,8 @@ case_rates_df <- cases_inner_join |>
   mutate(scaled_cases = raw_cases / pop * 1e5) # cases / 100K
 head(case_rates_df)
 ```
+
+Congratulations for making it through this crash course! That's all for this `glimpse()` into the tidyverse.
 
 ## Epi. data processing with `epiprocess`
 
