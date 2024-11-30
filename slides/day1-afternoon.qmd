@@ -784,6 +784,7 @@ rbind(
 The analysis helps identify the lag at which case rates from the past have the strongest correlation with future death rates.
 
 ```{r sys-lag-ex}
+#| fig-width: 7
 lags <- 0:35
 
 z <- map_dfr(lags, function(lag) {
@@ -815,7 +816,7 @@ The strongest correlation occurs at a lag of about 23 days, indicating that case
 
 * Growth rate measures the relative change in a signal over time. <!-- indicating how quickly a quantity (like case rates) is increasing or decreasing. -->
 
-* We can compute time-varying growth rates for the two states, and see how this cases evolves over time for each state.
+* We can compute time-varying growth rates for the two states, and see how this cases evolves over time.
 
 ```{r growth-rates-ex}
 #| echo: true
@@ -929,6 +930,7 @@ archive_cases_dv_subset
 
 
 ```{r plot-revision-patterns}
+#| fig-width: 7
 ggplot(snapshots |> filter(!latest),
        aes(x = time_value, y = percent_cli)) +  
   geom_line(aes(color = factor(version))) + 
@@ -986,7 +988,9 @@ ggplot(snapshots |> filter(!latest),
 
 * These two examples show the problem and now we need a solution...
 
-## Mathematical setup for nowcasting
+## Nowcasting and its mathematical setup
+
+* **Nowcasting**: Predict a finalized value from a provisional value.
 
 * Suppose today is time $t$
 
@@ -1333,15 +1337,32 @@ Tells us the distribution is right-skewed (mean > median) and so we should opt f
 
 
 ## Nowcasting on Feb. 25
-Since the [**median ratio**]{.primary} between real-time and finalized values is [**0.250**]{.primary} (i.e., real-time values are typically 25% of the finalized), then the nowcast is
-```{r nowcast-feb25}
+
+* Since the [**median ratio**]{.primary} between real-time and finalized values is [**0.250**]{.primary} (i.e., real-time values are typically 25% of the finalized), then the nowcast is
+```{r nowcast-feb25-point}
 #| echo: true
 # Now we can nowcast properly:
 nowcast <- provisional *
   1 / median(ratio_real_time_to_feb25)
 nowcast
 ```
-So, this [**nowcast is 92**]{.primary}, which is much closer to the [**finalized value of 104**]{.primary} than the [**provisional value of 23**]{.primary}.
+
+* To get the accompanying 95% prediction interval, calculate the 2.5th and 97.5th percentiles:
+
+```{r nowcast-feb25-lower}
+#| echo: true
+percentile_97.5 <- quantile(ratio_real_time_to_feb25, 0.975) |> unname()
+
+(lower_PI <- provisional * 1 / percentile_97.5)
+```
+
+```{r nowcast-feb25-upper}
+#| echo: true
+percentile_2.5 <- quantile(ratio_real_time_to_feb25, 0.025) |> unname()
+(upper_PI <- provisional * 1 / percentile_2.5)
+```
+
+* So, the [**nowcast is 92**]{.primary} with 95% PI: [61, 140], which is much closer to the [**finalized value of 104**]{.primary} than the [**provisional value of 23**]{.primary}.
 
 ## Summary of three main steps 
 So the main steps for this type of fixed lag nowcasting are...
@@ -1373,9 +1394,11 @@ mortality_as_of_feb25 <- epix_as_of(mortality_archive, as_of_date) |> filter(tim
 ratio_real_time_to_feb25 <- mortality_real_time_df$mortality / mortality_as_of_feb25$mortality
 
 # 3. Profit.
-nowcast <- provisional *
-  1 / median(ratio_real_time_to_feb25)
-nowcast
+(nowcast <- provisional * 1 / median(ratio_real_time_to_feb25))
+
+(upper_PI <- provisional * 1 / quantile(ratio_real_time_to_feb25, 0.025))
+(lower_PI <- provisional * 1 / quantile(ratio_real_time_to_feb25, 0.975))
+
 ```
 
 ## Nowcasting mortality for multiple dates
@@ -1409,11 +1432,15 @@ nowcast_function <- function(nowcast_date, fixed_lag) {
   
   #3. Profit.
   nowcast <- provisional * (1 / median_ratio)
+  upper_PI <- provisional * (1 / quantile(ratios[is.finite(ratios)], 0.025))
+  lower_PI <- provisional * (1 / quantile(ratios[is.finite(ratios)], 0.975))
   
   # Return a dataframe with the nowcast and date
   tibble(
     time_value = nowcast_date,
-    nowcast_mortality = nowcast
+    nowcast = nowcast,
+    lower_PI = lower_PI,
+    upper_PI = upper_PI 
   )
 }
 ```
@@ -1433,10 +1460,12 @@ nowcast_results_df <- map2(nowcast_dates, fixed_lag, nowcast_function) |> list_r
 Let's smooth with a rolling trailing mean (window size 4) & see the results:
 
 ```{r smooth-print-res}
-# Smooth results: Apply rolling median to nowcast_mortality with a window size of 4
-nowcast_results_df$nowcast_mortality <- zoo::rollapply(nowcast_results_df$nowcast_mortality, width = 4, FUN = mean, partial = TRUE, align = "right")
-# nowcast_results_df$nowcast_mortality[1:3] |> median()
-
+# Smooth results: Apply rolling median to nowcast and bounds with a window size of 4
+library(zoo)
+nowcast_results_df <- nowcast_results_df |> 
+  mutate(across(.cols = -time_value,  
+                .fns = ~ zoo::rollapply(.x, width = 4, FUN = mean, partial = TRUE, align = "right"),
+                .names = "{.col}"))
 nowcast_results_df
 ```
 
@@ -1444,19 +1473,87 @@ nowcast_results_df
 Finally, we can compare these nowcast results to the real-time and finalized values:
 ```{r nowcast-fun-plot-results}
 #| echo: false
-ggplot() +
-  geom_line(data = nowcast_results_df, aes(x = time_value, y = nowcast_mortality, color = "Nowcast")) +
-  geom_point(data = nowcast_results_df, aes(x = time_value, y = nowcast_mortality, color = "Nowcast"), shape = 16) +
+ggplot() + 
+  geom_line(data = nowcast_results_df, aes(x = time_value, y = nowcast, color = "Nowcast")) +
+  geom_point(data = nowcast_results_df, aes(x = time_value, y = nowcast, color = "Nowcast"), shape = 16) +
   geom_line(data = map_dfr(nowcast_dates, mortality_real_time), aes(x = time_value, y = mortality, color = "Real-Time")) +
   geom_point(data = map_dfr(nowcast_dates, mortality_real_time), aes(x = time_value, y = mortality, color = "Real-Time"), shape = 16) +
   geom_line(data = mortality_latest |> filter(time_value %in% nowcast_dates), aes(x = time_value, y = mortality, color = "Finalized")) +
   geom_point(data = mortality_latest |> filter(time_value %in% nowcast_dates), aes(x = time_value, y = mortality, color = "Finalized"), shape = 16) +
+  geom_ribbon(data = nowcast_results_df, 
+              aes(x = time_value, ymin = lower_PI, ymax = upper_PI), 
+              alpha = 0.2, fill = "blue") +
   ylab("Mortality") +
   xlab("Date") +
   scale_color_manual(values = c("Nowcast" = "blue", "Real-Time" = "red", "Finalized" = "black")) + 
   labs(color = "Mortality Type")  # Adds the legend title
 ```
 The real-time counts tend to be biased below the finalized counts. Nowcasted values tend to provide a much better approximation of the truth (at least for these dates).
+
+## Evaluation using MAE
+
+* Assume we have prediction $\hat y_{t}$ for the provisional value at time $t$.
+
+* Then for $y_{t}$ over times $t = 1, \dots, N$, then we may compute error metrics like mean absolute error (MAE).
+
+<!-- We'll see other error measures later on! For now, let's start with one that is simple and easy to interpret.-->
+
+* MAE measures the average absolute difference between the nowcast and finalized values. 
+
+$$MAE = \frac{1}{N} \sum_{t=1}^N |y_{t}- \hat y_{t}|$$
+
+* Note that it's scale-dependent, meaning it can vary depending on the units of the data (e.g., cases, deaths, etc.).
+
+## Evaluation using MAE
+
+* Let's numerically evaluate our point nowcasts for the provisional values of a time series (e.g., COVID-19 mortality) using MAE.
+
+<!-- Accuracy of nowcast is assessed by how close provisional estimates are to the finalized values to gauge the model's performance. -->
+
+```{r mae-code}
+#| echo: true
+# Step 1: Join the mortality data with nowcast data
+mae_data <- mortality_latest |> 
+  filter(time_value %in% nowcast_dates) |>   
+  left_join(nowcast_results_df, by = "time_value") |> 
+  left_join(map_dfr(nowcast_dates, mortality_real_time) |> rename(real_time = mortality), by = c("geo_value", "time_value"))
+
+# Step 2: Calculate the absolute error between actual and nowcasted values
+mae_data <- mae_data |> 
+  mutate(nc_abs_error = abs(mortality - nowcast),
+         rt_abs_error = abs(mortality - real_time))  
+
+# Step 3: Compute the MAE (mean of absolute errors)
+mae_value <- mae_data |> 
+  summarise(nc_MAE = mean(nc_abs_error),
+            rt_MAE = mean(rt_abs_error))
+mae_value 
+```
+
+## Evaluation using MAE
+
+Finally, we may visualize the distribution of errors across time:
+```{r abs-error-plot}
+ggplot(mae_data) +
+  # Nowcast Absolute Error 
+  geom_point(aes(x = time_value, y = nc_abs_error), color = "blue", size = 2) +
+  geom_line(aes(x = time_value, y = nc_abs_error), color = "blue") +
+  # Horizontal line for Nowcast Mean Absolute Error
+  geom_hline(aes(yintercept = mean(nc_abs_error), color = "Nowcast MAE"), linetype = "dashed") +
+  
+  # Real-Time Absolute Error 
+  geom_point(aes(x = time_value, y = rt_abs_error), color = "red", size = 2) +
+  geom_line(aes(x = time_value, y = rt_abs_error), color = "red") +
+  # Horizontal line for Real-Time Mean Absolute Error
+  geom_hline(aes(yintercept = mean(rt_abs_error), color = "Real-Time MAE"), linetype = "dashed") +
+  
+  # Customize the x and y axes labels, legend & add title
+  xlab("Time") + ylab("Absolute Error") +
+  scale_color_manual(values = c("Real-Time MAE" = "red", "Nowcast MAE" = "blue")) +
+  labs(color = "Mean Absolute Error")
+```
+
+We can see that the absolute errors are almost always lower for nowcasting.
 
 # Nowcasting with Two Variables
 
