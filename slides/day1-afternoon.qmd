@@ -664,16 +664,29 @@ contains the most [up-to-date values]{.primary} of the signal variables, [as of]
 
 * Consider the same dataset we just encountered on JHU daily COVID-19 cases and deaths rates from all states [as of]{.primary} May 31, 2022.
 
-* We can see that it meets the criteria `epi_df` (has `geo_value` and `time_value` columns) and in this form it contains additional metadata (i.e. `geo_type`, `time_type`, `as_of`, and `other_keys`).
+* We can see that it meets the criteria `epi_df` (has `geo_value` and `time_value` columns) and that it contains additional metadata (i.e. `geo_type`, `time_type`, `as_of`, and `other_keys`).
+
+:::: {.columns}
+
+::: {.column width="60%"}
 
 ```{r epi-df-ex}
 #| echo: true
 edf |> head()
 ```
 
+:::
+
+::: {.column width="40%"}
+
 ```{r extract-metadata}
+#| echo: true
 attr(edf, "metadata")
 ```
+
+::: 
+
+:::: 
 
 ## Examples of preprocessing
 
@@ -1446,7 +1459,7 @@ $$MAE = \frac{1}{N} \sum_{t=1}^N |y_{t}- \hat y_{t}|$$
 
 ## Evaluation using MAE
 
-* Let's numerically evaluate our point nowcasts for the provisional values of a time series (e.g., COVID-19 mortality) using MAE.
+Let's numerically evaluate our point nowcasts for the provisional values of a time series (e.g., COVID-19 mortality) using MAE.
 
 <!-- Accuracy of nowcast is assessed by how close provisional estimates are to the finalized values to gauge the model's performance. -->
 
@@ -1467,7 +1480,7 @@ mae_data <- mae_data |>
 mae_value <- mae_data |> 
   summarise(nc_MAE = mean(nc_abs_error),
             rt_MAE = mean(rt_abs_error))
-mae_value 
+knitr::kable(mae_value)
 ```
 
 ## Evaluation using MAE
@@ -1702,13 +1715,64 @@ ggplot(res, aes(x = time_value)) +
         axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
+## Evaluation using MAE
+
+* As before, we can evaluate our point nowcasts numerically using MAE.
+
+```{r mae-code-hosp}
+#| echo: true
+# Calculate the absolute error between actual and nowcasted values
+mae_data_admissions <- res |> 
+  mutate(nc_abs_error = abs(admissions - fit),  # Nowcast vs Finalized admissions
+         rt_abs_error = abs(admissions - real_time_val))  # Real-Time vs Finalized admissions
+
+# Compute the MAE (mean of absolute errors)
+mae_value_admissions <- mae_data_admissions |> 
+  summarise(nc_MAE = mean(nc_abs_error),
+            rt_MAE = mean(rt_abs_error))
+knitr::kable(mae_value_admissions)
+```
+
+* Based off of comparing these simple error measures, the nowcast MAE is clearly better.
+
+## Evaluation using MAE
+
+However, when we visualize the distribution of errors across time, it is not so cut-and-dry:
+```{r abs-error-plot-hosp}
+# Plot the absolute errors for Nowcast and Real-Time vs Finalized Admissions
+ggplot(mae_data_admissions) +
+  # Nowcast Absolute Error 
+  geom_point(aes(x = time_value, y = nc_abs_error), color = "#1f78b4", size = 2) +
+  geom_line(aes(x = time_value, y = nc_abs_error), color = "#1f78b4") +
+  # Horizontal line for Nowcast Mean Absolute Error
+  geom_hline(aes(yintercept = mean(nc_abs_error), color = "Nowcast MAE"), linetype = "dashed") +
+  
+  # Real-Time Absolute Error 
+  geom_point(aes(x = time_value, y = rt_abs_error), color = "darkred", size = 2) +
+  geom_line(aes(x = time_value, y = rt_abs_error), color = "darkred") +
+  # Horizontal line for Real-Time Mean Absolute Error
+  geom_hline(aes(yintercept = mean(rt_abs_error), color = "Real-Time MAE"), linetype = "dashed") +
+  
+  # Customize the x and y axes labels, legend & add title
+  xlab("Time") + ylab("Absolute Error") +
+  scale_color_manual(values = c("Real-Time MAE" = "darkred", "Nowcast MAE" = "#1f78b4")) +
+  labs(color = "Mean Absolute Error") +
+  theme_minimal() +
+  theme(legend.position = "top", legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The main driver behind the real-time MAE being greater is the "outlier-like" May 25 AE.
+
+So visualizing can provide an important perspective that is missed from a simple numerical summary of error.
+
 ## Key Takeaways: Linear regression nowcasting example
 
 * [**Provisional Data as Predictors**]{.primary}: Using [Google symptom search trends]{.primary} to predict [influenza hospital admissions]{.primary}.
 * [**Simple Linear Model**]{.primary}: A linear regression model captures the relationship between symptom searches and hospital admissions.
 * [**Actionable Predictions**]{.primary}: Nowcasts provide [timely insights]{.primary} for hospital admissions, even before data is finalized.
 * [**Sliding Window Approach**]{.primary}: Predictions are based on [data up to the current time]{.primary}, ensuring no future information influences the nowcast.
-* [**Evaluation**]{.primary}: Predictions are compared with actual admissions visually.
+* [**Evaluation**]{.primary}: Predictions are compared with actual admissions using numerical and visual perspectives.
 
 # Case Study - Nowcasting Cases Using %CLI 
 
@@ -1889,8 +1953,8 @@ Here's a summary of what `process_data_for_date_range()` does:
 
 ## Fetch Data - Run the function & inspect archive
 
-* Now, let's run the function & inspect the resulting `epi_archive` of 7-day averaged COVID-19 case counts:
-* Expect building the archive to take a nontrivial amount of time (enough for a cup of coffee or to meditate on life).
+* Now, let's run the function & inspect the resulting `epi_archive` of 7-day avg. COVID-19 case counts:
+* Expect building the archive to some time (enough for a cup of coffee or to meditate on life).
 
 <!-- To wonder why you chose Expect building the archive to take a nontrivial amount of time (enough for a cup of coffee or to wonder why you chose coding in the first place). -->
 ```{r run-fun-process-data-range}
@@ -1900,7 +1964,14 @@ y <- process_data_for_date_range("2021-01-10", "2021-12-01")  # Raw .xlsx data i
 y
 ```
 
-* Alternatively, you may run the following to load `y` that was previously saved as an RDS file: `y <- readRDS("_data/ma_case_archive.rds")`.
+* Alternatively, you may run the following to load `y` that was previously saved as an RDS file: 
+```{r load-ma-case-data}
+#| echo: true
+#| eval: FALSE
+#| results: hide
+y <- readRDS("_data/ma_case_archive.rds")
+```
+
 
 ## Fetch Data - % Outpatient doctors visits for CLI
 
@@ -2012,7 +2083,8 @@ res
 ```
 
 ## Visualizing nowcasts vs. actual values
-Finally, plot the predictions & real-time values on top of latest COVID-19 cases using `ggplot2`:
+
+Now, plot the predictions & real-time values on top of latest COVID-19 cases using `ggplot2`:
 
 ```{r plot-simple-lr-nowcast-res}
 #| echo: false
@@ -2043,6 +2115,55 @@ ggplot(res, aes(x = time_value)) +
   )
 ```
 
+## Evaluation using MAE
+
+* Finally, we numerically evaluate our nowcasts using MAE.
+
+* Shows that the nowcast errors are lower than those of the real-time estimates.
+
+```{r mae-code-cases}
+#| echo: true
+# Calculate the absolute error between actual and nowcasted COVID-19 cases
+mae_data_cases <- res |> 
+  mutate(nc_abs_error = abs(case_rate_7d_av - fit),  # Nowcast vs Finalized cases (7-day average)
+         rt_abs_error = abs(case_rate_7d_av - real_time_val))  # Real-Time vs Finalized cases
+
+# Compute the MAE (mean of absolute errors)
+mae_value_cases <- mae_data_cases |> 
+  summarise(nc_MAE = mean(nc_abs_error),
+            rt_MAE = mean(rt_abs_error))
+knitr::kable(mae_value_cases)
+```
+
+
+## Evaluation using MAE
+
+```{r abs-error-plot-cases}
+# Plot the absolute errors for Nowcast and Real-Time vs Finalized COVID-19 cases
+ggplot(mae_data_cases) +
+  # Nowcast Absolute Error 
+  geom_point(aes(x = time_value, y = nc_abs_error), color = "#1f78b4", size = 2) +
+  geom_line(aes(x = time_value, y = nc_abs_error), color = "#1f78b4") +
+  # Horizontal line for Nowcast Mean Absolute Error
+  geom_hline(aes(yintercept = mean(nc_abs_error), color = "Nowcast MAE"), linetype = "dashed") +
+  
+  # Real-Time Absolute Error 
+  geom_point(aes(x = time_value, y = rt_abs_error), color = "darkred", size = 2) +
+  geom_line(aes(x = time_value, y = rt_abs_error), color = "darkred") +
+  # Horizontal line for Real-Time Mean Absolute Error
+  geom_hline(aes(yintercept = mean(rt_abs_error), color = "Real-Time MAE"), linetype = "dashed") +
+  
+  # Customize the x and y axes labels, legend & add title
+  xlab("Date") + ylab("Absolute Error") +
+  scale_color_manual(values = c("Real-Time MAE" = "darkred", "Nowcast MAE" = "#1f78b4")) +
+  labs(color = "Mean Absolute Error") +
+  theme_minimal() +
+  theme(legend.position = "top", legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The elevated errors at both ends highlight periods where the discrepancies between the real-time and nowcast estimates are most pronounced.
+
 ## Takeaways
 
 [**Goal**]{.primary}: Predict COVID-19 cases using %CLI, overcoming delays in report data.
@@ -2057,7 +2178,7 @@ Main Steps:
 
 4. [**Nowcast**]{.primary}: Apply dynamic forecasting with `epix_slide()`.
 
-5. [**Visualize**]{.primary}: Plot nowcasts vs. actual cases with confidence intervals.
+5. [**Evaluate**]{.primary}: Calculate error measures and numerically and visually assess the results.
 
 Overall, nowcasting, based on the linear model, provided a closer approximation of true cases compared to the real-time values.
 
