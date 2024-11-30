@@ -692,6 +692,8 @@ dataset, which is a snapshot [**as of**]{.primary} May 31, 2022 that contains da
 ```{r head-edf}
 #| echo: false
 edf <- covid_case_death_rates
+# Only consider the 50 US states (no territories)
+edf <- edf |> filter(geo_value %in% tolower(state.abb)) 
 head(edf |> as_tibble())
 ```
 
@@ -745,12 +747,20 @@ attr(edf, "metadata")
 
 ## Features - Correlations at different lags
 
+<!-- * There are always at least two ways to compute correlations in an `epi_df`: grouping by `time_value`, and by `geo_value`. 
+
+* The latter is obtained by setting `cor_by = geo_value`. -->
+
+* The below plot addresses the question: "For each state, are case and death rates linearly associated across all days?"
+
+* To explore **lagged correlations** and how case rates associate with future death rates, we can use the `dt1` parameter in `epi_cor()` to shift case rates by a specified number of days. 
+
+<!--  * For example, setting `dt1 = -14` means that case rates on June 1st will be correlated with death rates on June 15th, assessing how past case rates influence future death rates. -->
+
 ```{r corr-lags-ex}
 #| echo: true
-## cor0 <- epi_cor(edf, case_rate, death_rate, cor_by = time_value)
-## cor14 <- epi_cor(edf, case_rate, death_rate, cor_by = time_value, dt1 = -14)
-cor0 <- epi_cor(edf, case_rate, death_rate, cor_by = time_value, method = "kendall")
-cor14 <- epi_cor(edf, case_rate, death_rate, cor_by = time_value, dt1 = -14, method = "kendall")
+cor0 <- epi_cor(edf, case_rate, death_rate, cor_by = geo_value)
+cor14 <- epi_cor(edf, case_rate, death_rate, cor_by = geo_value, dt1 = -14)
 ```
 
 ```{r plot-corr-lags-ex}
@@ -761,16 +771,51 @@ rbind(
   cor14 |> mutate(lag = 14)
 ) |>
   mutate(lag = as.factor(lag)) |>
-  ggplot(aes(x = time_value, y = cor)) +
-  geom_hline(yintercept = 0) +
-  geom_line(aes(color = lag)) +
-  scale_color_brewer(palette = "Set1") +
-  scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
-  labs(x = "Date", y = "Correlation", col = "Lag") +
-  theme(legend.position = "right")
+  ggplot(aes(cor)) +
+  geom_density(aes(fill = lag, col = lag), alpha = 0.5) +
+  labs(x = "Correlation", y = "Density", fill = "Lag", col = "Lag")
 ```
 
+* We can see that, in general, lagging the case rates back by 14 days improves the correlations.
+
+
+## Features - Systematic lag analysis
+
+The analysis helps identify the lag at which case rates from the past have the strongest correlation with future death rates.
+
+```{r sys-lag-ex}
+lags <- 0:35
+
+z <- map_dfr(lags, function(lag) {
+  epi_cor(edf, case_rate, death_rate, cor_by = geo_value, dt1 = -lag) %>%
+    mutate(lag = .env$lag)
+})
+
+z_summary <- z %>%
+  group_by(lag) %>%
+  summarize(mean = mean(cor, na.rm = TRUE))
+
+# Find the lag with the maximum correlation
+max_lag <- z_summary$lag[which.max(z_summary$mean)]
+```
+
+```{r plot-sys-lag-ex}
+#| fig-width: 7
+#| warning: false
+z_summary |> 
+  ggplot(aes(x = lag, y = mean)) +
+  geom_line() +
+  geom_point() +
+  geom_vline(xintercept = max_lag, linetype = "dashed", color = "royalblue", lwd = 1) + 
+  labs(x = "Lag", y = "Mean correlation")
+```
+The strongest correlation occurs at a lag of about 23 days, indicating that case rates are best correlated with death rates 23 days from now.
+
 ## Features - Compute growth rates
+
+* Growth rate measures the relative change in a signal over time. <!-- indicating how quickly a quantity (like case rates) is increasing or decreasing. -->
+
+* We can compute time-varying growth rates for the two states, and see how this cases evolves over time for each state.
 
 ```{r growth-rates-ex}
 #| echo: true
@@ -794,7 +839,20 @@ ggplot(edfg, aes(x = time_value, y = gr_cases)) +
         legend.key = element_blank())
 ```
 
+* As expected, the peak growth rates for both states occurred during the January 2022 Omicron wave, reflecting the sharp rise in cases over that period.
+
 ## Features - Outlier detection
+
+<!-- * There are multiple outliers in these data that a modeler may want to detect and correct. -->
+
+* The `detect_outlr()` function offers multiple outlier detection methods on a signal.
+
+* The simplest is `detect_outlr_rm()`, which works by calculating an outlier threshold using the rolling median and the rolling Interquartile Range (IQR) for each time point:
+
+**Threshold = Rolling Median ± (Detection Multiplier × Rolling IQR)**
+
+* Note that the default number of time steps to use in the rolling window by default is 21 and is centrally aligned. 
+* The detection multiplier default is 2 and controls how far away a data point must be from the median to be considered an outlier.
 
 ```{r outlier-ex}
 #| echo: true
@@ -807,6 +865,12 @@ edfo <- filter(edf, geo_value %in% c("nc", "ak")) |>
     x = time_value, y = case_rate
   )) 
 ```
+
+## Features - Outlier detection
+
+* Several data points that deviate from the expected case cadence have been flagged as outliers, and may require further investigation.
+
+* However, the peak in Jan. 2022 has also been flagged as an outlier. This highlights the importance of manual inspection before correcting the data, as these may represent valid events (e.g., a genuine surge in cases).
 
 ```{r plot-outlier-ex}
 #| fig-width: 7
@@ -835,6 +899,7 @@ edfo |>
         legend.background = element_rect(fill = NA), 
         legend.key = element_rect(fill = NA))
 ```
+
 
 ## `epi_archive`: Collection of `epi_df`s
 
@@ -902,14 +967,45 @@ ggplot(snapshots |> filter(!latest),
 <!-- predicting a finalized value from a provisional value and making predictions. -->
 ## Backfill Canadian edition
   
-* Every week the BC CDC releases COVID-19 hospitalization data.
+* Every week the [BC CDC releases COVID-19 hospitalization data](http://www.bccdc.ca/health-info/diseases-conditions/covid-19/archived-b-c-covid-19-data).
 
 * Following week they revise the number upward (by ~25%) due to lagged reports.
 
-![](gfx/bc_hosp_admissions_ex.jpg){style="width: 50%; display: block; margin-left: auto; margin-right: auto;"}
+![](gfx/bc_hosp_admissions_ex.jpg){style="width: 45%; display: block; margin-left: auto; margin-right: auto;"}
 <!-- Newest iteration of "backfill”, Canada edition. Every week the BC CDC releases hospitalization data. The following week they revise the number upward (by about 25%) due to lagging reports. Every single week, the newspaper says “hospitalizations have declined”. This week the BC CDC’s own report said “hospitalizations have declined”. The takeaway in the news is that hospitalizations ALWAYS fall from the previous week, but once backfilled, they’re rarely down -->
 
 * [**Takeaway**]{.primary}: Once the data is backfilled, hospitalizations rarely show a decline, challenging the common media narrative.
+
+## Backfill American edition
+
+* Again, we can see a similar systematic underestimation problem for COVID-19 morality rates in CA. <!-- 2023-2024 -->
+
+* This plot also illustrates the [**revision process**]{.primary} - how the reported mortality changes & increases across multiple updates until it stabilizes at the final value (black line).
+
+![](gfx/am_mortality_revisions_ex.jpg){style="width: 45%; display: block; margin-left: auto; margin-right: auto;"}
+
+* These two examples show the problem and now we need a solution...
+
+## Mathematical setup for nowcasting
+
+* Suppose today is time $t$
+
+* Let $y_i$ denote a series of interest observed at times $i=1,\ldots, t$.
+
+::: {.callout-important icon="false"}
+## Our goal
+
+* Produce a [**point nowcast**]{.primary} for the finalized values of $y_t$.
+* Accompany with time-varying prediction intervals
+
+:::
+
+* We also have access to $p$ other time series 
+$x_{ij},\; i=1,\ldots,t, \; j = 1,\ldots,p$
+
+* All may be subject to revisions.
+
+
 
 ## Aside on nowcasting
 
@@ -944,25 +1040,6 @@ cowplot::plot_grid(p1, p2)
 * Group built [`{rtestim}`](https://dajmcdon.github.io/rtestim) doing for this nonparametrically.
 
 * We may come back to this later...
-
-## Mathematical setup
-
-* Suppose today is time $t$
-
-* Let $y_i$ denote a series of interest observed at times $i=1,\ldots, t$.
-
-::: {.callout-important icon="false"}
-## Our goal
-
-* Produce a [**point nowcast**]{.primary} for the finalized values of $y_t$.
-* Accompany with time-varying prediction intervals
-
-:::
-
-* We also have access to $p$ other time series 
-$x_{ij},\; i=1,\ldots,t, \; j = 1,\ldots,p$
-
-* All may be subject to revisions.
 
 # Nowcasting with One Variable
 
@@ -1063,7 +1140,7 @@ summary(as.numeric(res$diff))
 * So if we were doing this in real-time, then we wouldn't have access to the finalized data.
 
 ## Comparison of final vs. multiple revisions
-This figure shows the finalized rates in comparison to [**multiple revisions**]{.primary} to see how the data changes over time:
+This shows the finalized rates in comparison to [**multiple revisions**]{.primary} to see how the data changes over time:
 
 ```{r mortality-by-revision-date}
 #| echo: false
@@ -1091,7 +1168,8 @@ ggplot() +
   geom_line(data = mortality_latest, aes(x = time_value, y = mortality), color = "black", size = 1) +
   geom_line(data = mortality_revisions, aes(x = time_value, y = mortality, color = as.factor(revision_date))) +
   geom_point(data = mortality_revisions, aes(x = time_value, y = mortality, color = as.factor(revision_date)), size = 2) +
-  labs(color = "Revision Date", y = "date") + 
+  theme_gray() + 
+  labs(color = "Revision Date", y = "Mortality", x = "Date") + 
   ggtitle("COVID-19 Mortality in CA: Finalized (black) vs Various Revisions")
 
 ```
