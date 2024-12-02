@@ -1130,6 +1130,53 @@ preds |> pivot_quantiles_wider(.pred)
 
 ## Ensembling
 
-## Recalibration
+* Instead of choosing one model, [combine]{.primary} the predictions from multiple constituent models
+
+* Ensemble types
+
+  * [untrained]{.primary}: combines multiple constituent models without considering their past performance 
+  
+  * [trained]{.primary}: weights different constituent models based on their accuracy
+  
+* Goals
+
+  * [compete-with-best]{.primary}: ensemble should have accuracy competitive with best individual constituent model
+  
+  * [robustness-over-all]{.primary}: ensemble should have greater robustness than any individual constituent model
+
+* Typically: untrained ensembles are robust but less accurate, 
+and trained ensembles are accurate but less robust.
+
+## Calibration
+
+* We have seen that prediction intervals often have [nominal coverage << actual empirical coverage]{.primary},
+e.g. 80% predictive intervals that in practice cover the truth $\approx$ 60% of the times
+
+* Calibration aims at adjusting the intervals so that 
+nominal coverage $\approx$ empirical coverage
+
+
+## Calibration
+
+### Quantile tracking
+
+* Let $\hat q_{t}^{1-\alpha}$ = predicted level $1-\alpha$ quantile of the 
+distribution of $e_t$, the absolute forecast error at time $t$:
+
+$$e_t = |y_t - \hat y_{t|t-1}|.$$
+
+* Given a learning rate $\eta>0$, update the quantiles as
+
+$$\hat q_{t+1}^{1-\alpha} = \begin{cases} 
+\hat q_{t}^{1-\alpha} + \eta(1-\alpha) \quad \text{if } x_t\notin I_{t|t-1}^{1-\alpha} \\
+\hat q_{t}^{1-\alpha} - \eta\alpha \quad \quad \quad \,\,\, \text{if } x_t\in I_{t|t-1}^{1-\alpha}
+\end{cases}$$
+
+where $I_{t|t-1}^{1-\alpha}$ is the 
+$1-\alpha$ prediction interval made by a forecaster at time $t$ for time $t+1$.
+
+* Quantile tracking in words: if the latest interval does not cover, increase the quantile by 
+$\eta(1-\alpha)$ (make the next interval wider), otherwise decrease the quantile by $\eta\alpha$
+(make the next interval narrower).
 
 ## Multi-horizon smoothing
