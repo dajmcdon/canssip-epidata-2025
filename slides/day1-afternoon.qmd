@@ -2,8 +2,6 @@
 talk-title: "Data Cleaning, Versioning, and Nowcasting"
 talk-short-title: "Nowcasting"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
-author: "Ailce Cima, Rachel Lobay, Daniel McDonald, Ryan Tibshirani"
-repo-address: "cmu-delphi/insightnet-workshop-2024"
 talk-date: "11 December -- Afternoon"
 format: revealjs
 ---
@@ -11,10 +9,12 @@ format: revealjs
 {{< include _titleslide.qmd >}}
 
 ```{r theme-load-pkg}
+#| cache: false
 library(tidyverse)
 library(epidatr)
 library(epipredict)
 library(epidatasets)
+theme_set(theme_bw())
 ```
 
 ## Outline
@@ -58,20 +58,17 @@ library(epidatasets)
 
 ## Introduction to `dplyr`
 
-![](gfx/dplyr.png){style="height: 450px"}
-
-To load `dplyr` you may simply load the `tidyverse` package:
+To load `dplyr`, you may simply load the `tidyverse` package:
 
 ```{r load-tidyverse}
 #| echo: true
 # install.packages("tidyverse")
-library(tidyverse)  # Load tidyverse, which includes dplyr & tidyr
+library(tidyverse)  
 ```
 
-## Introduction to `dplyr`
 Our focus will be on basic operations like selecting and filtering data.
 
-![](gfx/dplyr_and_fun.png){style="width: 70%;"}
+![](gfx/dplyr_and_fun.png){style="width: 60%;"}
 <div style="text-align: center;">
 <small>[Source](https://towardsdatascience.com/data-manipulation-in-r-with-dplyr-3095e0867f75)</small>
 </div>
@@ -132,7 +129,7 @@ Use `glimpse()` to get a compact overview of the dataset.
 glimpse(cases_df)
 ```
 
-## Creating tibbles
+<!-- ## Creating tibbles
 
 * [**Tibbles**]{.primary}: Modern data frames with enhanced features.
 * Rows represent [**observations**]{.primary} (or cases).
@@ -143,6 +140,7 @@ glimpse(cases_df)
 #| echo: true
 tibble(x = letters, y = 1:26)
 ```
+-->
 
 ## Selecting columns with `select()`
 
@@ -162,7 +160,7 @@ You can exclude columns by prefixing the column names with a minus sign `-`.
 select(cases_df, -raw_cases)  # Exclude the 'raw_cases' column from the dataset
 ```
 
-## Extracting columns with `pull()`
+<!-- ## Extracting columns with `pull()`
 
 * `pull()`: Extract a column as a vector.
 * Let's try this with the `cases` column...
@@ -171,6 +169,7 @@ select(cases_df, -raw_cases)  # Exclude the 'raw_cases' column from the dataset
 #| echo: true
 pull(cases_df, raw_cases) 
 ```
+-->
 
 ## Subsetting rows with `filter()`
 
@@ -221,10 +220,12 @@ cases_df |>
 ## Key practices in `dplyr`
 
 * Use [**tibbles**]{.primary} for easier data handling.
-* Use `select()` and `filter()` for data manipulation.
-* Use `pull()` to extract columns as vectors.
 * Use `head()`, `tail()`, and `glimpse()` for quick data inspection.
+* Use `select()` and `filter()` for data manipulation.
 * Chain functions with `|>` for cleaner code.
+
+<!-- * Use `pull()` to extract columns as vectors. --> 
+
 
 ## Grouping data with `group_by()`
 
@@ -261,7 +262,7 @@ ny_subset |>
   head()
 ```
 
-## Creating new columns with `mutate()`
+<!-- ## Creating new columns with `mutate()`
 
 * `mutate()` can create multiple new columns in one step.
 * Logical comparisons (e.g., `over_5000 = raw_cases > 5000`) can be used within `mutate()`.
@@ -273,6 +274,7 @@ ny_subset |>
          cumulative_cases = cumsum(raw_cases)) |> 
   head()
 ```
+-->
 
 ## Combining `group_by()` and `mutate()`
 
@@ -289,7 +291,7 @@ cases_df |>
   head()
 ```
 
-## Conditional calculations with `if_else()`
+<!-- ## Conditional calculations with `if_else()`
 * `if_else()` allows conditional logic within `mutate()`.
 * Perform different operations depending on conditions, like "high" or "low."
 
@@ -301,6 +303,7 @@ cases_df |>
   mutate(high_low_cases = if_else(raw_cases > t, "high", "low")) |> 
   head()
 ```
+-->
 
 ## Summarizing data with `summarise()`
 * `summarise()` reduces data to summary statistics (e.g., mean, median).
@@ -378,7 +381,7 @@ head(cases_df)
 </div>
 
 ## Making data wider with `pivot_wider()`
-* To convert data from long format to wide/messy format use`pivot_wider()`.
+* To convert data from long format to wide/messy format use `pivot_wider()`.
 * For example, let's try creating a column for each time value in `cases_df`:
 
 <!-- Example. Spreadsheet from hell -->
@@ -425,72 +428,6 @@ identical(tidy_cases_df |> arrange(time_value), cases_df)
 ```
 
 Great. That was a success!
-
-## Missing data
-* Sometimes you may have missing data in your time series.
-* Can be due to actual missing data, or it can be due to the fact that the data is only reported on certain days. 
-* Let's create a dataset with missing data & consider each of those cases:
-
-```{r slice-to-subset}
-#| echo: true
-ca_missing <- cases_df |>
-  filter(geo_value == "ca") |>
-  slice(1:2, 4:6) # Subset rows 1 to 2 and 4 to 6; ie. omit 2022-03-03
-
-ca_missing
-```
-
-## `complete()` and `fill()` to handle missing data
-
-A simple workflow to handle missing data relies on one or both of these functions:
-
-1. `complete()`: Adds missing rows for combinations of label variables (e.g.,
-   `geo_value`, `time_value`). Can replace gaps or gaps+NAs in value columns with
-   some constant.
-
-2. `fill()`: Replaces NAs in value columns, typically from previous or next available values (default is LOCF).
-
-## Data only reported on certain days
-
-* If the data is only reported on certain days, it is often useful to fill in the missing data with explicit zeros. 
-* `complete()` is enough to handle this:
-
-```{r complete-zero-ex}
-#| echo: true
-# First, use complete() to add missing time_value (2022-03-03)
-ca_complete <- ca_missing |>
-  complete(geo_value, time_value = full_seq(time_value, period = 1),
-           fill = list(raw_cases = 0), explicit = FALSE)
-ca_complete
-```
-<!-- Using complete(time_value) doesn't work as expected because it doesn't automatically generate a sequence of missing dates between the min and max values of time_value. Instead, it simply tries to match the unique values in time_value and doesn't infer a complete range. To ensure complete() does what you want for time, it is best practice to explicitly create a sequence of dates that covers the entire range of time_value. -->
-
-## Data is genuinely missing
-
-* If the data is truly missing, then there are multiple options (ex. omission, single imputation, multiple imputation).
-* A common single imputation method  used to handle missing data in time series or longitudinal datasets is LOCF.
-* We can easily perform LOCF using `complete()` followed by `fill()`.
-* Start with `complete()`:
-
-```{r complete-NA-ex}
-#| echo: true
-# First, use complete() to add missing time_value (2022-03-03)
-ca_complete <- ca_missing |>
-  complete(geo_value, time_value = full_seq(time_value, period = 1))
-head(ca_complete, n = 4) # notice no fill with 0s this time, NA by default
-```
-
-## Data is genuinely missing
-Then, use `fill()` to fill the counts using LOCF (default):
-
-```{r fill-ex}
-#| echo: true
-ca_complete <- ca_complete |>
-  group_by(geo_value) |>
-  fill(raw_cases) |>
-  ungroup()
-ca_complete
-```
 
 ## Introduction to joins in `dplyr`
 * Joining datasets is a powerful tool for combining info. from multiple sources.
@@ -552,7 +489,7 @@ cases_sub_right_join <- cases_df_sub |>
 head(cases_sub_right_join)
 ```
 
-## Inner Join: Only keeping matching rows
+## Inner Join: Only keep matching rows
 * An [**inner join**]{.primary} will only keep rows where there is a match in both datasets.
 * So, if a state in `state_census` does not have a corresponding entry in `cases_df_sub`, then that row will be excluded.
 ```{r inner-join}
@@ -564,7 +501,7 @@ cases_sub_inner_join <- cases_df_sub |>
 cases_sub_inner_join
 ```
 
-## Full Join: Keeping all rows from both datasets
+## Full Join: Keep all rows from both datasets
 
 * A [**full join**]{.primary} will keep all rows from both datasets.
 * If a state in either dataset has no match in the other, the missing values will be filled with NA.
@@ -589,17 +526,18 @@ head(cases_sub_full_join)
 <small>[Source](https://ohi-science.org/data-science-training/dplyr.html)</small>
 </div>
 
-## Final thoughts on joins
+<!-- ## Final thoughts on joins
 * Joins are an essential part of data wrangling in R.
 * The choice of join depends on the analysis you need to perform:
     + Use [**left joins**]{.primary} when you want to keep all data from the first dataset.
     + Use [**right joins**]{.primary} when you want to keep all data from the second dataset.
     + Use [**inner joins**]{.primary} when you're only interested in matching rows.
     + Use [**full joins**]{.primary} when you want to preserve all information from both datasets.
+-->
 
-## Three review questions
+## Two review questions
 
-**Q1)**: Now, what join function should you use if your goal is to scale the cases by population in `cases_df`?
+**Q1)**: What join function should you use if your goal is to scale the cases by population in `cases_df`?
 ```{r question-2}
 #| echo: true
 #| code-fold: true
@@ -617,7 +555,7 @@ cases_inner_join <- cases_df |>
 cases_inner_join
 ```
 
-**Q2)**: Finally, please create a new column in `cases_df` where you scale the cases by population and multiply by `1e5` to get cases / 100k.
+**Q2)**: Lastly, please create a new column in `cases_df` where you scale the cases by population and multiply by `1e5` to get cases / 100k.
 ```{r question-3}
 #| echo: true
 #| code-fold: true
@@ -626,6 +564,8 @@ case_rates_df <- cases_inner_join |>
   mutate(scaled_cases = raw_cases / pop * 1e5) # cases / 100K
 head(case_rates_df)
 ```
+
+Congratulations for making it through this crash course! That's all for this `glimpse()` into the tidyverse.
 
 ## Epi. data processing with `epiprocess`
 
@@ -692,6 +632,8 @@ dataset, which is a snapshot [**as of**]{.primary} May 31, 2022 that contains da
 ```{r head-edf}
 #| echo: false
 edf <- covid_case_death_rates
+# Only consider the 50 US states (no territories)
+edf <- edf |> filter(geo_value %in% tolower(state.abb)) 
 head(edf |> as_tibble())
 ```
 
@@ -718,20 +660,33 @@ Represents a [snapshot]{.primary} that
 contains the most [up-to-date values]{.primary} of the signal variables, [as of]{.primary} a given time.
 :::
 
-# `epi_df`: Snapshot of a dataset
+## `epi_df`: Snapshot of a dataset
 
 * Consider the same dataset we just encountered on JHU daily COVID-19 cases and deaths rates from all states [as of]{.primary} May 31, 2022.
 
-* We can see that it meets the criteria `epi_df` (has `geo_value` and `time_value` columns) and in this form it contains additional metadata (i.e. `geo_type`, `time_type`, `as_of`, and `other_keys`).
+* We can see that it meets the criteria `epi_df` (has `geo_value` and `time_value` columns) and that it contains additional metadata (i.e. `geo_type`, `time_type`, `as_of`, and `other_keys`).
+
+:::: {.columns}
+
+::: {.column width="60%"}
 
 ```{r epi-df-ex}
 #| echo: true
 edf |> head()
 ```
 
+:::
+
+::: {.column width="40%"}
+
 ```{r extract-metadata}
+#| echo: true
 attr(edf, "metadata")
 ```
+
+::: 
+
+:::: 
 
 ## Examples of preprocessing
 
@@ -745,31 +700,76 @@ attr(edf, "metadata")
 
 ## Features - Correlations at different lags
 
+<!-- * There are always at least two ways to compute correlations in an `epi_df`: grouping by `time_value`, and by `geo_value`. 
+
+* The latter is obtained by setting `cor_by = geo_value`. -->
+
+* The below plot addresses the question: "For each state, are case and death rates linearly associated across all days?"
+
+* To explore **lagged correlations** and how case rates associate with future death rates, we can use the `dt1` parameter in `epi_cor()` to shift case rates by a specified number of days. 
+
+<!--  * For example, setting `dt1 = -14` means that case rates on June 1st will be correlated with death rates on June 15th, assessing how past case rates influence future death rates. -->
+
 ```{r corr-lags-ex}
 #| echo: true
-## cor0 <- epi_cor(edf, case_rate, death_rate, cor_by = time_value)
-## cor14 <- epi_cor(edf, case_rate, death_rate, cor_by = time_value, dt1 = -14)
-cor0 <- epi_cor(edf, case_rate, death_rate, cor_by = time_value, method = "kendall")
-cor14 <- epi_cor(edf, case_rate, death_rate, cor_by = time_value, dt1 = -14, method = "kendall")
+cor0 <- epi_cor(edf, case_rate, death_rate, cor_by = geo_value)
+cor14 <- epi_cor(edf, case_rate, death_rate, cor_by = geo_value, dt1 = -14)
 ```
 
 ```{r plot-corr-lags-ex}
-#| fig-align: center
+#| fig-width: 7
 #| warning: false
 rbind(
   cor0 |> mutate(lag = 0),
   cor14 |> mutate(lag = 14)
 ) |>
   mutate(lag = as.factor(lag)) |>
-  ggplot(aes(x = time_value, y = cor)) +
-  geom_hline(yintercept = 0) +
-  geom_line(aes(color = lag)) +
-  scale_color_brewer(palette = "Set1") +
-  scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
-  labs(x = "Date", y = "Correlation", col = "Lag")
+  ggplot(aes(cor)) +
+  geom_density(aes(fill = lag, col = lag), alpha = 0.5) +
+  labs(x = "Correlation", y = "Density", fill = "Lag", col = "Lag")
 ```
 
+* We can see that, in general, lagging the case rates back by 14 days improves the correlations.
+
+
+## Features - Systematic lag analysis
+
+The analysis helps identify the lag at which case rates from the past have the strongest correlation with future death rates.
+
+```{r sys-lag-ex}
+#| fig-width: 7
+lags <- 0:35
+
+z <- map_dfr(lags, function(lag) {
+  epi_cor(edf, case_rate, death_rate, cor_by = geo_value, dt1 = -lag) %>%
+    mutate(lag = .env$lag)
+})
+
+z_summary <- z %>%
+  group_by(lag) %>%
+  summarize(mean = mean(cor, na.rm = TRUE))
+
+# Find the lag with the maximum correlation
+max_lag <- z_summary$lag[which.max(z_summary$mean)]
+```
+
+```{r plot-sys-lag-ex}
+#| fig-width: 7
+#| warning: false
+z_summary |> 
+  ggplot(aes(x = lag, y = mean)) +
+  geom_line() +
+  geom_point() +
+  geom_vline(xintercept = max_lag, linetype = "dashed", color = "royalblue", lwd = 1) + 
+  labs(x = "Lag", y = "Mean correlation")
+```
+The strongest correlation occurs at a lag of about 23 days, indicating that case rates are best correlated with death rates 23 days from now.
+
 ## Features - Compute growth rates
+
+* Growth rate measures the relative change in a signal over time. <!-- indicating how quickly a quantity (like case rates) is increasing or decreasing. -->
+
+* We can compute time-varying growth rates for the two states, and see how this cases evolves over time.
 
 ```{r growth-rates-ex}
 #| echo: true
@@ -802,7 +802,20 @@ edfg |>
   scale_y_continuous(name = NULL)
 ```
 
+* As expected, the peak growth rates for both states occurred during the January 2022 Omicron wave, reflecting the sharp rise in cases over that period.
+
 ## Features - Outlier detection
+
+<!-- * There are multiple outliers in these data that a modeler may want to detect and correct. -->
+
+* The `detect_outlr()` function offers multiple outlier detection methods on a signal.
+
+* The simplest is `detect_outlr_rm()`, which works by calculating an outlier threshold using the rolling median and the rolling Interquartile Range (IQR) for each time point:
+
+**Threshold = Rolling Median ± (Detection Multiplier × Rolling IQR)**
+
+* Note that the default number of time steps to use in the rolling window by default is 21 and is centrally aligned. 
+* The detection multiplier default is 2 and controls how far away a data point must be from the median to be considered an outlier.
 
 ```{r outlier-ex}
 #| echo: true
@@ -817,9 +830,14 @@ edfo <- filter(edf, geo_value %in% c("ut", "ca")) |>
   ungroup()
 ```
 
+## Features - Outlier detection
+
+* Several data points that deviate from the expected case cadence have been flagged as outliers, and may require further investigation.
+
+* However, the peak in Jan. 2022 has also been flagged as an outlier. This highlights the importance of manual inspection before correcting the data, as these may represent valid events (e.g., a genuine surge in cases).
+
 ```{r plot-outlier-ex}
-#| fig-width: 8
-#| fig-height: 4
+#| fig-width: 7
 edfo |> 
   unnest() |> 
   mutate(case_corrected = replacement) |> 
@@ -835,13 +853,16 @@ edfo |>
   ) |> 
   ggplot(aes(x = time_value)) +
   geom_line(aes(y = value, color = name)) +
-  scale_color_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Set1", name = "") +
   geom_hline(yintercept = 0) +
   facet_wrap(vars(geo_value), scales = "free_y", nrow = 1) +
   scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
   labs(x = "Date", y = "COVID-19 case rates") +
-  theme(legend.position = c(.120, .8), legend.background = element_rect(fill = NA), legend.key = element_rect(fill = NA))
+  theme(legend.position = c(.075, .8), 
+        legend.background = element_rect(fill = NA), 
+        legend.key = element_rect(fill = NA))
 ```
+
 
 ## `epi_archive`: Collection of `epi_df`s
 
@@ -871,6 +892,7 @@ archive_cases_dv_subset
 
 
 ```{r plot-revision-patterns}
+#| fig-width: 7
 ggplot(snapshots |> filter(!latest),
        aes(x = time_value, y = percent_cli)) +  
   geom_line(aes(color = factor(version))) + 
@@ -909,14 +931,47 @@ ggplot(snapshots |> filter(!latest),
 <!-- predicting a finalized value from a provisional value and making predictions. -->
 ## Backfill Canadian edition
   
-* Every week the BC CDC releases COVID-19 hospitalization data.
+* Every week the [BC CDC releases COVID-19 hospitalization data](http://www.bccdc.ca/health-info/diseases-conditions/covid-19/archived-b-c-covid-19-data).
 
 * Following week they revise the number upward (by ~25%) due to lagged reports.
 
-![](gfx/bc_hosp_admissions_ex.jpg){style="width: 50%; display: block; margin-left: auto; margin-right: auto;"}
+![](gfx/bc_hosp_admissions_ex.jpg){style="width: 45%; display: block; margin-left: auto; margin-right: auto;"}
 <!-- Newest iteration of "backfill”, Canada edition. Every week the BC CDC releases hospitalization data. The following week they revise the number upward (by about 25%) due to lagging reports. Every single week, the newspaper says “hospitalizations have declined”. This week the BC CDC’s own report said “hospitalizations have declined”. The takeaway in the news is that hospitalizations ALWAYS fall from the previous week, but once backfilled, they’re rarely down -->
 
 * [**Takeaway**]{.primary}: Once the data is backfilled, hospitalizations rarely show a decline, challenging the common media narrative.
+
+## Backfill American edition
+
+* Again, we can see a similar systematic underestimation problem for COVID-19 morality rates in CA. <!-- 2023-2024 -->
+
+* This plot also illustrates the [**revision process**]{.primary} - how the reported mortality changes & increases across multiple updates until it stabilizes at the final value (black line).
+
+![](gfx/am_mortality_revisions_ex.jpg){style="width: 45%; display: block; margin-left: auto; margin-right: auto;"}
+
+* These two examples show the problem and now we need a solution...
+
+## Nowcasting and its mathematical setup
+
+* **Nowcasting**: Predict a finalized value from a provisional value.
+
+* Suppose today is time $t$
+
+* Let $y_i$ denote a series of interest observed at times $i=1,\ldots, t$.
+
+::: {.callout-important icon="false"}
+## Our goal
+
+* Produce a [**point nowcast**]{.primary} for the finalized values of $y_t$.
+* Accompany with time-varying prediction intervals
+
+:::
+
+* We also have access to $p$ other time series 
+$x_{ij},\; i=1,\ldots,t, \; j = 1,\ldots,p$
+
+* All may be subject to revisions.
+
+
 
 ## Aside on nowcasting
 
@@ -951,25 +1006,6 @@ cowplot::plot_grid(p1, p2)
 * Group built [`{rtestim}`](https://dajmcdon.github.io/rtestim) doing for this nonparametrically.
 
 * We may come back to this later...
-
-## Mathematical setup
-
-* Suppose today is time $t$
-
-* Let $y_i$ denote a series of interest observed at times $i=1,\ldots, t$.
-
-::: {.callout-important icon="false"}
-## Our goal
-
-* Produce a [**point nowcast**]{.primary} for the finalized values of $y_t$.
-* Accompany with time-varying prediction intervals
-
-:::
-
-* We also have access to $p$ other time series 
-$x_{ij},\; i=1,\ldots,t, \; j = 1,\ldots,p$
-
-* All may be subject to revisions.
 
 # Nowcasting with One Variable
 
@@ -1070,7 +1106,7 @@ summary(as.numeric(res$diff))
 * So if we were doing this in real-time, then we wouldn't have access to the finalized data.
 
 ## Comparison of final vs. multiple revisions
-This figure shows the finalized rates in comparison to [**multiple revisions**]{.primary} to see how the data changes over time:
+This shows the finalized rates in comparison to [**multiple revisions**]{.primary} to see how the data changes over time:
 
 ```{r mortality-by-revision-date}
 #| echo: false
@@ -1098,7 +1134,8 @@ ggplot() +
   geom_line(data = mortality_latest, aes(x = time_value, y = mortality), color = "black", size = 1) +
   geom_line(data = mortality_revisions, aes(x = time_value, y = mortality, color = as.factor(revision_date))) +
   geom_point(data = mortality_revisions, aes(x = time_value, y = mortality, color = as.factor(revision_date)), size = 2) +
-  labs(color = "Revision Date", y = "date") + 
+  theme_gray() + 
+  labs(color = "Revision Date", y = "Mortality", x = "Date") + 
   ggtitle("COVID-19 Mortality in CA: Finalized (black) vs Various Revisions")
 
 ```
@@ -1262,15 +1299,32 @@ Tells us the distribution is right-skewed (mean > median) and so we should opt f
 
 
 ## Nowcasting on Feb. 25
-Since the [**median ratio**]{.primary} between real-time and finalized values is [**0.250**]{.primary} (i.e., real-time values are typically 25% of the finalized), then the nowcast is
-```{r nowcast-feb25}
+
+* Since the [**median ratio**]{.primary} between real-time and finalized values is [**0.250**]{.primary} (i.e., real-time values are typically 25% of the finalized), then the nowcast is
+```{r nowcast-feb25-point}
 #| echo: true
 # Now we can nowcast properly:
 nowcast <- provisional *
   1 / median(ratio_real_time_to_feb25)
 nowcast
 ```
-So, this [**nowcast is 92**]{.primary}, which is much closer to the [**finalized value of 104**]{.primary} than the [**provisional value of 23**]{.primary}.
+
+* To get the accompanying 95% prediction interval, calculate the 2.5th and 97.5th percentiles:
+
+```{r nowcast-feb25-lower}
+#| echo: true
+percentile_97.5 <- quantile(ratio_real_time_to_feb25, 0.975) |> unname()
+
+(lower_PI <- provisional * 1 / percentile_97.5)
+```
+
+```{r nowcast-feb25-upper}
+#| echo: true
+percentile_2.5 <- quantile(ratio_real_time_to_feb25, 0.025) |> unname()
+(upper_PI <- provisional * 1 / percentile_2.5)
+```
+
+* So, the [**nowcast is 92**]{.primary} with 95% PI: [61, 140], which is much closer to the [**finalized value of 104**]{.primary} than the [**provisional value of 23**]{.primary}.
 
 ## Summary of three main steps 
 So the main steps for this type of fixed lag nowcasting are...
@@ -1302,9 +1356,11 @@ mortality_as_of_feb25 <- epix_as_of(mortality_archive, as_of_date) |> filter(tim
 ratio_real_time_to_feb25 <- mortality_real_time_df$mortality / mortality_as_of_feb25$mortality
 
 # 3. Profit.
-nowcast <- provisional *
-  1 / median(ratio_real_time_to_feb25)
-nowcast
+(nowcast <- provisional * 1 / median(ratio_real_time_to_feb25))
+
+(upper_PI <- provisional * 1 / quantile(ratio_real_time_to_feb25, 0.025))
+(lower_PI <- provisional * 1 / quantile(ratio_real_time_to_feb25, 0.975))
+
 ```
 
 ## Nowcasting mortality for multiple dates
@@ -1338,11 +1394,15 @@ nowcast_function <- function(nowcast_date, fixed_lag) {
   
   #3. Profit.
   nowcast <- provisional * (1 / median_ratio)
+  upper_PI <- provisional * (1 / quantile(ratios[is.finite(ratios)], 0.025))
+  lower_PI <- provisional * (1 / quantile(ratios[is.finite(ratios)], 0.975))
   
   # Return a dataframe with the nowcast and date
   tibble(
     time_value = nowcast_date,
-    nowcast_mortality = nowcast
+    nowcast = nowcast,
+    lower_PI = lower_PI,
+    upper_PI = upper_PI 
   )
 }
 ```
@@ -1362,10 +1422,12 @@ nowcast_results_df <- map2(nowcast_dates, fixed_lag, nowcast_function) |> list_r
 Let's smooth with a rolling trailing mean (window size 4) & see the results:
 
 ```{r smooth-print-res}
-# Smooth results: Apply rolling median to nowcast_mortality with a window size of 4
-nowcast_results_df$nowcast_mortality <- zoo::rollapply(nowcast_results_df$nowcast_mortality, width = 4, FUN = mean, partial = TRUE, align = "right")
-# nowcast_results_df$nowcast_mortality[1:3] |> median()
-
+# Smooth results: Apply rolling median to nowcast and bounds with a window size of 4
+library(zoo)
+nowcast_results_df <- nowcast_results_df |> 
+  mutate(across(.cols = -time_value,  
+                .fns = ~ zoo::rollapply(.x, width = 4, FUN = mean, partial = TRUE, align = "right"),
+                .names = "{.col}"))
 nowcast_results_df
 ```
 
@@ -1373,19 +1435,87 @@ nowcast_results_df
 Finally, we can compare these nowcast results to the real-time and finalized values:
 ```{r nowcast-fun-plot-results}
 #| echo: false
-ggplot() +
-  geom_line(data = nowcast_results_df, aes(x = time_value, y = nowcast_mortality, color = "Nowcast")) +
-  geom_point(data = nowcast_results_df, aes(x = time_value, y = nowcast_mortality, color = "Nowcast"), shape = 16) +
+ggplot() + 
+  geom_line(data = nowcast_results_df, aes(x = time_value, y = nowcast, color = "Nowcast")) +
+  geom_point(data = nowcast_results_df, aes(x = time_value, y = nowcast, color = "Nowcast"), shape = 16) +
   geom_line(data = map_dfr(nowcast_dates, mortality_real_time), aes(x = time_value, y = mortality, color = "Real-Time")) +
   geom_point(data = map_dfr(nowcast_dates, mortality_real_time), aes(x = time_value, y = mortality, color = "Real-Time"), shape = 16) +
   geom_line(data = mortality_latest |> filter(time_value %in% nowcast_dates), aes(x = time_value, y = mortality, color = "Finalized")) +
   geom_point(data = mortality_latest |> filter(time_value %in% nowcast_dates), aes(x = time_value, y = mortality, color = "Finalized"), shape = 16) +
+  geom_ribbon(data = nowcast_results_df, 
+              aes(x = time_value, ymin = lower_PI, ymax = upper_PI), 
+              alpha = 0.2, fill = "blue") +
   ylab("Mortality") +
   xlab("Date") +
   scale_color_manual(values = c("Nowcast" = "blue", "Real-Time" = "red", "Finalized" = "black")) + 
   labs(color = "Mortality Type")  # Adds the legend title
 ```
 The real-time counts tend to be biased below the finalized counts. Nowcasted values tend to provide a much better approximation of the truth (at least for these dates).
+
+## Evaluation using MAE
+
+* Assume we have prediction $\hat y_{t}$ for the provisional value at time $t$.
+
+* Then for $y_{t}$ over times $t = 1, \dots, N$, then we may compute error metrics like mean absolute error (MAE).
+
+<!-- We'll see other error measures later on! For now, let's start with one that is simple and easy to interpret.-->
+
+* MAE measures the average absolute difference between the nowcast and finalized values. 
+
+$$MAE = \frac{1}{N} \sum_{t=1}^N |y_{t}- \hat y_{t}|$$
+
+* Note that it's scale-dependent, meaning it can vary depending on the units of the data (e.g., cases, deaths, etc.).
+
+## Evaluation using MAE
+
+Let's numerically evaluate our point nowcasts for the provisional values of a time series (e.g., COVID-19 mortality) using MAE.
+
+<!-- Accuracy of nowcast is assessed by how close provisional estimates are to the finalized values to gauge the model's performance. -->
+
+```{r mae-code}
+#| echo: true
+# Step 1: Join the mortality data with nowcast data
+mae_data <- mortality_latest |> 
+  filter(time_value %in% nowcast_dates) |>   
+  left_join(nowcast_results_df, by = "time_value") |> 
+  left_join(map_dfr(nowcast_dates, mortality_real_time) |> rename(real_time = mortality), by = c("geo_value", "time_value"))
+
+# Step 2: Calculate the absolute error between actual and nowcasted values
+mae_data <- mae_data |> 
+  mutate(nc_abs_error = abs(mortality - nowcast),
+         rt_abs_error = abs(mortality - real_time))  
+
+# Step 3: Compute the MAE (mean of absolute errors)
+mae_value <- mae_data |> 
+  summarise(nc_MAE = mean(nc_abs_error),
+            rt_MAE = mean(rt_abs_error))
+knitr::kable(mae_value)
+```
+
+## Evaluation using MAE
+
+Finally, we may visualize the distribution of errors across time:
+```{r abs-error-plot}
+ggplot(mae_data) +
+  # Nowcast Absolute Error 
+  geom_point(aes(x = time_value, y = nc_abs_error), color = "blue", size = 2) +
+  geom_line(aes(x = time_value, y = nc_abs_error), color = "blue") +
+  # Horizontal line for Nowcast Mean Absolute Error
+  geom_hline(aes(yintercept = mean(nc_abs_error), color = "Nowcast MAE"), linetype = "dashed") +
+  
+  # Real-Time Absolute Error 
+  geom_point(aes(x = time_value, y = rt_abs_error), color = "red", size = 2) +
+  geom_line(aes(x = time_value, y = rt_abs_error), color = "red") +
+  # Horizontal line for Real-Time Mean Absolute Error
+  geom_hline(aes(yintercept = mean(rt_abs_error), color = "Real-Time MAE"), linetype = "dashed") +
+  
+  # Customize the x and y axes labels, legend & add title
+  xlab("Time") + ylab("Absolute Error") +
+  scale_color_manual(values = c("Real-Time MAE" = "red", "Nowcast MAE" = "blue")) +
+  labs(color = "Mean Absolute Error")
+```
+
+We can see that the absolute errors are almost always lower for nowcasting.
 
 # Nowcasting with Two Variables
 
@@ -1594,13 +1724,64 @@ ggplot(res, aes(x = time_value)) +
         axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
+## Evaluation using MAE
+
+* As before, we can evaluate our point nowcasts numerically using MAE.
+
+```{r mae-code-hosp}
+#| echo: true
+# Calculate the absolute error between actual and nowcasted values
+mae_data_admissions <- res |> 
+  mutate(nc_abs_error = abs(admissions - fit),  # Nowcast vs Finalized admissions
+         rt_abs_error = abs(admissions - real_time_val))  # Real-Time vs Finalized admissions
+
+# Compute the MAE (mean of absolute errors)
+mae_value_admissions <- mae_data_admissions |> 
+  summarise(nc_MAE = mean(nc_abs_error),
+            rt_MAE = mean(rt_abs_error))
+knitr::kable(mae_value_admissions)
+```
+
+* Based off of comparing these simple error measures, the nowcast MAE is clearly better.
+
+## Evaluation using MAE
+
+However, when we visualize the distribution of errors across time, it is not so cut-and-dry:
+```{r abs-error-plot-hosp}
+# Plot the absolute errors for Nowcast and Real-Time vs Finalized Admissions
+ggplot(mae_data_admissions) +
+  # Nowcast Absolute Error 
+  geom_point(aes(x = time_value, y = nc_abs_error), color = "#1f78b4", size = 2) +
+  geom_line(aes(x = time_value, y = nc_abs_error), color = "#1f78b4") +
+  # Horizontal line for Nowcast Mean Absolute Error
+  geom_hline(aes(yintercept = mean(nc_abs_error), color = "Nowcast MAE"), linetype = "dashed") +
+  
+  # Real-Time Absolute Error 
+  geom_point(aes(x = time_value, y = rt_abs_error), color = "darkred", size = 2) +
+  geom_line(aes(x = time_value, y = rt_abs_error), color = "darkred") +
+  # Horizontal line for Real-Time Mean Absolute Error
+  geom_hline(aes(yintercept = mean(rt_abs_error), color = "Real-Time MAE"), linetype = "dashed") +
+  
+  # Customize the x and y axes labels, legend & add title
+  xlab("Time") + ylab("Absolute Error") +
+  scale_color_manual(values = c("Real-Time MAE" = "darkred", "Nowcast MAE" = "#1f78b4")) +
+  labs(color = "Mean Absolute Error") +
+  theme_minimal() +
+  theme(legend.position = "top", legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The main driver behind the real-time MAE being greater is the "outlier-like" May 25 AE.
+
+So visualizing can provide an important perspective that is missed from a simple numerical summary of error.
+
 ## Key Takeaways: Linear regression nowcasting example
 
 * [**Provisional Data as Predictors**]{.primary}: Using [Google symptom search trends]{.primary} to predict [influenza hospital admissions]{.primary}.
 * [**Simple Linear Model**]{.primary}: A linear regression model captures the relationship between symptom searches and hospital admissions.
 * [**Actionable Predictions**]{.primary}: Nowcasts provide [timely insights]{.primary} for hospital admissions, even before data is finalized.
 * [**Sliding Window Approach**]{.primary}: Predictions are based on [data up to the current time]{.primary}, ensuring no future information influences the nowcast.
-* [**Evaluation**]{.primary}: Predictions are compared with actual admissions visually.
+* [**Evaluation**]{.primary}: Predictions are compared with actual admissions using numerical and visual perspectives.
 
 # Case Study - Nowcasting Cases Using %CLI 
 
@@ -1781,8 +1962,8 @@ Here's a summary of what `process_data_for_date_range()` does:
 
 ## Fetch Data - Run the function & inspect archive
 
-* Now, let's run the function & inspect the resulting `epi_archive` of 7-day averaged COVID-19 case counts:
-* Expect building the archive to take a nontrivial amount of time (enough for a cup of coffee or to meditate on life).
+* Now, let's run the function & inspect the resulting `epi_archive` of 7-day avg. COVID-19 case counts:
+* Expect building the archive to some time (enough for a cup of coffee or to meditate on life).
 
 <!-- To wonder why you chose Expect building the archive to take a nontrivial amount of time (enough for a cup of coffee or to wonder why you chose coding in the first place). -->
 ```{r run-fun-process-data-range}
@@ -1792,7 +1973,14 @@ y <- process_data_for_date_range("2021-01-10", "2021-12-01")  # Raw .xlsx data i
 y
 ```
 
-* Alternatively, you may run the following to load `y` that was previously saved as an RDS file: `y <- readRDS("_data/ma_case_archive.rds")`.
+* Alternatively, you may run the following to load `y` that was previously saved as an RDS file: 
+```{r load-ma-case-data}
+#| echo: true
+#| eval: FALSE
+#| results: hide
+y <- readRDS("_data/ma_case_archive.rds")
+```
+
 
 ## Fetch Data - % Outpatient doctors visits for CLI
 
@@ -1904,7 +2092,8 @@ res
 ```
 
 ## Visualizing nowcasts vs. actual values
-Finally, plot the predictions & real-time values on top of latest COVID-19 cases using `ggplot2`:
+
+Now, plot the predictions & real-time values on top of latest COVID-19 cases using `ggplot2`:
 
 ```{r plot-simple-lr-nowcast-res}
 #| echo: false
@@ -1935,6 +2124,55 @@ ggplot(res, aes(x = time_value)) +
   )
 ```
 
+## Evaluation using MAE
+
+* Finally, we numerically evaluate our nowcasts using MAE.
+
+* Shows that the nowcast errors are lower than those of the real-time estimates.
+
+```{r mae-code-cases}
+#| echo: true
+# Calculate the absolute error between actual and nowcasted COVID-19 cases
+mae_data_cases <- res |> 
+  mutate(nc_abs_error = abs(case_rate_7d_av - fit),  # Nowcast vs Finalized cases (7-day average)
+         rt_abs_error = abs(case_rate_7d_av - real_time_val))  # Real-Time vs Finalized cases
+
+# Compute the MAE (mean of absolute errors)
+mae_value_cases <- mae_data_cases |> 
+  summarise(nc_MAE = mean(nc_abs_error),
+            rt_MAE = mean(rt_abs_error))
+knitr::kable(mae_value_cases)
+```
+
+
+## Evaluation using MAE
+
+```{r abs-error-plot-cases}
+# Plot the absolute errors for Nowcast and Real-Time vs Finalized COVID-19 cases
+ggplot(mae_data_cases) +
+  # Nowcast Absolute Error 
+  geom_point(aes(x = time_value, y = nc_abs_error), color = "#1f78b4", size = 2) +
+  geom_line(aes(x = time_value, y = nc_abs_error), color = "#1f78b4") +
+  # Horizontal line for Nowcast Mean Absolute Error
+  geom_hline(aes(yintercept = mean(nc_abs_error), color = "Nowcast MAE"), linetype = "dashed") +
+  
+  # Real-Time Absolute Error 
+  geom_point(aes(x = time_value, y = rt_abs_error), color = "darkred", size = 2) +
+  geom_line(aes(x = time_value, y = rt_abs_error), color = "darkred") +
+  # Horizontal line for Real-Time Mean Absolute Error
+  geom_hline(aes(yintercept = mean(rt_abs_error), color = "Real-Time MAE"), linetype = "dashed") +
+  
+  # Customize the x and y axes labels, legend & add title
+  xlab("Date") + ylab("Absolute Error") +
+  scale_color_manual(values = c("Real-Time MAE" = "darkred", "Nowcast MAE" = "#1f78b4")) +
+  labs(color = "Mean Absolute Error") +
+  theme_minimal() +
+  theme(legend.position = "top", legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The elevated errors at both ends highlight periods where the discrepancies between the real-time and nowcast estimates are most pronounced.
+
 ## Takeaways
 
 [**Goal**]{.primary}: Predict COVID-19 cases using %CLI, overcoming delays in report data.
@@ -1949,7 +2187,7 @@ Main Steps:
 
 4. [**Nowcast**]{.primary}: Apply dynamic forecasting with `epix_slide()`.
 
-5. [**Visualize**]{.primary}: Plot nowcasts vs. actual cases with confidence intervals.
+5. [**Evaluate**]{.primary}: Calculate error measures and numerically and visually assess the results.
 
 Overall, nowcasting, based on the linear model, provided a closer approximation of true cases compared to the real-time values.
 
