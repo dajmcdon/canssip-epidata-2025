@@ -797,6 +797,51 @@ observed_pred_arx_rf <- ca_extend |> filter(time_value %in% pred_arx_rf$target_d
 getErrors(observed_pred_arx_rf$deaths, pred_arx_rf$.pred, "")
 ```
 
+## Warning!
+
+Random forests have really [poor coverage]{.primary} here. 
+Can [change engine]{.primary} to get better coverage: 
+
+specify `engine = "grf_quantiles"` in the `rand_forest` call
+
+```{r arx-with-grf}
+#| fig-align: left
+pred_arx_grf <- ca_extend |>
+  epi_slide(
+    ~ arx_forecaster(epi_data = .x,
+                     outcome = "deaths", 
+                     predictors = c("deaths", "hospitalizations"), 
+                     trainer = parsnip::rand_forest(mode = "regression",
+                                                    engine = "grf_quantiles"),
+                     args_list = arx_args_list(
+                       lags = 0, 
+                       #lags = c(0, 7, 14),  # worse predictions
+                       ahead = 28,
+                       quantile_levels = c(0.1, 0.9))
+                     )$predictions |>
+        pivot_quantiles_wider(.pred_distn),
+  .window_size = w, 
+  .ref_time_values = fc_time_values
+)
+
+pred_arx_grf |>
+  ggplot(aes(target_date, .pred)) +
+  geom_line(data = ca_extend, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(col = primary) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_vline(xintercept = t0_date) +    
+  geom_vline(xintercept = t0_date + 28, lty = 2) +
+  labs(x = "", y = "Deaths per 100k people") +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.title = element_blank())
+```
+
+
+```{r error-arx-grf, eval=FALSE}
+observed_pred_arx_grf <- ca_extend |> filter(time_value %in% pred_arx_grf$target_date)
+getErrors(observed_pred_arx_grf$deaths, pred_arx_grf$.pred, "")
+```
+
 
 ## Geo-pooling
 
@@ -852,7 +897,7 @@ pred_arx_geo_pool |>
   theme(legend.title = element_blank())
 ```
 
-```{r error-arx-geo-pooling, eval=FALSE}
+```{r error-arx-geo-pooling}
 pred_ca_geo_pool <- pred_arx_geo_pool |> filter(geo_value == "ca")
 observed_ca_geo_pool <- ca_extend |> filter(time_value %in% pred_ca_geo_pool$target_date)
 getErrors(observed_ca_geo_pool$deaths, pred_ca_geo_pool$.pred, "")
@@ -1004,7 +1049,8 @@ Be able to add/remove layers of complexity sequentially
 
 ## Fit a forecaster from scratch
 
-So far, we performed some [manual pre-processing]{.primary}, and then relied on a [canned forecaster]{.primary}
+So far, we performed some [manual pre-processing]{.primary}, and then relied on 
+a [canned forecaster]{.primary}
 to automatically perform [more pre-processing]{.primary}, [training]{.primary}, [predicting]{.primary}, and [post-processing]{.primary}.
 
 
@@ -1053,21 +1099,18 @@ preds <- trained_ewf |> predict(new_data = latest)
 
 # A Flu Forecaster
 
-## Get the data
+## Flu data archive
 
-```{r get-flu-data}
-#| echo: true
-flu <- pub_covidcast(
-  source = "hhs",
-  signals = "confirmed_admissions_influenza_1d_prop",
-  time_type = "day",
-  geo_type = "state",
-  time_values = epirange(20200101, 20241231)
-  #issues = epirange(20200101, 20241231)
-) |> 
-  select(geo_value, time_value, hosp = value) |>
+```{r load-flu-data}
+source(here::here("_code/weekly_hhs.R"))
+```
+
+```{r show-flu-data}
+weekly_archive
+
+flu <- weekly_archive$DT |> 
+  filter(version == "2023-11-15") |>
   as_epi_df()
-
 ```
 
 ## Build forecaster
@@ -1078,14 +1121,14 @@ flu <- pub_covidcast(
 r <- epi_recipe(flu) |>
   #drop_non_seasons() |>
   step_population_scaling(
-    hosp,
+    hhs,
     df = epidatasets::state_census,
     df_pop_col = "pop",
     create_new = FALSE,
     rate_rescaling = 1e5,
     by = c("geo_value" = "abbr")) |>
-  step_epi_lag(hosp, lag = c(0, 7, 14)) |>
-  step_epi_ahead(hosp, ahead = 14) |>
+  step_epi_lag(hhs, lag = c(0, 7, 14)) |>
+  step_epi_ahead(hhs, ahead = 14) |>
   step_epi_naomit()
 
 # Training engine
@@ -1119,10 +1162,67 @@ latest <- get_test_data(r, flu)
 preds <- trained_ewf |> predict(new_data = latest)
 ```
 
-## Predictions
+## Predictions at one forecast date
 
-```{r}
+```{r pred-one-forecast-date}
 preds |> pivot_quantiles_wider(.pred)
+```
+
+## Slide forecaster
+
+```{r slide-flu-forecaster}
+#| echo: true
+flu_forecast <- function(epi_archive, forecast_date, ahead = 14) {
+  flu <- epi_archive$DT |> 
+    filter(version == forecast_date) |>
+    as_epi_df()
+
+  r <- epi_recipe(flu) |>
+    #drop_non_seasons() |>
+    step_population_scaling(
+      hhs,
+      df = epidatasets::state_census,
+      df_pop_col = "pop",
+      create_new = FALSE,
+      rate_rescaling = 1e5,
+      by = c("geo_value" = "abbr")) |>
+    step_epi_lag(hhs, lag = c(0, 7, 14)) |>
+    step_epi_ahead(hhs, ahead = ahead) |>
+    step_epi_naomit()
+  
+  ewf <- epi_workflow(r, e, f)
+  trained_ewf <- ewf |> fit(flu)
+  latest <- get_test_data(r, flu)
+  preds <- trained_ewf |> predict(new_data = latest)
+  return(preds)
+}
+
+forecast_dates <- seq.Date(as.Date("2023-10-04"), as.Date("2024-03-27"), by = 7L)
+forecasts <- bind_rows(map(forecast_dates, 
+                           ~ flu_forecast(weekly_archive, forecast_date = .x, ahead = 14)))
+```
+
+## Version-aware predictions
+
+```{r plot-flu-predictions}
+forecasts |>
+  pivot_quantiles_wider(.pred) |>
+  filter(geo_value %in% c("ca", "fl", "ny", "tx")) |>
+  ggplot(aes(x = target_date)) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = 0.2) +
+  #geom_vline(data = data_at_fc, aes(color = factor(version), xintercept = version), lty = 2) +
+  geom_line(
+    data = weekly_archive$DT |> 
+      filter(geo_value %in% c("ca", "fl", "ny", "tx") &
+               time_value >= min(forecasts$forecast_date)),
+    aes(x = time_value, y = hhs, color = factor(version)),
+    inherit.aes = FALSE, na.rm = TRUE, alpha = .5
+  ) +
+  geom_line(aes(y = `0.5`, color = factor(time_value))) +
+  geom_point(aes(y = `0.5`, color = factor(time_value))) +
+  facet_wrap(vars(geo_value)) +
+  labs(x = "", y = "Deaths per 100k people") +
+  theme(legend.position = "none")
 ```
 
 
