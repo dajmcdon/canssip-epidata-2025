@@ -25,6 +25,8 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. Delphi 
 
+1. Overview of this Workshop
+
 1. Panel Data
 
 1. Versioned Data
@@ -70,6 +72,12 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 ![](gfx/web_of_parts.svg){fig-align=center}
 
+# Workshop Overview
+
+## A few slides here
+
+## A few slides here
+
 # Panel Data
 
 ## Panel data
@@ -110,6 +118,7 @@ as_epi_df(panel_data[[1]]) %>%
 
 * WA switch to weekly reporting in 2022
 * FL reports "whenever" (weekly, biweekly, three days in a row, then 4 zeros, etc.)
+* API calculates change from cumulative, so no-report becomes a 0.
 
 :::
 
@@ -1272,9 +1281,13 @@ head(dv_state_issues_star) |>
 
 So, now we obtain all available issues for all states (not just PA) for the specified date range. Neat!
 
+<!--
+
 ## Last but not least... The do nothing approach 
 
 ![](gfx/do-nothing.jpg){height="550px"}
+
+-->
 
 ## Last but not least... The do nothing approach 
 **Final question:** What do you think happens when we adopt a "do nothing" approach to `geo_values` and `issues` (take both of them out) for this example?
