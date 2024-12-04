@@ -236,7 +236,7 @@ deaths_outlr |>
   labs(x = "", y = "Covid-19 deaths per 100k people")
 ```
 
-```{r outlier-cases}
+```{r outlier-cases, message=FALSE}
 cases_outlr <- df |> 
   group_by(geo_value) |>
   mutate(outlier_info = detect_outlr(x = time_value, 
@@ -362,24 +362,34 @@ predict(epi_arx$epi_workflow, test)
 
 ## Predict with ARX (when re-fitting)
 
-In practice, if we want to [re-train]{.primary} the forecasters as [new data]{.primary} arrive,
-we fit and predict combining `arx_forecaster` with `epi_slide`.
+* In practice, if we want to [re-train]{.primary} the forecasters as [new data]{.primary} arrive,
+we fit and predict combining `arx_forecaster` with `epix_slide`
 
+* From now on, we will only used [versioned data]{.primary}, and make predictions once a week
 
 ## Predict with ARX (re-fitting on trailing window)
+
+```{r source-versioned-data}
+source(here::here("_code/versioned_data.R"))
+```
+
+```{r ca-archive}
+ca_archive <- covid_archive$DT |> 
+  filter(geo_value == "ca") |>
+  as_epi_archive()
+```
 
 ```{r epipredict-cv-trailing}
 #| echo: true
 h <- 28         #horizon
 w <- 120 + h    #trailing window length
-n <- nrow(ca)   #time-series length
 
 # Specify the forecast dates
-fc_time_values <- seq(from = t0_date, to = ca$time_value[n]-h, by = "1 week")
+fc_time_values <- seq(from = t0_date, to = as.Date("2023-02-09"), by = "1 week")
 
-# Slide the arx_forecaster 
-pred_arx <- ca |>
-  epi_slide(
+# Slide the arx_forecaster over the epi_archive
+pred_arx <- ca_archive |>
+  epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
                      predictors = c("cases", "deaths"), 
@@ -388,8 +398,8 @@ pred_arx <- ca |>
                                                quantile_levels = c(0.1, 0.9))
                      )$predictions |>
         pivot_quantiles_wider(.pred_distn),
-  .window_size = w, 
-  .ref_time_values = fc_time_values
+  .before = w, 
+  .versions = fc_time_values
 )
 ```
 
@@ -418,17 +428,18 @@ implemented by setting:
 
 ```{r epipredict-cv, eval=FALSE}
 # slide an arx_forecaster with appropriate outcome, predictions and lags
-epi_pred <- epi_slide(
-  ca, 
-  ~ arx_forecaster(epi_data = .x,
-                   outcome = "deaths", 
-                   predictors = c("cases", "deaths"), 
-                   trainer = linear_reg() |> set_engine("lm"),
-                   args_list = arx_args_list(lags = 0, ahead = h,
-                                             quantile_levels = c(0.1, 0.9))
-                   )$predictions,
-  .window_size = Inf, 
-  .ref_time_values = fc_time_values
+pred_arx <- ca_archive |>
+  epix_slide(
+    ~ arx_forecaster(epi_data = .x,
+                     outcome = "deaths", 
+                     predictors = c("cases", "deaths"), 
+                     trainer = linear_reg() |> set_engine("lm"),
+                     args_list = arx_args_list(lags = 0, ahead = h,
+                                               quantile_levels = c(0.1, 0.9))
+                     )$predictions |>
+        pivot_quantiles_wider(.pred_distn),
+  .before = Inf, 
+  .versions = fc_time_values
 )
 ```
 
@@ -554,67 +565,66 @@ arx_args_list(
 
 ## Customizing `arx_forecaster`
 
-### Change predictors: hospitalizations instead of cases
+### Change predictors: doctor visits instead of cases
 
-```{r load-hhs-data}
-source(here::here("_code/hospitalizations.R"))
-```
-
-```{r get-hhs-data}
+```{r get-doctor-visits-data}
 #| echo: true
 #| eval: false
-hhs <- pub_covidcast(
-  source = "hhs",
-  signals = "confirmed_admissions_covid_1d_prop_7dav",
+dv_archive <- pub_covidcast(
+  source = "doctor-visits",
+  signals = "smoothed_adj_cli",
   time_type = "day",
   geo_type = "state",
   time_values = epirange(20200401, 20230401),
-  geo_values = "*") |>
-  select(geo_value, time_value, hospitalizations = value)
-```
-
-```{r hhs-data-epi}
-#| echo: true
-df_extend <- left_join(df, hhs, by = c("time_value", "geo_value")) |>
-  as_epi_df() 
-
-ca_extend <- df_extend |> filter(geo_value == "ca")
+  geo_values = "*",
+  issues = epirange(20200401, 20230401)) %>%
+  select(geo_value, time_value, version = issue, doctor_visits = value) %>%
+  arrange(geo_value, time_value) %>%
+  as_epi_archive(compactify = FALSE)
 ```
 
 ## Customizing `arx_forecaster`
 
-### Change predictors: hospitalizations instead of cases
+### Change predictors: doctor visits instead of cases
 
-```{r arx-with-hospital}
+```{r get-archives, warning=FALSE}
+ca_archive_dv <- covid_archive_dv$DT |> 
+  filter(geo_value == "ca") |>
+  as_epi_archive()
+
+usa_archive_dv <- covid_archive_dv$DT |> 
+  as_epi_archive()
+
+usa_archive <- covid_archive$DT |> 
+  as_epi_archive()
+```
+
+
+```{r arx-with-dv}
 #| echo: true
-#| code-line-numbers: "10"
-# Specify the forecast dates
-n = nrow(ca_extend)
-fc_time_values <- seq(from = t0_date, to = ca_extend$time_value[n]-h, by = "1 week")
-
-# Slide the arx_forecaster 
-pred_arx_hosp <- ca_extend |>
-  epi_slide(
+#| code-line-numbers: "5"
+pred_arx_hosp <- ca_archive_dv |>
+  epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "hospitalizations"), 
+                     predictors = c("deaths", "doctor_visits"), 
                      trainer = linear_reg() |> set_engine("lm"),
                      args_list = arx_args_list(lags = 0, ahead = 28,
                                                quantile_levels = c(0.1, 0.9))
                      )$predictions |>
         pivot_quantiles_wider(.pred_distn),
-  .window_size = w, 
-  .ref_time_values = fc_time_values
+  .before = w, 
+  .versions = fc_time_values
 )
 ```
 
-## Predictions (hospitalizations instead of cases in predictor set)
+## Predictions (doctor visits instead of cases in predictor set)
 
-```{r arx-with-hospital-plot}
+```{r arx-with-dv-plot}
 #| fig-align: left
 pred_arx_hosp |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca_extend, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -624,8 +634,8 @@ pred_arx_hosp |>
   theme(legend.title = element_blank())
 ```
 
-```{r error-arx-with-hospital}
-observed_pred_arx_hosp <- ca_extend |> filter(time_value %in% pred_arx_hosp$target_date)
+```{r error-arx-with-dv}
+observed_pred_arx_hosp <- ca |> filter(time_value %in% pred_arx_hosp$target_date)
 getErrors(observed_pred_arx_hosp$deaths, pred_arx_hosp$.pred, "")
 ```
 
@@ -637,11 +647,11 @@ getErrors(observed_pred_arx_hosp$deaths, pred_arx_hosp$.pred, "")
 ```{r arx-with-more-lags}
 #| echo: true
 #| code-line-numbers: "8"
-pred_arx_more_lags <- ca_extend |>
-  epi_slide(
+pred_arx_more_lags <- ca_archive |>
+  epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "hospitalizations"), 
+                     predictors = c("deaths", "cases"), 
                      trainer = linear_reg() |> set_engine("lm"),
                      args_list = arx_args_list(
                        lags = c(0, 7, 14),
@@ -649,8 +659,8 @@ pred_arx_more_lags <- ca_extend |>
                        quantile_levels = c(0.1, 0.9))
                      )$predictions |>
         pivot_quantiles_wider(.pred_distn),
-  .window_size = w, 
-  .ref_time_values = fc_time_values
+  .before = w, 
+  .versions = fc_time_values
 )
 ```
 
@@ -660,7 +670,7 @@ pred_arx_more_lags <- ca_extend |>
 #| fig-align: left
 pred_arx_more_lags |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca_extend, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -671,7 +681,7 @@ pred_arx_more_lags |>
 ```
 
 ```{r error-arx-more-lags}
-observed_pred_arx_more_lags <- ca_extend |> filter(time_value %in% pred_arx_more_lags$target_date)
+observed_pred_arx_more_lags <- ca |> filter(time_value %in% pred_arx_more_lags$target_date)
 getErrors(observed_pred_arx_more_lags$deaths, pred_arx_more_lags$.pred, "")
 ```
 
@@ -684,13 +694,13 @@ getErrors(observed_pred_arx_more_lags$deaths, pred_arx_more_lags$.pred, "")
 ```{r arx-multiple-h}
 #| echo: true
 #| code-line-numbers: "1-2,11,18|19-20"
-fc_time_values <- seq(from = t0_date, to = as.Date("2023-02-01"), by = "1 month")
-pred_h_days_ahead <- function(epi_df, ahead = 7) {
-  epi_df |>
-    epi_slide(
+forecast_times <- seq(from = t0_date, to = as.Date("2023-02-23"), by = "1 month")
+pred_h_days_ahead <- function(epi_archive, ahead = 7) {
+  epi_archive |>
+    epix_slide(
       ~ arx_forecaster(epi_data = .x,
                        outcome = "deaths", 
-                       predictors = c("deaths", "hospitalizations"), 
+                       predictors = c("deaths", "cases"), 
                        trainer = linear_reg() |> set_engine("lm"),
                        args_list = arx_args_list(
                          lags = 0,  
@@ -698,12 +708,12 @@ pred_h_days_ahead <- function(epi_df, ahead = 7) {
                          quantile_levels = c(0.1, 0.9))
       )$predictions |> 
         pivot_quantiles_wider(.pred_distn),
-  .window_size = w, 
-  .ref_time_values = fc_time_values
+  .before = w, 
+  .versions = forecast_times
   )
 }
 h <- c(7, 14, 21, 28)
-forecasts <- bind_rows(map(h, ~ pred_h_days_ahead(ca_extend, ahead = .x)))
+forecasts <- bind_rows(map(h, ~ pred_h_days_ahead(ca_archive, ahead = .x)))
 ```
 
 ## Predictions (multiple horizons)
@@ -711,12 +721,12 @@ forecasts <- bind_rows(map(h, ~ pred_h_days_ahead(ca_extend, ahead = .x)))
 ```{r arx-multiple-h-plot}
 #| fig-width: 10
 #| fig-height: 5
-ggplot(data = forecasts, aes(x = target_date, group = time_value)) +
+ggplot(data = forecasts, aes(x = target_date, group = forecast_date)) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`, fill = factor(forecast_date)), 
               alpha = 0.4) +
   geom_vline(aes(xintercept = forecast_date, color = factor(forecast_date)), 
              lty = 2) +
-  geom_line(data = ca_extend,
+  geom_line(data = ca,
     aes(x = time_value, y = deaths),
     inherit.aes = FALSE, na.rm = TRUE, alpha = .5
   ) +
@@ -757,21 +767,20 @@ arx_forecaster(epi_data = train |> as_epi_df(),
 ```{r arx-with-random-forests}
 #| echo: true
 #| code-line-numbers: "6"
-pred_arx_rf <- ca_extend |>
-  epi_slide(
+pred_arx_rf <- ca_archive |>
+  epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "hospitalizations"), 
+                     predictors = c("deaths", "cases"), 
                      trainer = parsnip::rand_forest(mode = "regression"), # defaults to ranger
                      args_list = arx_args_list(
-                       lags = 0, 
-                       #lags = c(0, 7, 14),  # worse predictions
+                       lags = 0,  
                        ahead = 28,
                        quantile_levels = c(0.1, 0.9))
                      )$predictions |>
         pivot_quantiles_wider(.pred_distn),
-  .window_size = w, 
-  .ref_time_values = fc_time_values
+  .before = w, 
+  .versions = fc_time_values
 )
 ```
 
@@ -781,7 +790,7 @@ pred_arx_rf <- ca_extend |>
 #| fig-align: left
 pred_arx_rf |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca_extend, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -793,7 +802,7 @@ pred_arx_rf |>
 
 
 ```{r error-arx-random-forests}
-observed_pred_arx_rf <- ca_extend |> filter(time_value %in% pred_arx_rf$target_date)
+observed_pred_arx_rf <- ca |> filter(time_value %in% pred_arx_rf$target_date)
 getErrors(observed_pred_arx_rf$deaths, pred_arx_rf$.pred, "")
 ```
 
@@ -806,27 +815,25 @@ specify `engine = "grf_quantiles"` in the `rand_forest` call
 
 ```{r arx-with-grf}
 #| fig-align: left
-pred_arx_grf <- ca_extend |>
-  epi_slide(
+pred_arx_grf <- ca_archive |>
+  epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "hospitalizations"), 
+                     predictors = c("deaths", "cases"), 
                      trainer = parsnip::rand_forest(mode = "regression",
                                                     engine = "grf_quantiles"),
                      args_list = arx_args_list(
-                       lags = 0, 
-                       #lags = c(0, 7, 14),  # worse predictions
+                       lags = 0,
                        ahead = 28,
                        quantile_levels = c(0.1, 0.9))
                      )$predictions |>
         pivot_quantiles_wider(.pred_distn),
-  .window_size = w, 
-  .ref_time_values = fc_time_values
+  .before = w, 
+  .versions = fc_time_values
 )
-
 pred_arx_grf |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca_extend, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -838,7 +845,7 @@ pred_arx_grf |>
 
 
 ```{r error-arx-grf, eval=FALSE}
-observed_pred_arx_grf <- ca_extend |> filter(time_value %in% pred_arx_grf$target_date)
+observed_pred_arx_grf <- ca |> filter(time_value %in% pred_arx_grf$target_date)
 getErrors(observed_pred_arx_grf$deaths, pred_arx_grf$.pred, "")
 ```
 
@@ -861,12 +868,11 @@ Estimated coefficients will not be location specific.
 ```{r arx-geo-pooling}
 #| echo: true
 #| code-line-numbers: "1"
-pred_arx_geo_pool <- df_extend |>
-  filter(time_value > as.Date("2020-06-01") & !geo_value %in% c("as", "gu", "mp")) |>
-  epi_slide(
+pred_arx_geo_pool <- usa_archive |>
+  epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "hospitalizations"), 
+                     predictors = c("deaths", "cases"), 
                      trainer = linear_reg() |> set_engine("lm"),
                      args_list = arx_args_list(
                        lags = 0,
@@ -874,8 +880,8 @@ pred_arx_geo_pool <- df_extend |>
                        quantile_levels = c(0.1, 0.9))
                      )$predictions |>
         pivot_quantiles_wider(.pred_distn),
-  .window_size = w, 
-  .ref_time_values = fc_time_values
+  .before = w, 
+  .versions = fc_time_values
 )
 ```
 
@@ -886,7 +892,7 @@ pred_arx_geo_pool <- df_extend |>
 pred_arx_geo_pool |>
   filter(geo_value == "ca") |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca_extend,
+  geom_line(data = ca,
             aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
@@ -899,7 +905,7 @@ pred_arx_geo_pool |>
 
 ```{r error-arx-geo-pooling}
 pred_ca_geo_pool <- pred_arx_geo_pool |> filter(geo_value == "ca")
-observed_ca_geo_pool <- ca_extend |> filter(time_value %in% pred_ca_geo_pool$target_date)
+observed_ca_geo_pool <- ca |> filter(time_value %in% pred_ca_geo_pool$target_date)
 getErrors(observed_ca_geo_pool$deaths, pred_ca_geo_pool$.pred, "")
 ```
 
@@ -911,116 +917,19 @@ getErrors(observed_ca_geo_pool$deaths, pred_ca_geo_pool$.pred, "")
 pred_arx_geo_pool |>
   filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = df_extend |> 
+  geom_point(data = usa_archive$DT |> 
               filter(geo_value %in% c("ca", "ma", "ny", "tx")), 
-            aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+            aes(x = time_value, y = deaths, color = factor(version)),
+    inherit.aes = FALSE, na.rm = TRUE, alpha = .5, size = 1) +
+  geom_line(col = base) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = base) +
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + 28, lty = 2) +
   facet_wrap(vars(geo_value), scales = 'free_y') +
   labs(x = "", y = "Deaths per 100k people") +
   scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.title = element_blank())
-```
-
-```{r get-versioned-data}
-source(here::here("_code/versioned_data.R"))
-```
-
-```{r versioned-weekly-avg}
-forecast_dates <- seq(from = t0_date, to = as.Date("2023-02-01"), by = "1 month")
-
-data_archive <- data_archive |>
-  epix_slide(
-    .before = Inf, 
-    .versions = forecast_dates,
-    function(x, gk, rtv) {
-      x |>
-        group_by(geo_value) |>
-        epi_slide_mean(case_rate, .window_size = 7L) |>
-        epi_slide_mean(death_rate, .window_size = 7L) |>
-        ungroup() |>
-        rename(case_rate_7d_av = slide_value_case_rate,
-               death_rate_7d_av = slide_value_death_rate)
-    }
-  ) |>
-  rename(
-    cases = case_rate_7d_av,
-    deaths = death_rate_7d_av
-  ) |>
-  select(version, time_value, geo_value, cases, deaths) |>
-  as_epi_archive(compactify = TRUE)
-
-us_data <- data_archive$DT |> 
-  #filter(geo_value == "ca") |>
-  as_epi_archive()
-```
-
-## Versioned data
-
-```{r print-versioned-data}
-#| echo: true
-us_data
-```
-
-## Version-aware forecasting with geo-pooling
-
-```{r predict-version-aware}
-#| echo: true
-#| code-line-numbers: "|5-17"
-forecast_dates <- seq(from = t0_date, to = as.Date("2023-02-01"), by = "1 month")
-h <- c(7, 14, 21, 28)
-
-forecast_k_days_ahead <- function(epi_archive, forecast_dates, ahead = 7) {
-  epi_archive |>
-    epix_slide(
-      ~ arx_forecaster(
-        .x, 
-        outcome = "deaths", 
-        predictors = c("cases", "deaths"),
-        trainer = linear_reg() |> set_engine("lm"),
-        args_list = arx_args_list(lags = 0, ahead = ahead,
-                                  quantile_levels = c(0.1, 0.9))
-      )$predictions |> pivot_quantiles_wider(.pred_distn),
-      .before = 120,
-      .versions = forecast_dates
-    )
-}
-
-forecasts <- bind_rows(map(h, ~ forecast_k_days_ahead(us_data, forecast_dates, ahead = .x)))
-```
-
-## Version-aware forecasting with geo-pooling
-
-```{r plot-version-aware}
-#| fig-width: 10
-#| fig-height: 5
-geo <- "ca"
-forecasts_filtered <- forecasts |>
-  filter(geo_value == geo) |>
-  mutate(time_value = version)
-
-data_at_fc <- bind_rows(
-  map(forecast_dates,
-      ~ us_data |>
-        epix_as_of(.x) |>
-        mutate(version = .x)
-  )) |>
-  filter(geo_value == geo)
-
-ggplot(data = forecasts_filtered, aes(x = target_date, group = time_value)) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`, fill = factor(time_value)), alpha = 0.4) +
-  geom_vline(data = data_at_fc, aes(color = factor(version), xintercept = version), lty = 2) +
-  geom_line(
-    data = data_at_fc,
-    aes(x = time_value, y = deaths, color = factor(version)),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5
-  ) +
-  geom_line(aes(y = .pred, color = factor(time_value))) +
-  geom_point(aes(y = .pred, color = factor(time_value))) +
-  labs(x = "", y = "Deaths per 100k people") +
   theme(legend.position = "none")
+
 ```
 
 # Building a forecaster
@@ -1219,9 +1128,9 @@ forecasts |>
     inherit.aes = FALSE, na.rm = TRUE, alpha = .5
   ) +
   geom_line(aes(y = `0.5`, color = factor(time_value))) +
-  geom_point(aes(y = `0.5`, color = factor(time_value))) +
+  geom_point(aes(y = `0.5`, color = factor(time_value)), size = 1) +
   facet_wrap(vars(geo_value)) +
-  labs(x = "", y = "Deaths per 100k people") +
+  labs(x = "", y = "Hospitalizations") +
   theme(legend.position = "none")
 ```
 
