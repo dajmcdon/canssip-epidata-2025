@@ -9,7 +9,7 @@ Welcome to the Insight Net Workshop 2024 Github Repository. We've made it easy f
 If you're new to GitHub or prefer not to use command-line tools, the easiest way to get started is by downloading the repository as a ZIP file.
 
 ### Steps:
-1. Go to the [InsightNet Workshop 2024 GitHub repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+1. On the [InsightNet Workshop 2024 GitHub repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
 2. Click the green **Code** button located at the top right of this repository.
 3. In the dropdown menu, select **Download ZIP**.
 4. Once downloaded, extract the ZIP file to a folder on your local machine.
