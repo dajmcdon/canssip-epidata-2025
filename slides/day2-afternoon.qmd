@@ -814,7 +814,7 @@ Can [change engine]{.primary} to get better coverage:
 specify `engine = "grf_quantiles"` in the `rand_forest` call
 
 ```{r arx-with-grf}
-#| fig-align: left
+#| eval: false
 pred_arx_grf <- ca_archive |>
   epix_slide(
     ~ arx_forecaster(epi_data = .x,
