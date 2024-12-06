@@ -41,9 +41,9 @@ ggplot2::theme_set(ggplot2::theme_bw())
 ```{r install, eval=FALSE}
 #| echo: true
 # Stable version
-pak::pkg_install("cmu-delphi/epipredict@main")
+# pak::pkg_install("cmu-delphi/epipredict@main")
 # Development version
-# pak::pkg_install("cmu-delphi/epipredict@dev")
+pak::pkg_install("cmu-delphi/epipredict@dev")
 ```
 
 
@@ -326,7 +326,9 @@ epi_arx$predictions
 ::: {.callout-important icon="false"}
 ## Note 
 
-`.pred_dstn` is actually a “distribution”, parameterized by its quantiles. 
+* `.pred_distn` is actually a “distribution”, parameterized by its quantiles
+
+* `arx_forecaster` estimates the quantiles in a different way than `lm` 
 :::
 
 
@@ -373,7 +375,7 @@ we fit and predict combining `arx_forecaster` with `epix_slide`
 source(here::here("_code/versioned_data.R"))
 ```
 
-```{r ca-archive}
+```{r ca-archive, warning=FALSE}
 ca_archive <- covid_archive$DT |> 
   filter(geo_value == "ca") |>
   as_epi_archive()
@@ -491,11 +493,19 @@ getErrors <- function(truth, prediction, type) {
                     "MASE" = MASE(truth, prediction), 
                     row.names = type))
 }
+
+getAccuracy = function(finalized, predictions, row_name = "") {
+  observed = (finalized |> 
+                filter(time_value %in% predictions$target_date))$deaths
+  return(cbind(
+    getErrors(observed, predictions$.pred, ""),
+    "Coverage" = mean(observed >= predictions$`0.1` & observed <= predictions$`0.9`), 
+    row.names = row_name))
+}
 ```
 
 ```{r error-arx}
-test_h <- ca %>% filter(time_value %in% pred_arx$target_date)
-getErrors(test_h$deaths, pred_arx$.pred, "time series CV + trailing")
+getAccuracy(ca, pred_arx)
 ```
 
 
@@ -577,9 +587,9 @@ dv_archive <- pub_covidcast(
   geo_type = "state",
   time_values = epirange(20200401, 20230401),
   geo_values = "*",
-  issues = epirange(20200401, 20230401)) %>%
-  select(geo_value, time_value, version = issue, doctor_visits = value) %>%
-  arrange(geo_value, time_value) %>%
+  issues = epirange(20200401, 20230401)) |>
+  select(geo_value, time_value, version = issue, doctor_visits = value) |>
+  arrange(geo_value, time_value) |>
   as_epi_archive(compactify = FALSE)
 ```
 
@@ -635,8 +645,7 @@ pred_arx_hosp |>
 ```
 
 ```{r error-arx-with-dv}
-observed_pred_arx_hosp <- ca |> filter(time_value %in% pred_arx_hosp$target_date)
-getErrors(observed_pred_arx_hosp$deaths, pred_arx_hosp$.pred, "")
+getAccuracy(ca, pred_arx_hosp)
 ```
 
 
@@ -647,11 +656,11 @@ getErrors(observed_pred_arx_hosp$deaths, pred_arx_hosp$.pred, "")
 ```{r arx-with-more-lags}
 #| echo: true
 #| code-line-numbers: "8"
-pred_arx_more_lags <- ca_archive |>
+pred_arx_more_lags <- ca_archive_dv |>
   epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "cases"), 
+                     predictors = c("deaths", "doctor_visits"), 
                      trainer = linear_reg() |> set_engine("lm"),
                      args_list = arx_args_list(
                        lags = c(0, 7, 14),
@@ -681,8 +690,7 @@ pred_arx_more_lags |>
 ```
 
 ```{r error-arx-more-lags}
-observed_pred_arx_more_lags <- ca |> filter(time_value %in% pred_arx_more_lags$target_date)
-getErrors(observed_pred_arx_more_lags$deaths, pred_arx_more_lags$.pred, "")
+getAccuracy(ca, pred_arx_more_lags)
 ```
 
 
@@ -700,7 +708,7 @@ pred_h_days_ahead <- function(epi_archive, ahead = 7) {
     epix_slide(
       ~ arx_forecaster(epi_data = .x,
                        outcome = "deaths", 
-                       predictors = c("deaths", "cases"), 
+                       predictors = c("deaths", "doctor_visits"), 
                        trainer = linear_reg() |> set_engine("lm"),
                        args_list = arx_args_list(
                          lags = 0,  
@@ -713,7 +721,7 @@ pred_h_days_ahead <- function(epi_archive, ahead = 7) {
   )
 }
 h <- c(7, 14, 21, 28)
-forecasts <- bind_rows(map(h, ~ pred_h_days_ahead(ca_archive, ahead = .x)))
+forecasts <- bind_rows(map(h, ~ pred_h_days_ahead(ca_archive_dv, ahead = .x)))
 ```
 
 ## Predictions (multiple horizons)
@@ -755,7 +763,7 @@ arx_forecaster(epi_data = train |> as_epi_df(),
 
 * Modify `trainer` to use a model that is not `lm` (default)
 
-  * <span class="inner-list"> e.g. `trainer = quantile_reg()`</span>
+  * <span class="inner-list"> e.g. `trainer = rand_forest()`</span>
   
   * <span class="inner-list">can use any `{parsnip}` models, 
   see [list](https://www.tidymodels.org/find/parsnip/)</span>
@@ -767,14 +775,14 @@ arx_forecaster(epi_data = train |> as_epi_df(),
 ```{r arx-with-random-forests}
 #| echo: true
 #| code-line-numbers: "6"
-pred_arx_rf <- ca_archive |>
+pred_arx_rf <- ca_archive_dv |>
   epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "cases"), 
+                     predictors = c("deaths", "doctor_visits"), 
                      trainer = parsnip::rand_forest(mode = "regression"), # defaults to ranger
                      args_list = arx_args_list(
-                       lags = 0,  
+                       lags = 0,
                        ahead = 28,
                        quantile_levels = c(0.1, 0.9))
                      )$predictions |>
@@ -802,24 +810,23 @@ pred_arx_rf |>
 
 
 ```{r error-arx-random-forests}
-observed_pred_arx_rf <- ca |> filter(time_value %in% pred_arx_rf$target_date)
-getErrors(observed_pred_arx_rf$deaths, pred_arx_rf$.pred, "")
+getAccuracy(ca, pred_arx_rf)
 ```
 
 ## Warning!
 
-Random forests have really [poor coverage]{.primary} here. 
+Random forests has really [poor coverage]{.primary} here. 
 Can [change engine]{.primary} to get better coverage: 
 
 specify `engine = "grf_quantiles"` in the `rand_forest` call
 
 ```{r arx-with-grf}
 #| eval: false
-pred_arx_grf <- ca_archive |>
+pred_arx_grf <- ca_archive_dv |>
   epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "cases"), 
+                     predictors = c("deaths", "doctor_visits"), 
                      trainer = parsnip::rand_forest(mode = "regression",
                                                     engine = "grf_quantiles"),
                      args_list = arx_args_list(
@@ -845,8 +852,7 @@ pred_arx_grf |>
 
 
 ```{r error-arx-grf, eval=FALSE}
-observed_pred_arx_grf <- ca |> filter(time_value %in% pred_arx_grf$target_date)
-getErrors(observed_pred_arx_grf$deaths, pred_arx_grf$.pred, "")
+getAccuracy(ca, pred_arx_grf)
 ```
 
 
@@ -862,20 +868,21 @@ getErrors(observed_pred_arx_grf$deaths, pred_arx_grf$.pred, "")
   * Fit one model using all locations together at each time point ([geo-pooling]{.primary}).
 Estimated coefficients will not be location specific.
 
+* We will now pool data from [all US states]{.primary} to make predictions.
 
 ## Geo-pooling
 
 ```{r arx-geo-pooling}
 #| echo: true
 #| code-line-numbers: "1"
-pred_arx_geo_pool <- usa_archive |>
+pred_arx_geo_pool <- usa_archive_dv |>
   epix_slide(
     ~ arx_forecaster(epi_data = .x,
                      outcome = "deaths", 
-                     predictors = c("deaths", "cases"), 
+                     predictors = c("deaths", "doctor_visits"), 
                      trainer = linear_reg() |> set_engine("lm"),
                      args_list = arx_args_list(
-                       lags = 0,
+                       lags = 0, #c(0, 7, 14),
                        ahead = 28,
                        quantile_levels = c(0.1, 0.9))
                      )$predictions |>
@@ -886,6 +893,9 @@ pred_arx_geo_pool <- usa_archive |>
 ```
 
 ## Predictions (geo-pooling): California
+
+[Error is worse]{.primary} than without geo-pooling, 
+but much [better coverage]{.primary} (close to nominal 80%)
 
 ```{r arx-geo-pooling-plot-ca}
 #| fig-align: left
@@ -905,8 +915,7 @@ pred_arx_geo_pool |>
 
 ```{r error-arx-geo-pooling}
 pred_ca_geo_pool <- pred_arx_geo_pool |> filter(geo_value == "ca")
-observed_ca_geo_pool <- ca |> filter(time_value %in% pred_ca_geo_pool$target_date)
-getErrors(observed_ca_geo_pool$deaths, pred_ca_geo_pool$.pred, "")
+getAccuracy(ca, pred_ca_geo_pool, "CA")
 ```
 
 
@@ -917,12 +926,13 @@ getErrors(observed_ca_geo_pool$deaths, pred_ca_geo_pool$.pred, "")
 pred_arx_geo_pool |>
   filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
   ggplot(aes(target_date, .pred)) +
-  geom_point(data = usa_archive$DT |> 
-              filter(geo_value %in% c("ca", "ma", "ny", "tx")), 
-            aes(x = time_value, y = deaths, color = factor(version)),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5, size = 1) +
-  geom_line(col = base) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = base) +
+  geom_line(data = epix_as_of(usa_archive_dv, version = usa_archive_dv$versions_end) |> 
+              filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+              mutate(deaths = pmax(0, deaths)), 
+             aes(x = time_value, y = deaths),
+    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
+  geom_line(col = primary) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + 28, lty = 2) +
   facet_wrap(vars(geo_value), scales = 'free_y') +
@@ -931,6 +941,128 @@ pred_arx_geo_pool |>
   theme(legend.position = "none")
 
 ```
+
+```{r error-geo-pooling-all-states}
+final_data = epix_as_of(usa_archive_dv, version = usa_archive_dv$versions_end) |> 
+  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+  mutate(deaths = pmax(0, deaths))
+
+rbind(getAccuracy(final_data |> filter(geo_value == "ma"), 
+                  pred_arx_geo_pool |> 
+                    filter(geo_value == "ma" & 
+                             target_date %in% (final_data |> filter(geo_value == "ma"))$time_value), 
+                  "MA"),
+      getAccuracy(final_data |> filter(geo_value == "ny"), 
+                  pred_arx_geo_pool |> 
+                    filter(geo_value == "ny" & 
+                             target_date %in% (final_data |> filter(geo_value == "ny"))$time_value), 
+                  "NY"),
+      getAccuracy(final_data |> filter(geo_value == "tx"),
+                  pred_arx_geo_pool |> 
+                    filter(geo_value == "tx" & 
+                             target_date %in% (final_data |> filter(geo_value == "tx"))$time_value), 
+                  "TX"))
+```
+
+
+## Quantile regression
+
+* Quantile regression is a different estimation method, which directly targets conditional 
+quantiles of the outcome over time
+
+* It [needs more data]{.primary} to estimate quantiles appropriately, so
+
+  * unsuitable for settings with small training set (e.g. trailing window on one state)
+  
+  * can benefit by combination with geo-pooling (much more data to train on)
+
+```{r qr-geo-pooling}
+#| echo: true
+#| code-line-numbers: "|8"
+library(quantreg)
+
+pred_qr_geo_pool <- usa_archive_dv |>
+  epix_slide(
+    ~ arx_forecaster(epi_data = .x,
+                     outcome = "deaths", 
+                     predictors = c("deaths", "doctor_visits"), 
+                     trainer = quantile_reg(),
+                     args_list = arx_args_list(
+                       lags = 0, #c(0, 7, 14),
+                       ahead = 28,
+                       quantile_levels = c(0.1, 0.9))
+                     )$predictions |>
+        pivot_quantiles_wider(.pred_distn),
+  .before = w, 
+  .versions = fc_time_values
+)
+```
+
+## Predictions (geo-pooling + quantile regression): California
+
+```{r qr-geo-pooling-plot-ca}
+#| fig-align: left
+pred_qr_geo_pool |>
+  filter(geo_value == "ca") |>
+  ggplot(aes(target_date, .pred)) +
+  geom_line(data = ca,
+            aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(col = primary) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_vline(xintercept = t0_date) +    
+  geom_vline(xintercept = t0_date + 28, lty = 2) +
+  labs(x = "", y = "Deaths per 100k people") +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.title = element_blank())
+```
+
+```{r error-qr-geo-pooling}
+pred_ca_qr_geo_pool <- pred_qr_geo_pool |> filter(geo_value == "ca")
+getAccuracy(ca, pred_ca_qr_geo_pool, "CA")
+```
+
+
+## Predictions (geo-pooling + quantile regression)
+
+```{r qr-geo-pooling-plot}
+#| fig-align: left
+pred_qr_geo_pool |>
+  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+  ggplot(aes(target_date, .pred)) +
+  geom_line(data = epix_as_of(usa_archive_dv, version = usa_archive_dv$versions_end) |> 
+              filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+              mutate(deaths = pmax(0, deaths)), 
+             aes(x = time_value, y = deaths),
+    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
+  geom_line(col = primary) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_vline(xintercept = t0_date) +    
+  geom_vline(xintercept = t0_date + 28, lty = 2) +
+  facet_wrap(vars(geo_value), scales = 'free_y') +
+  labs(x = "", y = "Deaths per 100k people") +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.position = "none")
+
+```
+
+```{r error-qr-geo-pooling-all-states}
+rbind(getAccuracy(final_data |> filter(geo_value == "ma"), 
+                  pred_qr_geo_pool |> 
+                    filter(geo_value == "ma" & 
+                             target_date %in% (final_data |> filter(geo_value == "ma"))$time_value), 
+                  "MA"),
+      getAccuracy(final_data |> filter(geo_value == "ny"), 
+                  pred_qr_geo_pool |> 
+                    filter(geo_value == "ny" & 
+                             target_date %in% (final_data |> filter(geo_value == "ny"))$time_value), 
+                  "NY"),
+      getAccuracy(final_data |> filter(geo_value == "tx"),
+                  pred_qr_geo_pool |> 
+                    filter(geo_value == "tx" & 
+                             target_date %in% (final_data |> filter(geo_value == "tx"))$time_value), 
+                  "TX"))
+```
+
 
 # Building a forecaster
 

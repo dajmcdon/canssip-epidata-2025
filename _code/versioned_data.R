@@ -75,17 +75,16 @@ if (!file.exists(file_path_1) | !file.exists(file_path_2)) {
         x |>
           group_by(geo_value) |>
           epi_slide_mean(death_rate, .window_size = 7L) |>
-          #epi_slide_mean(dv, .window_size = 7L) |>
+          epi_slide_mean(dv, .window_size = 7L) |>
           ungroup() |>
-          rename(death_rate_7d_av = slide_value_death_rate #,
-                 #dv_7d_av = slide_value_dv
+          rename(death_rate_7d_av = slide_value_death_rate,
+                 dv_7d_av = slide_value_dv
           )
       }
     ) |>
     rename(
       deaths = death_rate_7d_av,
-      #doctor_visits = dv_7d_av
-      doctor_visits = dv
+      doctor_visits = dv_7d_av
     ) |>
     select(version, time_value, geo_value, deaths, doctor_visits) |>
     as_epi_archive(compactify = TRUE)
