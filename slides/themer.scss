@@ -18,6 +18,12 @@ $presentation-heading-color: $primary;
 $presentation-font-size-root: 36px;
 
 $link-color: $secondary;
+$callout-color-note: $primary;
+$callout-color-tip: $fourth-colour;
+$callout-color-important: $secondary;
+$callout-color-caution: $tertiary;
+
+$code-block-font-size: .65em;
 
 /*-- scss:rules --*/
 
@@ -33,12 +39,17 @@ $link-color: $secondary;
   font-size: 0.75em;
 }
 
-.reveal .callout.callout-style-simple .callout-body,
-.reveal .callout.callout-style-default .callout-body,
-.reveal .callout.callout-style-simple div.callout-title,
-.reveal .callout.callout-style-default div.callout-title {
-  font-size: 1.2em;
+
+.reveal .slides section div.callout {
+  font-size: 1em;
 }
+
+//.reveal .callout.callout-style-simple .callout-body,
+//.reveal .callout.callout-style-default .callout-body,
+//.reveal .callout.callout-style-simple div.callout-title,
+//.reveal .callout.callout-style-default div.callout-title {
+//  font-size: 1.2em;
+//}
 
 .reveal .callout.callout-style-default .callout-icon::before,
 .reveal .callout.callout-style-simple .callout-icon::before {
@@ -50,6 +61,18 @@ $link-color: $secondary;
 .reveal .callout.callout-titled .callout-icon::before {
   margin-top: 1.75rem;
 }
+
+.reveal div.sourceCode {
+  margin-bottom: 10px !important;
+}
+
+
+// .reveal pre code {
+//  border-style: solid;
+//  border-color: $code-block-border-color;
+//  border-width: 1px;
+//  border-radius: .5;
+//}
 
 
 ol {

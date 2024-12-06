@@ -11,8 +11,6 @@ format: revealjs
 ```{r theme-load-pkg}
 #| cache: false
 library(tidymodels)
-library(gridExtra)
-library(grid)
 library(epidatasets)
 library(epipredict)
 library(epidatr)
@@ -23,7 +21,7 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 ## Outline
 
-1. Delphi 
+1. The Delphi Research Group
 
 1. Overview of this Workshop
 
@@ -33,14 +31,14 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. Epidata API
 
-1. Epidatr
-
 1. Find Data Sources and Signals
 
-1. Versioning in epidatr
+1. `{epidatr}`
+
+1. Versioning in `{epidatr}`
 
 
-# Delphi
+# The Delphi Research Group
 
 ## About Delphi
 
@@ -710,42 +708,41 @@ Added value
 
 ## Some of our data sources
 
-* ATTN: what do the pairs in { } vs ( ) mean? Standardize.
 
 ### Ongoing Sources:
 
 Insurance claims
-: %Covid {inpatient, outpatient}, by {county x day}
+: %Covid `{inpatient, outpatient}`, by `county x day`
 
 Google Symptom searches
-: 7 symptoms groups, by {county x day}
+: 7 symptoms groups, by `county x day`
 
 Quidel/Ortho antigen tests
-: %Covid by age group, by {county x day}
+: %Covid by `age group x county x day`
 
 NCHS Deaths
-: all-cause, pneumonia, flu, Covid, by {state x week}
+: all-cause, pneumonia, flu, Covid, by `state x week`
 
 NSSP ED visits
-: %Covid, %flu, %RSV, by {county x week}  (new!)
+: %Covid, %flu, %RSV, by `county x week`  (new!)
 
 NWSS Covid
-: wastewater by {sampling-site x day}  (in progress)
+: wastewater by `sampling-site x day`  (in progress)
 
 ## Some of our data sources
 ### Active during pandemic, could be restarted for the next PHE:
 
 HHS Hosp/ICU beds
-: Covid, flu, by age-group, by {state x day}, {facility x week}
+: Covid, flu, by `{age-group x {state x day, facility x week}}`
 
 CTIS ("Delphi Facebook Survey")
-: many dozens of questions, by (county x day)
+: many dozens of questions, by `county x day`
 
 STLT-reported
-: {cases, deaths} via {JHU, USAFacts}, by (country x day)
+: `{cases, deaths}` via `{JHU, USAFacts}`, by `country x day`
 
 Safegraph mobility
-: misc measures by {county x day}, {county x week}
+: misc measures by `{county x day, county x week}`
 
 
 
@@ -781,111 +778,6 @@ Safegraph mobility
 ## Severity pyramid
 
 ![](gfx/severity-pyramid.svg){fig-align=center}
-
-# Epidatr
-
-
-## Installing `epidatr`
-
-(you already did this, but just for posterity...)
-
-Install the CRAN version
-
-```{r install-epidatr-cran}
-#| echo: true
-#| eval: false
-# Install the CRAN version
-pak::pkg_install("epidatr")
-```
-
-<br>
-
-or the development version
-
-```{r install-epidatr-dev}
-#| eval: false
-#| echo: true
-# Install the development version from the GitHub dev branch
-pak::pkg_install("cmu-delphi/epidatr@dev")
-```
-
-The CRAN listing is [here](https://cran.r-project.org/package=epidatr/index.html).
-
-## Python
-
-In Python, install [`delphi-epidata` from PyPI](https://pypi.org/project/delphi-epidata/) with 
-
-``` sh
-pip install delphi-epidata
-```
-
-<br>
-
-`delphi-epidata` is soon to be replaced with `epidatpy`.
-
-``` sh
-# Latest dev version
-pip install -e "git+https://github.com/cmu-delphi/epidatpy.git#egg=epidatpy"
-
-# PyPI version (not yet available)
-pip install epidatpy
-```
-
-
-
-
-## Using `epidatr` and `epidatpy`
-The following shows how to import the library and fetch all confirmed influenza hospital admissions occurring each day for North Carolina:
-
-```{r hhs-influenza-pub-covidcast}
-#| echo: true
-#| eval: false
-library(epidatr)
-hhs_flu_nc <- pub_covidcast(
-  source = 'hhs', 
-  signals = 'confirmed_admissions_influenza_1d', 
-  geo_type = 'state', 
-  time_type = 'day', 
-  geo_values = 'nc',
-  time_values = c(20240401, 20240405:20240414)
-)
-head(hhs_flu_nc, n = 3)
-```
-
-```{r hhs-influenza-pub-covidcast-2}
-#| echo: false
-head(hhs_flu_nc, n = 3)
-```
-
-<br>
-
-Python equivalent:
-``` python
-res = Epidata.covidcast('hhs', 'confirmed_admissions_influenza_1d', 'day', 'state', [20240401, Epidata.range(20240405, 20240414)], 'nc')
-print(res['result'], res['message'], len(res['epidata']))
-```
-
-
-
-## API keys
-
-* Anyone may access the Epidata API anonymously without providing any personal data!!
-
-* Anonymous API access is subject to some restrictions:
-  <small>public datasets only; 60 requests per hour; only two parameters may have multiple selections</small>
-
-* API key grants privledged access; can be obtained by [registering with us](https://api.delphi.cmu.edu/epidata/admin/registration_form) 
-
-* Privileges of registration: no rate limit; no limit on multiple selections
-
-* We just want to know which signals people care about and ensure we're providing benefit
-
-<!-- rate limited to 60 requests per hour;  -->
-::: {.callout-tip}
-* The `epidatr` client automatically searches for the key in the `DELPHI_EPIDATA_KEY` environment variable. 
-* We recommend storing it in your `.Renviron` file, which R reads by default. 
-* More on setting your API key [here](https://rdrr.io/cran/epidatr/man/get_api_key.html).
-:::
 
 
 
@@ -978,11 +870,122 @@ Easily find data sources and signals, no programming required
 
 <!-- To reproduce: Pathogen/Syndrom = flu, Severity pyramid = Dead (top of pyramid), Geo-level = ADM1 (e.g. U.S. states) -->
 
+
+
+
+
+# `{epidatr}`
+
+
+## Installing `{epidatr}`
+
+(you already did this, but just for posterity...)
+
+Install the CRAN version
+
+```{r install-epidatr-cran}
+#| echo: true
+#| eval: false
+# Install the CRAN version
+pak::pkg_install("epidatr")
+```
+
+<br>
+
+or the development version
+
+```{r install-epidatr-dev}
+#| eval: false
+#| echo: true
+# Install the development version from the GitHub dev branch
+pak::pkg_install("cmu-delphi/epidatr@dev")
+```
+
+The CRAN listing is [here](https://cran.r-project.org/package=epidatr/index.html).
+
+## Python
+
+In Python, install [`delphi-epidata` from PyPI](https://pypi.org/project/delphi-epidata/) with 
+
+``` sh
+pip install delphi-epidata
+```
+
+<br>
+
+`delphi-epidata` is soon to be replaced with `epidatpy`.
+
+``` sh
+# Latest dev version
+pip install -e "git+https://github.com/cmu-delphi/epidatpy.git#egg=epidatpy"
+
+# PyPI version (not yet available)
+pip install epidatpy
+```
+
+
+
+
+## Using `{epidatr}` and `{epidatpy}`
+
+```{r hhs-influenza-pub-covidcast}
+#| echo: true
+#| eval: false
+library(epidatr)
+hhs_flu_nc <- pub_covidcast(
+  source = 'hhs', 
+  signals = 'confirmed_admissions_influenza_1d', 
+  geo_type = 'state', 
+  time_type = 'day', 
+  geo_values = 'nc',
+  time_values = c(20240401, 20240405:20240414)
+)
+head(hhs_flu_nc, n = 3)
+```
+
+```{r hhs-influenza-pub-covidcast-2}
+#| echo: false
+head(hhs_flu_nc, n = 3)
+```
+
+<br>
+
+Python equivalent:
+``` python
+res = Epidata.covidcast('hhs', 'confirmed_admissions_influenza_1d', 'day', 'state', [20240401, Epidata.range(20240405, 20240414)], 'nc')
+print(res['result'], res['message'], len(res['epidata']))
+```
+
+
+
+## API keys
+
+* Anyone may access the Epidata API anonymously without providing any personal data!!
+
+* Anonymous API access is subject to some restrictions:
+  <small>public datasets only; 60 requests per hour; only two parameters may have multiple selections</small>
+
+* API key grants privledged access; can be obtained by [registering with us](https://api.delphi.cmu.edu/epidata/admin/registration_form) 
+
+* Privileges of registration: no rate limit; no limit on multiple selections
+
+* We just want to know which signals people care about and ensure we're providing benefit
+
+<!-- rate limited to 60 requests per hour;  -->
+::: {.callout-tip}
+* The `{epidatr}` client automatically searches for the key in the `DELPHI_EPIDATA_KEY` environment variable. 
+* We recommend storing it in your `.Renviron` file, which R reads by default. 
+* More on setting your API key [here](https://rdrr.io/cran/epidatr/man/get_api_key.html).
+:::
+
+
+
+
 ## Interactive tooling in R 
 
 [**Find sources and signals in R?**]{.primary}
 
-Functions to enhance data discovery in `epidatr`:
+Functions to enhance data discovery in `{epidatr}`:
 
 `avail_endpoints()`
 : Lists all endpoints with brief descriptions
@@ -1128,9 +1131,7 @@ head(jhu_state_cases) |>
 
 ## COVIDcast main endpoint - Example query 
 
-County `geo_values` are [FIPS codes](https://en.wikipedia.org/wiki/List_of_United_States_FIPS_codes_by_county) 
-
-The example below is for Orange County, California. 
+County `geo_values` are [FIPS codes](https://en.wikipedia.org/wiki/List_of_United_States_FIPS_codes_by_county): Orange County, California. 
 
 ```{r county-jhu-pub-covid}
 #| echo: true
@@ -1151,13 +1152,11 @@ head(jhu_county_cases) |>
   select(geo_value, signal, source, geo_type, time_value, issue, lag, value)
 ```
 
-::: {.callout-important icon="false"}
-
-## Getting everything
+::: {.callout-important appearance="simple" icon="false"}
 
 The `covidcast` endpoint supports `*` in its time and geo fields. 
 
-To obtain the signal values for all available counties, replace `geo_values = "06059"` with `geo_values = "*"`.
+Signal values for all available counties: replace `geo_values = "06059"` with `geo_values = "*"`.
 :::
 
 ## Example queries - Other endpoints: Hospitalizations
@@ -1170,8 +1169,6 @@ To obtain the signal values for all available counties, replace `geo_values = "0
 #| echo: true
 pub_covid_hosp_facility_lookup(city = "southlake")
 ```
-
-<br> 
 
 ```{r hosp-facility-lookup-wy}
 #| echo: true
@@ -1194,12 +1191,13 @@ pub_covid_hosp_facility(
 ) |> head()
 ```
 
+## Example queries - Other endpoints: Hospitalizations
+
 [**COVID-19 Hospitalization by State**]{.primary}
 
 <small> API docs: <https://cmu-delphi.github.io/delphi-epidata/api/covid_hosp.html> </small>
 ```{r hosp-by-state}
 #| echo: true
-#| results: hide
 pub_covid_hosp_state_timeseries(states = "MA", dates = "20200510")
 ```
 
@@ -1252,9 +1250,9 @@ Metadata accessors
 * `pub_fluview_meta()`: metadata for FluView
 * `pub_meta()`: general metadata for the Delphi Epidata API
 
-# Versioning in `epidatr`
+# Versioning in `{epidatr}`
 
-## Versioned data in `epidatr`
+## Versioned data in `{epidatr}`
 
 Epidata API contains each signal's estimate, location, date, and update timeline
 
@@ -1324,10 +1322,18 @@ head(dv_pa_final) |>
 
 * Increased to ~6% from <3%
     
-[**Versioning is important for forecasting**]{.primary}:
+## Versioning is important for forecasting
+
+<br>
 
 * Backtesting requires using data that would have been available at the time
+
+<br>
+
 * Not later updates
+
+<br>
+
 * Overly optimistic
 
 
@@ -1380,18 +1386,14 @@ head(dv_pa_issues_sub) |>
   select(geo_value, signal, source, time_value, issue, lag, value, stderr)
 ```
 
-* No change here
+No change here • Can matter if the latency or reporting lag is unknown
 
-* Can matter if the latency or reporting lag is unknown
-
-* [API docs](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html)
+[API docs](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html)
 show the earliest date available.
 
 ## Obtaining multiple issues for one state
 
-* At some point, nothing changes
-* It is [finalized]{.primary}
-* That will be the "last" issue
+At some point, nothing changes • It is [finalized]{.primary} • That will be the "last" issue
 
 ```{r extreme-lb-ub-multiple-issues}
 #| echo: true
@@ -1598,7 +1600,7 @@ head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value
 
 <!-- Open-access API delivering up-to-date, granular epidemiological data + makes all historical versions available. -->
 
-* [**Epidatr:**]{.primary} Client package for R
+* `{epidatr}`:{.primary} Client package for R
 
 <!-- and interactive tools for discovering and analyzing health signals. -->
 
