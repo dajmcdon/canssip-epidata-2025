@@ -1,6 +1,6 @@
 ---
-talk-title: "Whirlwind Tour of Forecasting and Time-Series Models"
-talk-short-title: "Time-Series"
+talk-title: "Quick Tour of Time Series Forecasting"
+talk-short-title: "Time Series"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
 talk-date: "12 December -- Morning"
 format: revealjs

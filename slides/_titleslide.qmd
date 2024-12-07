@@ -79,7 +79,7 @@ snapshots_all |>
 <br>
 
 #### {{< meta author >}} 
-[with thanks to Delphi Tooling & Forecasting Team: Logan Brooks, Nat DeFries, Dmitry Shemetov, David Webber]{.fstyle}
+[with thanks to Xueda Shen, Nat DeFries, Dmitry Shemetov, and David Webber]{.fstyle}
 
 {{< meta talk-date >}}
 :::

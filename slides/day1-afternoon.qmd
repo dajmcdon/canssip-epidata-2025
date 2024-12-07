@@ -1,5 +1,5 @@
 ---
-talk-title: "Data Cleaning, Versioning, and Nowcasting"
+talk-title: "Data Cleaning, Versioning, Nowcasting With `{epiprocess}"
 talk-short-title: "Nowcasting"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
 talk-date: "11 December -- Afternoon"

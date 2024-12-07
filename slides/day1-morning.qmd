@@ -1,5 +1,5 @@
 ---
-talk-title: "Signal Discovery, Data Fetching, & Panel Data"
+talk-title: "Introduction to Panel Data in Epidemiology"
 talk-short-title: "Panel Data"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
 talk-date: "11 December -- Morning"

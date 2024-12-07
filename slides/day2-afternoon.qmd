@@ -1,5 +1,5 @@
 ---
-talk-title: "Forecasting with `{epipredict}`"
+talk-title: "Forecasting With `{epipredict}` and Other Advanced Topics"
 talk-short-title: "Forecasting"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
 talk-date: "12 December -- Afternoon"
