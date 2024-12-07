@@ -17,7 +17,7 @@ We also assume that you use
 If you’re more familiar with a different IDE (VSCode, Emacs, etc.),
 that’s fine
 
-## 1. Download the repository (for beginners)
+## 1. Download the repository (beginner option)
 
 If you’re new to GitHub or prefer not to use command-line tools, the
 easiest way to get started is by downloading the repository as a ZIP
@@ -37,7 +37,7 @@ file.
 You can now open the `insightnet-workshop-2024.Rproj` file and start
 working with them.
 
-## 1. Clone or fork the repository (for qdvanced users)
+## 1. Clone or fork the repository (advanced options)
 
 If you’re familiar with `git`, cloning or forking the repository is a
 more flexible option. This will allow you to stay up to date with the
@@ -47,33 +47,33 @@ latest changes and contribute to the project directly.
 
 <!-- You'll get a local copy of the repository. -->
 
-The RStudio way: 1. On the [InsightNet Workshop 2024 GitHub
-repository](https://github.com/cmu-delphi/insightnet-workshop-2024). 1.
-Click the green <kbd>\<\> Code ▾</kbd> button located at the top right
-of this repository. 1. Then in RStudio, choose “New project” \> “Version
-Control” \> “Git” and paste the address. 1. Choose a location on your
-machine where you want the files to be. 1. Select “Create Project”.
+The RStudio way:
 
-The Command Line way: 1. On the [InsightNet Workshop 2024 GitHub
-repository](https://github.com/cmu-delphi/insightnet-workshop-2024). 1.
-Click the green <kbd>\<\> Code ▾</kbd> button located at the top right
-of this repository. 1. Open a terminal or command prompt on your
-computer. 1. Navigate to the folder where you want to store the
-project. 1. Run the following command:
+1.  On the [InsightNet Workshop 2024 GitHub
+    repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+2.  Click the green <kbd>\<\> Code ▾</kbd> button located at the top
+    right of this repository.
+3.  Then in RStudio, choose “New project” \> “Version Control” \> “Git”
+    and paste the address.
+4.  Choose a location on your machine where you want the files to be.
+5.  Select “Create Project”.
 
-``` bash
-git clone https://github.com/cmu-delphi/insightnet-workshop-2024.git
-```
+The Command Line way:
 
-Once cloning is complete, navigate into the project folder:
-
-``` bash
-cd insightnet-workshop-2024
-```
+1.  On the [InsightNet Workshop 2024 GitHub
+    repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+2.  Click the green <kbd>\<\> Code ▾</kbd> button located at the top
+    right of this repository.
+3.  Open a terminal or command prompt on your computer.
+4.  Navigate to the folder where you want to store the project.
+5.  Run
+    `git clone https://github.com/cmu-delphi/insightnet-workshop-2024.git`
+6.  Once cloning is complete, navigate into the project folder:
+    `cd insightnet-workshop-2024`
 
 ### Steps for forking the repo (requires a personal GitHub account):
 
-1.  In the top right corner of this Github repository, click the grey
+1.  In the top right corner of this GitHub repository, click the grey
     <kbd>⑂ Fork ▾</kbd> button.
 2.  Proceed from Step 2 in either the “Cloning” or even “Download Zip”
     options. You’ll just be working from your own remote copy rather our
@@ -105,7 +105,7 @@ Ask for help if you see something like:
     ℹ Installed: epipredict 0.2.0.
     ℹ Required: epipredict == 0.1.0.
 
-## Getting help from our volunteers:
+## ✋ Getting help from our volunteers
 
 If you encounter any issues or would like assistance with setting things
 up, don’t hesitate to reach out. We have a fantastic group of volunteers
