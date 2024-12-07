@@ -1,6 +1,6 @@
 ---
 talk-title: "Signal Discovery, Data Fetching, & Panel Data"
-talk-short-title: "Panel Data"
+talk-short-title: "Understanding Data"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
 talk-date: "11 December -- Morning"
 format: revealjs
@@ -23,7 +23,7 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. The Delphi Research Group
 
-1. Overview of this Workshop
+1. Workshop Overview and System Setup
 
 1. Panel Data
 
@@ -70,11 +70,110 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 ![](gfx/web_of_parts.svg){fig-align=center}
 
-# Workshop Overview
+# Workshop Overview and System Setup
 
 ## A few slides here
 
 ## A few slides here
+
+## System setup -- Passive viewing
+
+<br>
+
+### All of the slides are at 
+
+<br>
+
+[<https://cmu-delphi.github.io/insightnet-workshop-2024>]{style="text-align: center;"}
+
+<br>
+
+### The source code is in the Repo 
+
+<br>
+
+<https://github.com/cmu-delphi/insightnet-workshop-2024>
+
+<br>
+
+This is enough, but we hope you'll want to work through the code as we go along.
+
+<br>
+
+[Detailed versions of the next few slides are shown at the Repo Link above.]{.secondary}
+
+## System setup -- Required software 
+
+<br>
+
+### We assume you already have
+
+<br>
+
+1. `R`
+
+<br>
+
+2. An IDE. We'll use RStudio, but you can use VSCode or Emacs or Whatnot
+
+## System setup -- Downloading the materials
+
+### Easy way: 
+
+1. Click the [Big Green Button]{.fourth-colour} that says <kbd>< > Code ▾</kbd>
+2. Choose [Download Zip]{.primary}
+3. Open the Zip directory and then Open `insightnet-workshop-2024.Rproj`
+
+### More expert (local `git` user):
+
+1. Click the [Big Green Button]{.fourth-colour} that says <kbd>< > Code ▾</kbd>
+2. Copy the URL.
+3. Open RStudio, select File > New Project > Version Control. Paste there and proceed.
+
+### Even more expert (wants `github` remote):
+
+1. Click the Grey Button that says <kbd>⑂ Fork ▾</kbd>
+2. Proceed along the same lines as above.
+
+## System setup -- Installing required packages
+
+We will use a [lot]{.tertiary} of packages.
+
+### We've tried to make it so you can get them all at once (with the right versions)
+
+🤞 We hope this works... 🤞
+[Note that you can "Copy to Clipboard"]{.fourth-colour}
+
+<br>
+
+In RStudio:
+
+``` r
+install.packages("pak") # good for installing from non-CRAN sources
+pak::pkg_install("cmu-delphi/InsightNetFcast24", dependencies = TRUE)
+InsightNetFcast24::verify_setup()
+```
+
+<br>
+
+Hopefully, you see:
+```{r}
+#| message: true
+cli::cli_alert_success("You should be good to go!")
+```
+
+Ask for help if you see something like:
+```{r}
+#| error: TRUE
+verify_setup <- function() {
+  cli::cli_abort(c(
+    "The following packages do not have the correct version:",
+    "i" = "Installed: {.pkg epipredict 0.2.0}.",
+    "i" = "Required: {.pkg epipredict == 0.1.0}."
+  ))
+}
+verify_setup()
+```
 
 # Panel Data
 
