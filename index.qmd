@@ -40,7 +40,6 @@ production of nowcasts and forecasts.
 ## Instructors
 
 * Logan C. Brooks
-* Alice Cima
 * Rachel Lobay
 * Daniel J. McDonald
 * Ryan J. Tibshirani
