@@ -29,7 +29,7 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. Versioned Data
 
-1. Epidata API
+1. Epidata Repository and API
 
 1. Find Data Sources and Signals
 
@@ -283,7 +283,7 @@ ggplot(ca |>
 
 ## Intro to versioned data
 
-* Many epidemic aggregates are subject to [reporting delays]{.primary}
+* Many epidemic aggregates are subject to [reporting delays and revisions]{.primary}
 
 * This is because individual-level data has delayed availability:
     
@@ -303,9 +303,9 @@ until a few days have passed (the patient may even have been released)
 
 ## Versioned data
 
-* The event time is indicated by `time_value`
+* The event time is indicated by `time_value` (aka `reference_date`)
 
-* Now, we add a second time index to indicate the data `version`
+* Now, we add a second time index to indicate the data `version` (aka `reporting_date`)
 
 * `version` = the time at which we saw a particular `value` associated to a `time_value`
 ```{r versioned-ca-ex}
@@ -341,7 +341,7 @@ weekly_snapshots |>
   geom_line(aes(color = version, group = factor(version))) +
   # geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
   geom_line(data = dv_final |> filter(geo_value %in% c("fl", "ca")), color = "black") +
-  labs(x = "Date", y = "% doctor's visits with CLI") +
+  labs(x = "Reference date", y = "% doctor's visits with CLI") +
   expand_limits(y = 0) +
   scale_x_date(date_labels = "%m/%Y", expand = expansion(0)) +
   scale_y_continuous(expand = expansion(c(0, 0.05))) +
@@ -400,7 +400,7 @@ p1 <- dv_cli |>
   filter(time_value > ymd("2021-12-31"), issue >= "2021-12-31") |>
   ggplot(aes(time_value, issue, fill = value / final_value * 100)) +
   geom_tile() +
-  scale_x_date(expand = expansion(), name = "Date") +
+  scale_x_date(expand = expansion(), name = "Reference date") +
   scale_y_date(expand = expansion(), name = "Report date") +
   scale_fill_viridis_c(
     name = "% final", 
@@ -414,7 +414,7 @@ p2 <- dv_cli |>
   filter(issue >= "2021-12-31", time_value > ymd("2021-12-31")) |>
   ggplot(aes(time_value)) +
   geom_line(aes(y = value, colour = issue, group = issue)) +
-  scale_x_date(expand = expansion(), name = "Date") +
+  scale_x_date(expand = expansion(), name = "Reference date") +
   scale_y_continuous(
     expand = expansion(), 
     name = "% Outpatient visits b/c CLI",
@@ -622,7 +622,28 @@ cowplot::plot_grid(g1, g2, ncol = 2, rel_widths = c(.38, .62))
 * [Cross-checking data with external sources from different reporting systems]{.primary}
 
 
-# Epidata API
+# Epidata Repository and API
+
+## What is the Epidata repository
+
+[**Epidata:**]{.primary} repository of aggregated epi-surveillance time series
+
+Code is open-source. Signals can be either public or restricted.
+
+* To date, it has accumulated over 5 billion records.
+
+* At the peak of the pandemic, handled millions of API queries per day.
+
+* Many aren't available elsewhere
+
+Data from
+: public health reporting, medical insurance claims, medical device data, Google search queries, wastewater, app-based mobility patterns.
+
+<br>
+
+Added value
+: revision tracking, anomaly detection, trend detection, smoothing, imputation, geo-temporal-demographic disaggregation.
+
 
 ## Goals of Delphi Epidata platform and repository
 
@@ -637,40 +658,13 @@ cowplot::plot_grid(g1, g2, ncol = 2, rel_widths = c(.38, .62))
 3. **Add value to existing signals and synthesize new ones**
     + Via signal fusion, nowcasting, smoothing
 
-4. **Provide access to otherwise private data where possible**
-    + With privacy protocols in place
-    + Better positioned than government or industry
 
 ::: {.callout-important appearance="simple"}
 Make epi-surveillance more nimble, complete, standardized, robust, and real-time
 :::
 
-Epidata is not the solution; but we hope it is a blueprint towards such a solution.
 
 
-## What is the Epidata repository
-
-[**Epidata:**]{.primary} repository of aggregated epi-surveillance time series
-
-Free and open-source
-
-<!-- To the full extent we can, we make everything [free and open-source]{.primary}. -->
-
-* To date, it has accumulated over 5 billion records.
-
-<!-- (each record is the value of a signal, at a particular date, and a particular location). -->
-
-* At the peak of the pandemic, handled millions of API queries per day.
-
-* Many aren't available elsewhere
-
-Data from
-: public health reporting, medical insurance claims, medical device data, Google search queries, wastewater, app-based mobility patterns.
-
-<br>
-
-Added value
-: revision tracking, anomaly detection, trend detection, smoothing, imputation, geo-temporal-demographic disaggregation.
 
 ## Features of Delphi Epidata
 
@@ -689,22 +683,20 @@ Added value
 
 * Signals are as accessible (w/ API, SDK) as allowed by DUAs
 
-<!-- MSA, HRR, state, HHS region, nation -->
-<!-- 1st point: Concepts of "reporting date" and "as of". -->
-<!--     + Backfill projection and alerting to changes in backfill dynamics -->
-## Epidata API 
+## Epidata Documentation
 
-* [Delphi's Epidata API](https://cmu-delphi.github.io/delphi-epidata/) real-time access to epidemiological surveillance data
+<br>
 
-* The [main endpoint](https://cmu-delphi.github.io/delphi-epidata/api/covidcast.html) (covidcast) daily updates about COVID-19 and influenza in the U.S.
+[Delphi's Epidata API](https://cmu-delphi.github.io/delphi-epidata/) real-time access to epidemiological surveillance data
 
-* A [variety of other endpoints](https://cmu-delphi.github.io/delphi-epidata/api/README.html) international historical data for COVID-19, influenza, dengue, norovirus
+<br>
 
-* A [full-featured R client](https://cmu-delphi.github.io/delphi-epidata/api/client_libraries.html) for quick access to all data
+The [main endpoint](https://cmu-delphi.github.io/delphi-epidata/api/covidcast.html) (covidcast) daily updates about COVID-19 and influenza in the U.S.
 
-* A [legacy Python client](https://cmu-delphi.github.io/delphi-epidata/api/client_libraries.html#python), full-featured Python client in development
+<br>
 
-<!-- The main endpoint (covidcast) providing daily updates about current COVID-19 and influenza activity across the United States. -->
+A [variety of other endpoints](https://cmu-delphi.github.io/delphi-epidata/api/README.html) international historical data for COVID-19, influenza, dengue, norovirus
+
 
 ## Some of our data sources
 
@@ -745,35 +737,6 @@ Safegraph mobility
 : misc measures by `{county x day, county x week}`
 
 
-
-<!--
-
-## Some of our pre-pandemic data sources
-* FluView ILINet, by {state x week}
-
-* FluView Clinical (% positive flu, PH and clinical labs)
-
-* Google Health Trends (GHT), precursor to Google Symptoms
-
-* Google Flu Trends (GFT), precursor to to GHT
-
-* Twitter flu
-
-* Access counts for flu-related CDC pages, by {city x week}
-
-* Access counts for flu-related Wikipedia entries by {day x hour}
-
-* Flu-surv (flu hosp rates, now expanded to RESP-NET)
-
-* Misc signals for dengue, norovirus
-
-* Misc signals for PAHO countries, ECDC, KCDC, Taiwan,...
-
-* Delphi ILI nowcasts, by {state x week}, visualized in "ILI Nearby" website
-
-* Delphi ILI forecasts, by {state x week}
-
--->
 
 ## Severity pyramid
 
@@ -820,55 +783,6 @@ Docs are great for a deep dive into the data, while the apps & tools are useful 
  
 <br>
 [Dashboard builder](https://delphi.cmu.edu/covidcast/dashboard/)
-
-
-## Signal dashboard - For COVID-19 & flu data
-
-::: flex
-::: w-40
-
-<br>
-
-* Displays [a selection](https://delphi.cmu.edu/covidcast/) of signals for COVID-19 & flu
-
-
-* Browse by location or indicator
-
-* Choose signals to export
-
-<br>
-
-* **Example**: Google symptom search trends in NC.
-
-<!-- 
-* Includes "Data Export" to pull a selected signal & download as a CSV. -->
-
-:::
-::: w-60
-
-<iframe width="800" height="800" src="https://delphi.cmu.edu/covidcast/indicator/?date=20240426&region=NC"></iframe>
-
-:::
-:::
-
-
-## Signal discovery app - Browse for more data
-
-Easily find data sources and signals, no programming required
-
-[https://delphi.cmu.edu/signals/](https://delphi.cmu.edu/signals/)
-
-<a href="https://delphi.cmu.edu/signals/">
-  <img src="gfx/signal_discover_screenshot.jpg" alt="Signal Discover Screenshot" style="height: auto; width: auto;">
-</a>
-
-## Example - NCHS weekly flu mortality data in states
-
-<a href="https://delphi.cmu.edu/signals/">
-  <img src="gfx/signal_discover_screenshot_ex.jpg" alt="Signal Discover Screenshot" style="height: auto; width: auto;">
-</a>
-
-<!-- To reproduce: Pathogen/Syndrom = flu, Severity pyramid = Dead (top of pyramid), Geo-level = ADM1 (e.g. U.S. states) -->
 
 
 
