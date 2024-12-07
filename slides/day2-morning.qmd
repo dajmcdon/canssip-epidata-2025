@@ -16,6 +16,8 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 ## Outline
 
+1. Some Words About Forecasting
+
 1. Linear Regression for Time Series Data
 
 1. Evaluation Methods
@@ -30,6 +32,18 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. Other Approaches to Time Series Data
 
+# Some Words About Forecasting
+
+## Forecasting is not magic
+
+- Forecasts are generally comprised of two parts: trend and seasonality
+- Methods for detecting and projecting trends are not magic; in general they're
+  not qualitatively that different from what you can do with your eyeballs
+- That said, assimilating information from exogenous features (ideally, leading
+  indicators) can lead highly nontrivial gains, beyond the eyeballs
+- Remember ... good data is just as (more?) important as a good model! 
+- Seasonality can help short-term forecasts. Long-term forecasts, absent of 
+  strong seasonality, are generally not very tractable
 
 # Linear Regression for Time Series Data
 
