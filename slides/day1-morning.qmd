@@ -1,6 +1,6 @@
 ---
 talk-title: "Introduction to Panel Data in Epidemiology"
-talk-short-title: "Panel Data"
+talk-short-title: "Understanding Data"
 talk-subtitle: "InsightNet Forecasting Workshop 2024"
 talk-date: "11 December -- Morning"
 format: revealjs
@@ -23,13 +23,13 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. The Delphi Research Group
 
-1. Overview of this Workshop
+1. Workshop Overview and System Setup
 
 1. Panel Data
 
 1. Versioned Data
 
-1. Epidata API
+1. Epidata Repository and API
 
 1. Find Data Sources and Signals
 
@@ -70,11 +70,151 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 ![](gfx/web_of_parts.svg){fig-align=center}
 
-# Workshop Overview
+# Workshop Overview and System Setup
 
-## A few slides here
+## What we will cover
 
-## A few slides here
+- Characteristics of panel data in epidemiology
+- Tools for processing and plotting panel data
+- Statistical background on nowcasting and forecasting
+- Tools for building nowcasting and forecasting models 
+- Plenty of examples throughout of real case studies
+
+## Goals part I
+
+- Expose you to a statistical way of thinking about now/forecasting
+- Certain basic mindsets (e.g., the importance of empirical validation
+  using techniques like time series cross-validation) are ubiquitous
+- Certain basic modeling considerations (e.g., starting simple and
+  building up complexity, taming variance through regularization,
+  addressing nonstationarity with trailing training windows) are also
+  ubiquitous
+
+## Goals part II
+
+- Expose you to software packages which aid processing, tracking,
+  nowcasting, and forecasting with panel data 
+- These tools are still in development and we welcome your feedback
+- We have tried hard to get the framework right; but many individual
+  pieces themselves could still be improved 
+- If these aren't working for you, then we want to hear from you!
+- We welcome collaboration, and everything we do is open source
+
+## A disclaimer
+
+- Our backgrounds are primarily in statistics and computer science
+- This obviously influences our way of thinking and our approach to 
+  nowcasting and forecasting
+- We don't have nearly as much experience with traditional epi models
+  but we do have opinions about the pros/cons. Ask us at any point if
+  you have a question about why we're doing things a certain way
+  
+## One last slide
+
+- This workshop is supposed to be useful for YOU. Ask questions if
+  you have them, don't be shy
+- We may not (likely won't?) cover everything. Hopefully the materials
+  will be a resource for you beyond this workshop
+  
+
+## System setup -- Passive viewing
+
+<br>
+
+### All of the slides are at 
+
+<br>
+
+[<https://cmu-delphi.github.io/insightnet-workshop-2024>]{style="text-align: center;"}
+
+<br>
+
+### The source code is in the Repo 
+
+<br>
+
+<https://github.com/cmu-delphi/insightnet-workshop-2024>
+
+<br>
+
+This is enough, but we hope you'll want to work through the code as we go along.
+
+<br>
+
+[Detailed versions of the next few slides are shown at the Repo Link above.]{.secondary}
+
+## System setup -- Required software 
+
+<br>
+
+### We assume you already have
+
+<br>
+
+1. `R`
+
+<br>
+
+2. An IDE. We'll use RStudio, but you can use VSCode or Emacs or Whatnot
+
+## System setup -- Downloading the materials
+
+### Easy way: 
+
+1. Click the [Big Green Button]{.fourth-colour} that says <kbd>< > Code ▾</kbd>
+2. Choose [Download Zip]{.primary}
+3. Open the Zip directory and then Open `insightnet-workshop-2024.Rproj`
+
+### More expert (local `git` user):
+
+1. Click the [Big Green Button]{.fourth-colour} that says <kbd>< > Code ▾</kbd>
+2. Copy the URL.
+3. Open RStudio, select File > New Project > Version Control. Paste there and proceed.
+
+### Even more expert (wants `github` remote):
+
+1. Click the Grey Button that says <kbd>⑂ Fork ▾</kbd>
+2. Proceed along the same lines as above.
+
+## System setup -- Installing required packages
+
+We will use a [lot]{.tertiary} of packages.
+
+### We've tried to make it so you can get them all at once (with the right versions)
+
+🤞 We hope this works... 🤞
+[Note that you can "Copy to Clipboard"]{.fourth-colour}
+
+<br>
+
+In RStudio:
+
+``` r
+install.packages("pak") # good for installing from non-CRAN sources
+pak::pkg_install("cmu-delphi/InsightNetFcast24", dependencies = TRUE)
+InsightNetFcast24::verify_setup()
+```
+
+<br>
+
+Hopefully, you see:
+```{r}
+#| message: true
+cli::cli_alert_success("You should be good to go!")
+```
+
+Ask for help if you see something like:
+```{r}
+#| error: TRUE
+verify_setup <- function() {
+  cli::cli_abort(c(
+    "The following packages do not have the correct version:",
+    "i" = "Installed: {.pkg epipredict 0.2.0}.",
+    "i" = "Required: {.pkg epipredict == 0.1.0}."
+  ))
+}
+verify_setup()
+```
 
 # Panel Data
 
@@ -82,7 +222,7 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 * [**Panel data**](https://en.wikipedia.org/wiki/Panel_data) or longitudinal data, contain cross-sectional measurements of subjects over time.
 
-* Since we're working with aggregated data, the subjects are geographic units (e.g. counties, states) 
+* Since we're working with aggregated data, the subjects are geographic units (e.g. counties, states). 
 
 <!-- and not individuals.--> 
 
@@ -283,7 +423,7 @@ ggplot(ca |>
 
 ## Intro to versioned data
 
-* Many epidemic aggregates are subject to [reporting delays]{.primary}
+* Many epidemic aggregates are subject to [reporting delays and revisions]{.primary}
 
 * This is because individual-level data has delayed availability:
     
@@ -303,9 +443,9 @@ until a few days have passed (the patient may even have been released)
 
 ## Versioned data
 
-* The event time is indicated by `time_value`
+* The event time is indicated by `time_value` (aka `reference_date`)
 
-* Now, we add a second time index to indicate the data `version`
+* Now, we add a second time index to indicate the data `version` (aka `reporting_date`)
 
 * `version` = the time at which we saw a particular `value` associated to a `time_value`
 ```{r versioned-ca-ex}
@@ -341,7 +481,7 @@ weekly_snapshots |>
   geom_line(aes(color = version, group = factor(version))) +
   # geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
   geom_line(data = dv_final |> filter(geo_value %in% c("fl", "ca")), color = "black") +
-  labs(x = "Date", y = "% doctor's visits with CLI") +
+  labs(x = "Reference date", y = "% doctor's visits with CLI") +
   expand_limits(y = 0) +
   scale_x_date(date_labels = "%m/%Y", expand = expansion(0)) +
   scale_y_continuous(expand = expansion(c(0, 0.05))) +
@@ -400,7 +540,7 @@ p1 <- dv_cli |>
   filter(time_value > ymd("2021-12-31"), issue >= "2021-12-31") |>
   ggplot(aes(time_value, issue, fill = value / final_value * 100)) +
   geom_tile() +
-  scale_x_date(expand = expansion(), name = "Date") +
+  scale_x_date(expand = expansion(), name = "Reference date") +
   scale_y_date(expand = expansion(), name = "Report date") +
   scale_fill_viridis_c(
     name = "% final", 
@@ -414,7 +554,7 @@ p2 <- dv_cli |>
   filter(issue >= "2021-12-31", time_value > ymd("2021-12-31")) |>
   ggplot(aes(time_value)) +
   geom_line(aes(y = value, colour = issue, group = issue)) +
-  scale_x_date(expand = expansion(), name = "Date") +
+  scale_x_date(expand = expansion(), name = "Reference date") +
   scale_y_continuous(
     expand = expansion(), 
     name = "% Outpatient visits b/c CLI",
@@ -622,7 +762,28 @@ cowplot::plot_grid(g1, g2, ncol = 2, rel_widths = c(.38, .62))
 * [Cross-checking data with external sources from different reporting systems]{.primary}
 
 
-# Epidata API
+# Epidata Repository and API
+
+## What is the Epidata repository
+
+[**Epidata:**]{.primary} repository of aggregated epi-surveillance time series
+
+Code is open-source. Signals can be either public or restricted.
+
+* To date, it has accumulated over 5 billion records.
+
+* At the peak of the pandemic, handled millions of API queries per day.
+
+* Many aren't available elsewhere
+
+Data from
+: public health reporting, medical insurance claims, medical device data, Google search queries, wastewater, app-based mobility patterns.
+
+<br>
+
+Added value
+: revision tracking, anomaly detection, trend detection, smoothing, imputation, geo-temporal-demographic disaggregation.
+
 
 ## Goals of Delphi Epidata platform and repository
 
@@ -637,40 +798,13 @@ cowplot::plot_grid(g1, g2, ncol = 2, rel_widths = c(.38, .62))
 3. **Add value to existing signals and synthesize new ones**
     + Via signal fusion, nowcasting, smoothing
 
-4. **Provide access to otherwise private data where possible**
-    + With privacy protocols in place
-    + Better positioned than government or industry
 
 ::: {.callout-important appearance="simple"}
 Make epi-surveillance more nimble, complete, standardized, robust, and real-time
 :::
 
-Epidata is not the solution; but we hope it is a blueprint towards such a solution.
 
 
-## What is the Epidata repository
-
-[**Epidata:**]{.primary} repository of aggregated epi-surveillance time series
-
-Free and open-source
-
-<!-- To the full extent we can, we make everything [free and open-source]{.primary}. -->
-
-* To date, it has accumulated over 5 billion records.
-
-<!-- (each record is the value of a signal, at a particular date, and a particular location). -->
-
-* At the peak of the pandemic, handled millions of API queries per day.
-
-* Many aren't available elsewhere
-
-Data from
-: public health reporting, medical insurance claims, medical device data, Google search queries, wastewater, app-based mobility patterns.
-
-<br>
-
-Added value
-: revision tracking, anomaly detection, trend detection, smoothing, imputation, geo-temporal-demographic disaggregation.
 
 ## Features of Delphi Epidata
 
@@ -689,22 +823,20 @@ Added value
 
 * Signals are as accessible (w/ API, SDK) as allowed by DUAs
 
-<!-- MSA, HRR, state, HHS region, nation -->
-<!-- 1st point: Concepts of "reporting date" and "as of". -->
-<!--     + Backfill projection and alerting to changes in backfill dynamics -->
-## Epidata API 
+## Epidata Documentation
 
-* [Delphi's Epidata API](https://cmu-delphi.github.io/delphi-epidata/) real-time access to epidemiological surveillance data
+<br>
 
-* The [main endpoint](https://cmu-delphi.github.io/delphi-epidata/api/covidcast.html) (covidcast) daily updates about COVID-19 and influenza in the U.S.
+[Delphi's Epidata API](https://cmu-delphi.github.io/delphi-epidata/) real-time access to epidemiological surveillance data
 
-* A [variety of other endpoints](https://cmu-delphi.github.io/delphi-epidata/api/README.html) international historical data for COVID-19, influenza, dengue, norovirus
+<br>
 
-* A [full-featured R client](https://cmu-delphi.github.io/delphi-epidata/api/client_libraries.html) for quick access to all data
+The [main endpoint](https://cmu-delphi.github.io/delphi-epidata/api/covidcast.html) (covidcast) daily updates about COVID-19 and influenza in the U.S.
 
-* A [legacy Python client](https://cmu-delphi.github.io/delphi-epidata/api/client_libraries.html#python), full-featured Python client in development
+<br>
 
-<!-- The main endpoint (covidcast) providing daily updates about current COVID-19 and influenza activity across the United States. -->
+A [variety of other endpoints](https://cmu-delphi.github.io/delphi-epidata/api/README.html) international historical data for COVID-19, influenza, dengue, norovirus
+
 
 ## Some of our data sources
 
@@ -745,35 +877,6 @@ Safegraph mobility
 : misc measures by `{county x day, county x week}`
 
 
-
-<!--
-
-## Some of our pre-pandemic data sources
-* FluView ILINet, by {state x week}
-
-* FluView Clinical (% positive flu, PH and clinical labs)
-
-* Google Health Trends (GHT), precursor to Google Symptoms
-
-* Google Flu Trends (GFT), precursor to to GHT
-
-* Twitter flu
-
-* Access counts for flu-related CDC pages, by {city x week}
-
-* Access counts for flu-related Wikipedia entries by {day x hour}
-
-* Flu-surv (flu hosp rates, now expanded to RESP-NET)
-
-* Misc signals for dengue, norovirus
-
-* Misc signals for PAHO countries, ECDC, KCDC, Taiwan,...
-
-* Delphi ILI nowcasts, by {state x week}, visualized in "ILI Nearby" website
-
-* Delphi ILI forecasts, by {state x week}
-
--->
 
 ## Severity pyramid
 
@@ -820,55 +923,6 @@ Docs are great for a deep dive into the data, while the apps & tools are useful 
  
 <br>
 [Dashboard builder](https://delphi.cmu.edu/covidcast/dashboard/)
-
-
-## Signal dashboard - For COVID-19 & flu data
-
-::: flex
-::: w-40
-
-<br>
-
-* Displays [a selection](https://delphi.cmu.edu/covidcast/) of signals for COVID-19 & flu
-
-
-* Browse by location or indicator
-
-* Choose signals to export
-
-<br>
-
-* **Example**: Google symptom search trends in NC.
-
-<!-- 
-* Includes "Data Export" to pull a selected signal & download as a CSV. -->
-
-:::
-::: w-60
-
-<iframe width="800" height="800" src="https://delphi.cmu.edu/covidcast/indicator/?date=20240426&region=NC"></iframe>
-
-:::
-:::
-
-
-## Signal discovery app - Browse for more data
-
-Easily find data sources and signals, no programming required
-
-[https://delphi.cmu.edu/signals/](https://delphi.cmu.edu/signals/)
-
-<a href="https://delphi.cmu.edu/signals/">
-  <img src="gfx/signal_discover_screenshot.jpg" alt="Signal Discover Screenshot" style="height: auto; width: auto;">
-</a>
-
-## Example - NCHS weekly flu mortality data in states
-
-<a href="https://delphi.cmu.edu/signals/">
-  <img src="gfx/signal_discover_screenshot_ex.jpg" alt="Signal Discover Screenshot" style="height: auto; width: auto;">
-</a>
-
-<!-- To reproduce: Pathogen/Syndrom = flu, Severity pyramid = Dead (top of pyramid), Geo-level = ADM1 (e.g. U.S. states) -->
 
 
 
