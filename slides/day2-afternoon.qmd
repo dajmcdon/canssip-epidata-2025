@@ -740,6 +740,8 @@ ggplot(data = forecasts, aes(x = target_date, group = forecast_date)) +
   ) +
   geom_line(aes(y = .pred, color = factor(forecast_date))) +
   geom_point(aes(y = .pred, color = factor(forecast_date))) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() +
   labs(x = "", y = "Deaths per 100k people") +
   theme(legend.position = "none")
 ```
