@@ -18,7 +18,7 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. Some Words About Forecasting
 
-1. Linear Regression for Time Series Data
+1. Linear Regression for Time Series 
 
 1. Evaluation Methods
 
@@ -30,7 +30,7 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. Forecasting with Versioned Data
 
-1. Other Approaches to Time Series Data
+1. Traditional Approaches to Time Series 
 
 # Some Words About Forecasting
 
@@ -45,7 +45,7 @@ ggplot2::theme_set(ggplot2::theme_bw())
 - Seasonality can help short-term forecasts. Long-term forecasts, absent of 
   strong seasonality, are generally not very tractable
 
-# Linear Regression for Time Series Data
+# Linear Regression for Time Series 
 
 ## Basics of linear regression 
 
@@ -570,11 +570,11 @@ ggplot(ca |>
 
 
 
-## Time-series cross-validation (CV)
+## Time series cross-validation (CV)
 #### $h$-step ahead predictions
 
 * If we [refit]{.primary} in the future once new data are available, a more 
-appropriate way to estimate the prediction error is time-series cross-validation.
+appropriate way to estimate the prediction error is time series cross-validation.
 
 * To get $h$-step ahead predictions, for each time $t = t_0, t_0+1, \dots$,
 
@@ -591,7 +591,7 @@ $$CVMSE = \frac{1}{n-h-t_0} \sum_{t = t_0}^{n-h} (\hat y_{t+h|t} - y_{t+h})^2$$
 where	$\hat y_{t+h|t}$ indicates a prediction for $y$ at time $t+h$ that was made 
 with data available up to time $t$.
 
-## Time-series cross-validation (CV) 
+## Time series cross-validation (CV) 
 #### Linear regression of COVID deaths on lagged cases
 
 ```{r time-series-cv}
@@ -615,7 +615,7 @@ With the current model, we can only predict $k$ days ahead (where $k$ = number o
 :::
 
 
-## Time-series cross-validation (CV)
+## Time series cross-validation (CV)
 #### Linear regression of COVID deaths on lagged cases
 
 ```{r plot-cv-predictions}
@@ -706,7 +706,7 @@ for (t in t0:(n-h)) {
 ```
 
 
-## Time-series CV: all past vs trailing window
+## Time series CV: all past vs trailing window
 #### Linear regression of COVID deaths on lagged cases
 
 ```{r plot-cv-predictions-trailing}
@@ -773,7 +773,7 @@ $$\hat y_{t+28} = \hat\phi + \hat\phi_0 y_{t} + \hat\beta_0 x_{t}$$
 ca$lagged_deaths <- dplyr::lag(ca$deaths, n = k)
 ```
 
-* How does it compare to the previous model in terms of time-series CV?
+* How does it compare to the previous model in terms of time series CV?
 
 ::: {.callout-important icon="false"}
 ## Note
@@ -817,7 +817,7 @@ errors_arx
 
 
 
-## Time-Series CV (trailing): ARX(1) vs `lm` on lagged cases
+## Time series CV (trailing): ARX(1) vs `lm` on lagged cases
 
 ```{r arx-time-series-cv}
 # Getting 28-step ahead predictions through CV 
@@ -1135,7 +1135,7 @@ for (t in t0:(n-h)) {
 
 ```
 
-## Time-Series CV (trailing): ARX(1), ARX(2), and ARX(3) 
+## Time series CV (trailing): ARX(1), ARX(2), and ARX(3) 
 
 ```{r arx-2-and-3-plot-cv-predictions}
 #| fig-width: 7
@@ -1425,7 +1425,7 @@ ca |>
 
 
 
-## Time-series CV (trailing) for ARX(3) + ridge/lasso 
+## Time series CV (trailing) for ARX(3) + ridge/lasso 
 
 ```{r regularization-cv}
 #| echo: true
@@ -1465,7 +1465,7 @@ for (t in t0:(n-h)) {
 ```
 
 
-## Predictions: time-series CV (trailing) for ARX(1) + ridge/lasso 
+## Predictions: time series CV (trailing) for ARX(1) + ridge/lasso 
 
 ```{r regularize-arx-1}
 #| fig-width: 7
@@ -1540,7 +1540,7 @@ rbind(getErrors(y_test, pred_arx1[!is.na(pred_arx1)], "ARX(1)"),
 ```
 
 
-## Predictions: time-series CV (trailing) for ARX(2) + ridge/lasso 
+## Predictions: time series CV (trailing) for ARX(2) + ridge/lasso 
 
 ```{r regularize-arx-2}
 #| fig-width: 7
@@ -1615,7 +1615,7 @@ rbind(getErrors(y_test, pred_arx2[!is.na(pred_arx2)], "ARX(2)"),
 
 
 
-## Predictions: time-series CV (trailing) for ARX(3) + ridge/lasso 
+## Predictions: time series CV (trailing) for ARX(3) + ridge/lasso 
 
 ```{r plot-arx3-regularization-cv}
 #| fig-width: 7
