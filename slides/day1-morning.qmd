@@ -72,9 +72,50 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 # Workshop Overview and System Setup
 
-## A few slides here
+## What we will cover
 
-## A few slides here
+- Characteristics of panel data in epidemiology
+- Tools for processing and plotting panel data
+- Statistical background on nowcasting and forecasting
+- Tools for building nowcasting and forecasting models 
+- Plenty of examples throughout of real case studies
+
+## Goals part I
+
+- Expose you to a statistical way of thinking about now/forecasting
+- Certain basic mindsets (e.g., the importance of empirical validation
+  using techniques like time series cross-validation) are ubiquitous
+- Certain basic modeling considerations (e.g., starting simple and
+  building up complexity, taming variance through regularization,
+  addressing nonstationarity with trailing training windows) are also
+  ubiquitous
+
+## Goals part II
+
+- Expose you to software packages which aid processing, tracking,
+  nowcasting, and forecasting with panel data 
+- These tools are still in development and we welcome your feedback
+- We have tried hard to get the framework right; but many individual
+  pieces themselves could still be improved 
+- If these aren't working for you, then we want to hear from you!
+- We welcome collaboration, and everything we do is open source
+
+## A disclaimer
+
+- Our backgrounds are primarily in statistics and computer science
+- This obviously influences our way of thinking and our approach to 
+  nowcasting and forecasting
+- We don't have nearly as much experience with traditional epi models
+  but we do have opinions about the pros/cons. Ask us at any point if
+  you have a question about why we're doing things a certain way
+  
+## One last slide
+
+- This workshop is supposed to be useful for YOU. Ask questions if
+  you have them, don't be shy
+- We may not (likely won't?) cover everything. Hopefully the materials
+  will be a resource for you beyond this workshop
+  
 
 ## System setup -- Passive viewing
 
@@ -181,7 +222,7 @@ verify_setup()
 
 * [**Panel data**](https://en.wikipedia.org/wiki/Panel_data) or longitudinal data, contain cross-sectional measurements of subjects over time.
 
-* Since we're working with aggregated data, the subjects are geographic units (e.g. counties, states) 
+* Since we're working with aggregated data, the subjects are geographic units (e.g. counties, states). 
 
 <!-- and not individuals.--> 
 
