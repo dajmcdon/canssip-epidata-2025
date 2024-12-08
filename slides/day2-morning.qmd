@@ -1924,17 +1924,58 @@ getErrors((ca |> filter(time_value %in% (fc_time_values+h)))$deaths,
           pred_unaware$X1, "version-unaware")
 ```
 
-# Other Approaches to Time Series Data
+# Traditional Approaches to Time Series 
 
-## Traditional Time Series Forecasting
+## Popular forecasting frameworks
 
-Two popular frameworks:
+- Autoregressive integrated model average (ARIMA) models
+- Exponential smoothing with trend and seasonality (ETS) 
+- Prophet forecaster
+- DeepAR (neural network)
 
-* Exponential Smoothing with Trend and Seasonality ([ETS]{.primary})
+First two here are classic and standard, second two are more recent. None are 
+particularly well-suited for epi forecasting out-of-the-box, ask us about them
+if you're curious. We'll discuss ARIMA as it's closest to what we've seen.
 
-* Autoregressive Integrated Moving Average ([ARIMA]{.primary})
+## Dissecting ARIMA 
 
+- AR = autoregressive, include lags of response itself as features
+- MA = moving average, include lags of noise terms (correlated noise model)
+- I = integrated, we model and forecast differences between observations
 
+## Discussion
+
+Worth comparing and discussing ARIMA versus the kind of autoregressive models 
+you've just seen:
+
+- The way lags are handled:
+    * In what you've seen, we can include arbitrary lags (and regularize)
+    * Traditional AR models require lags to be contiguous (e.g., all of 0-17, 
+    instead of 0, 7, 14)
+- The way multi-step forecasts are made: 
+    * In what you've seen, we model h-step ahead directly 
+    * Traditional AR models only do 1-step ahead prediction, and iterate this 
+    to get forecasts at longer horizons
+
+## Discussion
+
+- The way nonstationarity is handled: 
+    * In what you've seen, we address nonstationarity via trailing training 
+    windows (or observation weights more generally)
+    * Traditional ARIMA models use the I component for this: remove linear or
+    quadratic trends by differences, add them back in at prediction time
+- The way exogenous features are included: 
+    * In what you've seen, they appear directly as an exogenous predictor
+    * Traditional ARIMA models (software, such as `fable()`) includes them in 
+    a different manner; they are effectively subject to the same lags as the AR
+    and MA terms
+
+## Supplementary resources
+
+- Hyndman and Athanasopoulos, [Forecasting: Principles and Practice](https://otexts.com/fpp3/)
+- Ryan's course notes, [Introduction to Time Series](https://stat153.berkeley.edu/fall-2024/)
+
+<!--
 ## ETS
 
 ### Simple Exponential Smoothing (SES)
@@ -2046,6 +2087,4 @@ with $\theta_0 = 1$
 
 Assumes an $ARMA(p, q)$ model on the 
 $d^{th}$-order differences of $y_t$
-
-## Mechanistic Models
-
+-->
