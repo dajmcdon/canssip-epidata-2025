@@ -1068,7 +1068,7 @@ rbind(getAccuracy(final_data |> filter(geo_value == "ma"),
 
 # Building a forecaster
 
-## Philosophy of forecasting
+## Anatomy of a forecaster
 
 ::: {.fragment .fade-in-then-semi-out}
 
@@ -1268,58 +1268,106 @@ forecasts |>
   theme(legend.position = "none")
 ```
 
-
 # Advanced Topics
 
 ## Ensembling
 
-* Instead of choosing one model, [combine]{.primary} the predictions from multiple constituent models
+Instead of choosing one model, we can [combine]{.primary} the predictions from multiple base models. Ensemble types:
 
-* Ensemble types
-
-  * [untrained]{.primary}: combines multiple constituent models without considering their past performance 
+* [untrained]{.primary}: combine base models, agnostic to past performance 
   
-  * [trained]{.primary}: weights different constituent models based on their accuracy
+* [trained]{.primary}: weight base models, accounting for past performance
   
-* Goals
+Simplest untrained method: simple average of base model forecasts 
 
-  * [compete-with-best]{.primary}: ensemble should have accuracy competitive with best individual constituent model
+$$
+\hat{y}^{\text{avg}}_{t+h|t} = \frac{1}{p} \sum_{j=1}^p \hat{y}^j_{t+h|t} 
+$$
+
+A more robust option: simple median of base model forecasts
+
+$$
+\hat{y}^{\text{med}}_{t+h|t} = \mathrm{median}\Big\{ \hat{y}^j_{t+h|t} : j = 1,\dots,p \Big\}
+$$
+### Example from the Covid-19 Forecast Hub  
   
-  * [robustness-over-all]{.primary}: ensemble should have greater robustness than any individual constituent model
+![](gfx/cramer.png)
 
-* Typically: untrained ensembles are robust but less accurate, 
-and trained ensembles are accurate but less robust.
+### Two key goals of ensembling
 
-## Calibration
+1 [Compete-with-best]{.primary}: ensemble should have accuracy competitive with best individual constituent model
 
-* We have seen that prediction intervals often have [nominal coverage << actual empirical coverage]{.primary},
-e.g. 80% predictive intervals that in practice cover the truth $\approx$ 60% of the times
+2. [Robustness-over-all]{.primary}: ensemble should have greater robustness than any individual constituent model  
 
-* Calibration aims at adjusting the intervals so that 
-nominal coverage $\approx$ empirical coverage
+Typically these are hard to accomplish simultaneously, and untrained methods excel at point 2, whereas trained methods can achieve point 1
 
+### Linear stacking
 
-## Calibration
+One of the simplest trained ensemble methods is to directly fit a weighted 
+combination of base forecasts to optimize accuracy (MSE, MAE, etc.), often 
+called linear stacking: e.g., to form the forecast at time $t$, we solve
+
+\begin{alignat*}{2}
+&\min_{w \in \R^p} && \hspace{-6pt} \sum_{s=t_0+1}^t \bigg( y_s - \sum_{j=1}^p
+w_j \cdot \hat{y}^j_{s|s-h} \bigg)^2 \\   
+&\st \quad && \sum_{j=1}^p w_j = 1, \;\;\text{and} \;\; w_j \geq 0, \;
+j=1,\dots,p   
+\end{alignat*}
+
+then use
+
+$$
+\hat{y}^{\text{stack}}_{t+h|t} = \sum_{j=1}^p \hat{w}^t_j \cdot
+\hat{y}^j_{t+h|t} 
+$$
+
+Note that the stacking optimization problem uses forward-looking predictions (as
+in time series cross-validation)
+
+## Recalibration
+
+* We have seen that prediction intervals often have [empirical coverage << nominal coverage]{.primary}, e.g., our 80% predictive intervals in practice cover $\approx$ 60% of the time
+
+* Recalibration methods aim at adjusting the intervals so that nominal coverage $\approx$ empirical coverage
 
 ### Quantile tracking
 
-* Let $\hat q_{t}^{1-\alpha}$ = predicted level $1-\alpha$ quantile of the 
-distribution of $e_t$, the absolute forecast error at time $t$:
+Quantile tracking is a method for producing calibrated prediction intervals 
+from base forecasts and scores. In the simplest case, we can take the score
+to be absolute error of point forecasts:
 
-$$e_t = |y_t - \hat y_{t|t-1}|.$$
+$$e_t = |y_t - \hat y_{t|t-1}|$$
 
-* Given a learning rate $\eta>0$, update the quantiles as
+* Let $\hat q_{t}^{1-\alpha}$ be a predicted level $1-\alpha$ quantile of the distribution of $e_t$
+
+* Define $I_{t|t-1}^{1-\alpha} = [\hat{y}_{t|t-1} - \hat{q}_t^{1-\alpha}, \;     \hat{y}_{t|t-1} + \hat{q}_t^{1-\alpha}]$. Note that 
+    
+    $$
+    e_t \leq \hat{q}_t^{1-\alpha} \iff y_t \in I_{t|t-1}^{1-\alpha}
+    $$
+* Therefore we the reduced the problem of producing prediction intervals $I_{t|t-1}^{1-\alpha}$ to one of tracking a quantile of $e_t$
+
+### Quantile updates
+
+We begin with some estimate $\hat{q}_{t_0+1}^{1-\alpha}$ based on a burn-in set.
+Then repeat the following updates as $t$ increases, for a step size $\eta > 0$: 
 
 $$\hat q_{t+1}^{1-\alpha} = \begin{cases} 
-\hat q_{t}^{1-\alpha} + \eta(1-\alpha) \quad \text{if } x_t\notin I_{t|t-1}^{1-\alpha} \\
-\hat q_{t}^{1-\alpha} - \eta\alpha \quad \quad \quad \,\,\, \text{if } x_t\in I_{t|t-1}^{1-\alpha}
+\hat q_{t}^{1-\alpha} + \eta(1-\alpha) \quad \text{if } y_t\notin I_{t|t-1}^{1-\alpha} \\
+\hat q_{t}^{1-\alpha} - \eta\alpha \quad \quad \quad \,\,\, \text{if } y_t\in I_{t|t-1}^{1-\alpha}
 \end{cases}$$
 
-where $I_{t|t-1}^{1-\alpha}$ is the 
-$1-\alpha$ prediction interval made by a forecaster at time $t$ for time $t+1$.
+In words: 
 
-* Quantile tracking in words: if the latest interval does not cover, increase the quantile by 
-$\eta(1-\alpha)$ (make the next interval wider), otherwise decrease the quantile by $\eta\alpha$
-(make the next interval narrower).
+* if the latest interval does not cover, then we increase the quantile (make the next interval wider), 
+* otherwise we decrease the quantile by (make the next interval narrower).
+
+This method has the following guarantee: 
+
+$$
+\Bigg| \frac{1}{T} \sum_{t=t_0+1}^{t_0+T} 1 \big\{ y_t \in I_{t|t-1}^{1-\alpha} \big\} - (1-\alpha) \Bigg| \leq \frac{b/\eta + 1}{T}
+$$
+
+where $b$ is a bound on the errors (largest error possible/observable).
 
 ## Multi-horizon smoothing
