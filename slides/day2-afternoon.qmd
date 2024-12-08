@@ -207,8 +207,6 @@ df |>
 ```{r outliers-deaths}
 #| echo: true
 #| code-fold: true
-#| fig-width: 10
-#| fig-height: 5
 detection_methods <- dplyr::bind_rows(
   dplyr::tibble(method = "rm", args = list(list(detect_negatives = TRUE)), abbr = "rm")#,
   #dplyr::tibble(method = "stl", args = list(list(detect_negatives = TRUE, seasonal_period = 7)),
@@ -224,15 +222,17 @@ deaths_outlr <- df |>
                                      )) |>
   ungroup() |>
   unnest(outlier_info)
+```
 
+```{r outliers-fig}
 deaths_outlr |>
   filter(geo_value %in% c("ca", "ma", "ny", "tx")) |> 
   ggplot(aes(x = time_value)) +
-  geom_line(aes(y = deaths), linetype = 2) +
+  geom_line(aes(y = deaths), col = "grey") +
   geom_line(aes(y = combined_replacement, col = geo_value)) +
-  geom_hline(yintercept = 0, linetype = 3) +
+  geom_hline(yintercept = 0) +
   facet_wrap(vars(geo_value), scales = "free_y") +
-  scale_color_viridis_d() +
+  scale_color_viridis_d(name = "") +
   labs(x = "", y = "Covid-19 deaths per 100k people")
 ```
 
