@@ -1003,7 +1003,7 @@ nchs_archive <- pub_covidcast(
 
 Recall, we need to watch out for:
 
-* [**Latency**]{.primary} the time difference between date of occurrence and date of the initial report
+* [**Latency**]{.primary} the time difference between date of reference and date of the initial report
 * [**Backfill**]{.primary} how data for a given date is updated after initial report. 
 
 `revision_summary()` provides a sumamry to both aspects.  
@@ -1034,8 +1034,8 @@ revision_data |> select(geo_value, time_value, min_lag) |> slice_sample(n = 10)
 ```{r revision-summary-time-near-latest-demo}
 revision_data |> select(geo_value, time_value, time_near_latest) |> slice_sample(n = 10)
 ```
-* It generally takes at least 4 weeks for reported value to be within 20\% of the finalized value. 
-* We can change the threshold of percentage difference by specifying `within_latest`  argument of `revision_summary()`. 
+* It generally takes at least 4 weeks for reported value to be within 20\% (default in `revision_summary()`) of the finalized value. 
+* We can change the threshold of percentage difference by specifying the `within_latest` argument of `revision_summary()`. 
 
 ## Versioning analysis - backfill 
 
@@ -1175,6 +1175,7 @@ ggplot(nchs_snapshots |> filter(!latest),
             inherit.aes = FALSE, color = "black")
 ```
 
+<!--
 ## Aside: Do we need a burn-in/training set? 
 
 * Typical stat-ML practise suggests a train, validation, test split.
@@ -1185,26 +1186,14 @@ ggplot(nchs_snapshots |> filter(!latest),
   + These analyses do not involve model fitting, we have little risk of an overly optimistic performance evaluation (no overfitting on test data).
 * However, for a [**psuedo-prospective analysis**]{.primary}, the best practise is to do a train/test split.
   + In such analysis, one would be fitting and validating many models, a train/test split provides a more rigorous control on overfitting to test set. 
+-->
 
 ## Ratio nowcaster: jumping from provisional to finalized value
 
 * Recall, the goal of nowcast at date $t$ is to use project the [*finalized value*]{.primary} of $y_t,$ given the information available on date $t$. 
 * A very simple nowcaster is the ratio between finalized and provisional value. 
 
-<br>
-
 How can we sensibly estimate this quantity? 
-
-<br>
-
-::: {.fragment .fade-in}
-
-* At nowcast date $t,$ would have recieved reports with versions up to and including $t.$
-* We need to build training samples, which
-  + correctly aligns finalized value against provisional value 
-  + uses features that would have been available at test time 
-  + have enough data to ensure sensible estimation results
-:::
 
 ```{r nchs-ca-only}
 #| echo: false
@@ -1222,10 +1211,9 @@ nchs_archive <- pub_covidcast(
   as_epi_archive(compactify = TRUE)
 ```
 
-
 ## Ratio nowcaster: building training samples
 
-* At nowcast date $t,$ would have recieved reports with versions up to and including $t.$
+* At nowcast date $t,$ would have received reports with versions up to and including $t.$
 * We need to build training samples, which
   + correctly aligns finalized value against provisional value 
   + uses features that would have been available at test time 
@@ -1234,7 +1222,7 @@ nchs_archive <- pub_covidcast(
 ::: {.fragment .fade-in}
 * Build training samples by treating dates prior to date $t$ as actual nowcast dates.
   + What is the provisional data on that date?
-  + Have we recieved finalized value for that date? 
+  + Have we received finalized value for that date? 
 :::
 
 ## Ratio nowcaster: building training samples
@@ -1244,23 +1232,28 @@ nchs_archive <- pub_covidcast(
   + [**Finalized value**]{.primary} as the (potentially unobserved) finalized value of $Y_{s_0}.$
     - We only know in *hindsight* when reported value of $Y_{s_0}$ is finalized -- need an approximation. 
 
-::: {.fragment .fade-in}
+## Revisiting `revision_summary()`
+
+Recall, `revision_summary()` reports the number of days to be within 20\% (default value) of finalized value
+
 ```{r revision-summary-time-near-latest-show-again}
 #| echo: false
 #| eval: true
 
 revision_data |> select(geo_value, time_value, time_near_latest) |> slice_sample(n = 5)
-quantile(revision_data$time_near_latest)
+(lag_quantiles = quantile(revision_data$time_near_latest))
+approx_final_lag = lag_quantiles["75%"]
 ```
-:::
 
 ::: {.fragment .fade-in}
-We can say data reported 49 days after occurrence date is good enough to be considered finalized. 
+Let's say data reported `r approx_final_lag` days after reference date is good enough to be considered finalized. 
 :::
 
 ## Ratio nowcaster: test time feature
 
-* At test time $t,$ take provisional value to be $Y_s,$ where $s$ is the largest occureence date among all values reported up until time $t.$
+* Due to latency, provisional values may not be available at lag 0
+* We use last-observation-carried-forward (LOCF) to impute missing values at test time
+* Precisely, at test time $t,$ we use last observed data point (among all those reported up through time $t$)
 
 ## Nowcasting at a single date: building training samples 
 
@@ -1289,14 +1282,14 @@ initial_data <- nchs_archive$DT |>
 #| echo: true
 #| 
 finalized_data <- epix_as_of(nchs_archive, nowcast_date) |>
-  filter(time_value >= nowcast_date - 49 - window_length & time_value <= nowcast_date - 49) |>
+  filter(time_value >= nowcast_date - approx_final_lag - window_length & time_value <= nowcast_date - approx_final_lag) |>
   rename(finalized_val = mortality) |>
   select(geo_value, time_value, finalized_val)
 ```
 :::
 
+## Nowcasting at a single date: estimating ratio model
 
-::: {.fragment .fade-in}
 * After searching for both provisional and finalized values, we merge them together and estimate the ratio. 
 ```{r one-date-combine-provsional-and-final}
 #| echo: true
@@ -1307,21 +1300,27 @@ ratio <- finalized_data |>
   pull(ratio) |>
   mean(na.rm = TRUE)
 ```
-:::
 
-## Nowcasting at a single date: test feature and actual nowcast 
+## Nowcasting at a single date: test feature construction
 
-```{r one-date-test-feat and nowcast}
+```{r one-date-test-feat}
 #| echo: true
 
 last_avail <- epix_as_of(nchs_archive, nowcast_date) |>
   slice_max(time_value) |>
   pull(mortality) 
+```
+
+## Nowcasting at a single date: producing the nowcast
+
+```{r one-date-nowcast}
+#| echo: true
 
 nowcast <- last_avail * ratio
 nowcast
 ```
 
+TODO for XS: we need to compare to the finalized value!
 
 ## Nowcasting for multiple dates
 
@@ -1339,7 +1338,7 @@ We begin by templatizing our previous operations.
 ```{r nowcaster-to-slide}
 #| echo: true
 
-nowcaster = function(x, g, t, wl=180, appx=49) {
+nowcaster = function(x, g, t, wl=180, appx=approx_final_lag) {
   
 
   initial_data = x$DT |>
@@ -1514,7 +1513,7 @@ nowcasts <- nchs_archive |>
     .all_versions = TRUE
 )
 
-nowcaster <- function(x, g, t, wl=180, appx=49) {
+nowcaster <- function(x, g, t, wl=180, appx=approx_final_lag) {
   
 
   initial_data = x$DT |>
@@ -1540,7 +1539,7 @@ We are now finally able to compare nowcasts against first available reports:
 #| echo: false
 
 
-intial_val_extracter <- function(x, g, t, wl=180, appx=49) {
+intial_val_extracter <- function(x, g, t, wl=180, appx=approx_final_lag) {
   
   last_avail = epix_as_of(x, t) |>
     slice_max(time_value) |>
