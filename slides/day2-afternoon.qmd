@@ -1036,20 +1036,11 @@ rbind(getAccuracy(ca,
 
 ## Geo-pooling or not?
 
-For horizon $h=28$ we observe that
+* Geo-pooled predictions tend to be [more stable]{.primary} with [wider intervals]{.primary}
 
-* [Geo-pooled]{.primary} predictions have actual [coverage near the nominal 80%]{.primary} while 
-non-geo-pooled predictions have lower coverage
+* Meanwhile, predictions from state-wise models tend to be [more volatile]{.primary}
 
-* Point predictions [without geo-pooling]{.primary} are significantly [better]{.primary}
-than with geo-pooling for [California]{.primary} only
-
-* Point predictions [without geo-pooling]{.primary} for the other states are less stable 
-and can largely [overshoot]{.primary} the target 
-
-If we decrease the horizon to $h=7$, the benefits of geo-pooling in stabilizing the point predictions 
-for these four states disappear (short horizons are easier to predict)
-
+The extent to which this occurs differs based on the horizon. Previously we studied $h=28$. What happens for $h=7$?
 
 ```{r arx-geo-pooling-h7}
 pred_arx_geo_pool_7 <- usa_archive_dv |>
