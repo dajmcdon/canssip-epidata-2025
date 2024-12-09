@@ -1166,50 +1166,12 @@ ggplot(snapshots |> filter(!latest),
 
 :::
 
-* We also have access to $p$ other time series 
-$x_{ij},\; i=1,\ldots,t, \; j = 1,\ldots,p$
-
-* All may be subject to revisions.
+* We may also have access to $p$ other time series 
+$x_{ij},\; i=1,\ldots,t, \; j = 1,\ldots, p$ which may be subject to revisions.
 
 
 
-## Aside on nowcasting
-
-* To some Epis, "nowcasting" can be equated with "estimate the time-varying instantaneous reproduction number, $R_t$"
-
-* Ex. using the number of reported COVID-19 cases in British Columbia between Jan. 2020 and Apr. 15, 2023. 
-
-<!-- This data is the number of reported COVID-19 cases in British Columbia between January 2020 and April 15, 2023. The values are.up-to-date as of August 2023. -->
-```{r rtestim}
-#| fig-width: 9
-#| fig-height: 3
-#| out-height: "400px"
-#| label: nowcasting
-library(rtestim)
-source(here::here("_code/bccovid.R"))
-
-p1 <- bccovid|>
-  ggplot(aes(date, cases)) + 
-  geom_line(colour = primary) +
-  geom_vline(xintercept = ymd("2023-04-15"), colour = secondary,
-             linewidth = 2) +
-  labs(y = "BC Covid-19 cases", x = "Date") +
-  scale_y_continuous(expand = expansion(c(0, NA)))
-bc_rt <- estimate_rt(bccovid$cases, x = bccovid$date, 
-                     lambda = c(1e6, 1e5))
-p2 <- plot(confband(bc_rt, lambda = 1e5)) + 
-  coord_cartesian(ylim = c(0.5, 2)) +
-  scale_y_continuous(expand = expansion(0))
-cowplot::plot_grid(p1, p2)
-```
-
-* Group built [`{rtestim}`](https://dajmcdon.github.io/rtestim) doing for this nonparametrically.
-
-* We may come back to this later...
-
-# Nowcasting with One Variable
-
-## Nowcasting simple ratio Ex: NCHS mortality 
+## Case study: NCHS mortality
 
 * In this example, we'll demonstrate the concept of nowcasting using [**NHCS mortality data**]{.primary}.
 (the number of weekly new deaths with confirmed or presumed COVID-19, per 100,000 population).
@@ -1219,47 +1181,65 @@ cowplot::plot_grid(p1, p2)
 ## Fetch versioned data
 
 Let's fetch versioned mortality data from the API (`pub_covidcast`) for CA (`geo_values = "ca"`) and the signal of interest (`deaths_covid_incidence_num`) over early 2024.
+
 ```{r mortality-archive-construct}
 #| echo: true
+
 # Fetch the versioned NCHS mortality data (weekly)
-mortality_archive <- pub_covidcast(
+nchs_archive <- pub_covidcast(
   source = "nchs-mortality",
   signals = "deaths_covid_incidence_num",
   geo_type = "state",
   time_type = "week",
-  geo_values = "ca",  # California (CA)
-  time_values = epirange(202401, 202413),  
+  geo_values = c("ca", "ut"),  
+  time_values = epirange(202001, 202440),  
   issues = "*"
 ) |> 
   select(geo_value, time_value, version = issue, mortality = value) |> 
   as_epi_archive(compactify = TRUE)
 
-# Set the start and end days for the analysis 
-# corresponding to the weeks entered in time_values
-start_time = as.Date("2023-12-31")
-end_time = as.Date("2024-03-24")
 ```
 
-## Latency in reporting - Minimum lag
 
-* A quick inspection reveals that mortality rates are systematically 7 days latent ([**fixed lag**]{.primary}).
+## Analysis of versioning behavior 
 
-```{r inspect-latency-dplyr-way}
+Recall, we need to watch out for:
+
+* [**Latency**]{.primary} the time difference between date of occurrence and date of the initial report
+* [**Backfill**]{.primary} how data for a given date is updated after initial report. 
+
+`revision_summary()` provides a sumamry to both aspects.  
+
+```{r inspect-revision_summary}
 #| echo: true
-mortality_revision_inspect = mortality_archive$DT |> mutate(version_time_diff = version - time_value)
-
-# Look at the first revision for each week
-mortality_revision_inspect |> group_by(time_value) |> slice(1) |> head()
+revision_data = revision_summary(nchs_archive, mortality, print_inform = FALSE)
 ```
 
-* Use `revision_summary()` from `epiprocess` to generate basic statistics about the revision behavior for the dataset.
 
-```{r revision-summary-ex}
-#| eval: false
-revision_summary(mortality_archive, print_inform = TRUE)
+## Versioning analysis -- latency
+
+* [**Question:**]{.primary} What is the latency of NCHS data? 
+
+```{r nchs-latency-via-revision-summary}
+#| echo: true
+
+revision_data |> select(geo_value, time_value, min_lag) |> slice_sample(n = 10)
 ```
 
-## Latency in reporting - Finalized value attainment
+* We randomly sampled some dates to check if there is a consistent latency pattern. 
+* Understanding latency prevents us from using data that we shouldn't have access to. 
+
+## Versioning analysis -- backfill
+
+* [**Question:**]{.primary} How long does it take for the reported value to be close to the finalized value? 
+
+```{r revision-summary-time-near-latest-demo}
+revision_data |> select(geo_value, time_value, time_near_latest) |> slice_sample(n = 10)
+```
+* It generally takes at least 4 weeks for reported value to be within 20\% of the finalized value. 
+* We can change the threshold of percentage difference by specifying `within_latest`  argument of `revision_summary()`. 
+
+## Versioning analysis - backfill 
 
 * [**Question:**]{.primary} When is the [**finalized value**]{.primary} first attained for each date? Would we have access to any in real-time?
 * How fast are the final values attained & what's the pattern for these times, if any?
@@ -1293,35 +1273,55 @@ check_when_finalized <- function(epi_archive, start_date = NULL, end_date = NULL
 
 ```{r check-when-finalized-run}
 #| echo: false
-res <- check_when_finalized(mortality_archive, start_date = start_time, end_date = end_time)
+res <- check_when_finalized(nchs_archive, 
+  start_date = min(nchs_archive$DT$time_value), 
+  end_date = max(nchs_archive$DT$time_value))
+
 head(res)
 ```
-And here's a numerical summary:
+Here is a look at its quantiles:
 ```{r summary-diff}
 #| echo: false
 summary(as.numeric(res$diff))
 ```
 
-* [**Conclusion**]{.primary}: Tends to take a long time & varies. Even for this relatively small time period... Goes as low as 84 days or as high as 294 days. Yikes.
-* So if we were doing this in real-time, then we wouldn't have access to the finalized data.
+* [**Conclusion**]{.primary}: The revision behavior is pretty long-tailed. Value reported 4 weeks later is reasonably close to the finalized value. 
 
-## Comparison of final vs. multiple revisions
+
+## Revision pattern visualization  
 This shows the finalized rates in comparison to [**multiple revisions**]{.primary} to see how the data changes over time:
 
-```{r mortality-by-revision-date}
+```{r mortality-by-accessed-weeks-later}
 #| echo: false
 
-# Visualize the mortality values for different revisions
-revision_dates <- seq(min(mortality_archive$DT$version), end_time, by = "1 week")
+ref_dates <- unique(nchs_archive$DT$time_value)
+offsets = seq(1, 7) * 7
+max_version <- nchs_archive$versions_end
 
-# Create a data frame for each version and label them by revision date
-mortality_revisions <- map_dfr(revision_dates, function(date) {
-  epix_as_of(mortality_archive, date) |>
-    mutate(revision_date = date)  # Add a column for the revision date
-})
+get_val_asof <- function(time_val, archive, offsets) {
+  
+  as_of_dates <- pmin(time_val + offsets, max_version)
+  
+  result <- map(as_of_dates, function(x) {
+    
+    qd <- archive |>
+      epix_as_of(x) |>
+      filter(time_value == time_val) |>
+      select(geo_value, time_value, mortality) |>
+      mutate(lag = x - time_val)
+  }) |>
+    list_rbind()
+  
+  return(result)
 
-# Extract the latest/finalized version
-mortality_latest <- epix_as_of(mortality_archive, max(mortality_archive$DT$version))
+  
+}
+
+value_at_lags <- map(ref_dates, get_val_asof, 
+  archive <- nchs_archive, offsets <- offsets) |>
+  list_rbind()
+  
+values_final <- epix_as_of(nchs_archive, max(nchs_archive$versions_end))
 
 ```
 
@@ -1330,327 +1330,503 @@ mortality_latest <- epix_as_of(mortality_archive, max(mortality_archive$DT$versi
 #| fig-width: 9
 #| fig-height: 4
 #| out-height: "500px"
-ggplot() +
-  geom_line(data = mortality_latest, aes(x = time_value, y = mortality), color = "black", size = 1) +
-  geom_line(data = mortality_revisions, aes(x = time_value, y = mortality, color = as.factor(revision_date))) +
-  geom_point(data = mortality_revisions, aes(x = time_value, y = mortality, color = as.factor(revision_date)), size = 2) +
-  theme_gray() + 
-  labs(color = "Revision Date", y = "Mortality", x = "Date") + 
-  ggtitle("COVID-19 Mortality in CA: Finalized (black) vs Various Revisions")
+ggplot(value_at_lags, aes(x = time_value, y = mortality)) +  
+  geom_line(aes(color = factor(lag))) + 
+  facet_wrap(~ geo_value, scales = "free_y", ncol = 1) +
+  scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
+  labs(x = "", y = "Weekly new COVID deaths") + 
+  # scale_color_viridis_d(option="D", end=0.8) +
+  theme(legend.position = "none") +
+  geom_line(data = values_final, aes(x = time_value, y = mortality), 
+            inherit.aes = FALSE, color = "black")
+
 
 ```
 
-## Comparison of final vs. one revision
+## Revision pattern visualization 
 
-The below figure compares the finalized rates (in black) to [**one revision**]{.primary} (in yellow) from March 3, 2024.
-
-```{r one-revision-final-plot}
-#| out-height: "400px"
-as_of_date = as.Date("2024-03-03")
-
-ggplot() +
-  geom_line(data = mortality_latest, 
-            aes(x = time_value, y = mortality, color = "Finalized"), 
-            size = 1) +
-  geom_line(data = mortality_revisions |> filter(revision_date == as_of_date), 
-            aes(x = time_value, y = mortality, color = "Revision"), 
-            size = 1) +
-  ylab("Mortality") + 
-  xlab("Date") + 
-  scale_color_manual(values = c("Finalized" = "black", "Revision" = "#FFB300")) + 
-  labs(color = "Mortality Type")
-
-```
-The real-time data is biased downwards (systematically below the true value). That is, the signal tends to get scaled up with future revisions.
-
-
-## Calculate one ratio: Provisional vs. finalized data
-<!-- * Let's start simple with computing one ratio. -->
-
-Suppose that the day is March 10, 2024. Then, because the data is 7 days latent, we can compute the ratio between provisional and finalized data for [**March 3, 2024**]{.primary}.
-
-```{r one-ratio-calc}
-#| echo: true
-as_of_date = as.Date("2024-03-10"); fixed_lag = 7
-
-# Load the finalized mortality data for CA
-ca_finalized <- mortality_latest |>
-  filter(time_value == (as_of_date - fixed_lag)) |>
-  dplyr::select(mortality)
-
-# Load the provisional mortality data for the same week
-mortality_old = epix_as_of(mortality_archive, as_of_date)
-
-ca_provisional <- mortality_old |>
-  filter(time_value == (as_of_date - fixed_lag)) |>
-  dplyr::select(mortality)
-
-# Calculate ratio between provisional and finalized cases for the week of interest
-ratio <- ca_provisional$mortality / ca_finalized$mortality
-ratio
-```
-
-[**Conclusion**]{.primary}: The real-time rate is well below the finalized for this time (26 vs 72 here).
-
-[**Question**]{.primary}: Can we generalize this over many days? 
-
-## Calculating the ratio using multiple dates
-Let's move from calculating the ratio by using one day to multiple days with the goal to use it to nowcast for Feb. 18, which has a [**provisional value**]{.primary} of 23
-```{r provisional-val-feb18}
-#| echo: true
-as_of_date = as.Date("2024-02-25")
-
-provisional <- epix_as_of(mortality_archive, as_of_date) |>
-  filter(time_value == as_of_date - 7) |>
-  pull(mortality)
-provisional
-```
-<br>
-and a [**finalized value**]{.primary} of 104
-
-```{r finalized-val-feb18}
-#| echo: true
-finalized <- mortality_latest |>
-  filter(time_value == as_of_date - 7) |>
-  pull(mortality)
-finalized
-```
-
-## Calculating the ratio using multiple dates
-First, let's download the real-time rates for CA, and compare them to their finalized version.
-
-```{r real-time-mortality}
-#| echo: true
-dates <- seq(start_time, (as_of_date - 7), by = "day")
-mortality_real_time <- function(date) {
-  epix_as_of(mortality_archive, date + 7) |>
-    filter(time_value == date)
-}
-mortality_real_time_df <- map_dfr(dates, mortality_real_time)
-head(mortality_real_time_df)
-```
-
-## Calculating the ratio using multiple dates
-Now, let's plot the real-time vs the finalized mortality rates:
-```{r real-time-vs-finalized}
-ggplot() +
-  geom_line(data = mortality_latest |> filter(time_value <= (as_of_date - 7)), 
-            aes(x = time_value, y = mortality, color = "Finalized")) +
-  geom_line(data = mortality_real_time_df, 
-            aes(x = time_value, y = mortality, color = "Real-Time")) +
-  ylab("Mortality") +
-  xlab("Date") + 
-  scale_color_manual(values = c("Finalized" = "black", "Real-Time" = "red")) + 
-  labs(color = "Mortality Type")  # Adds the legend title
-
-```
-* [**Takeaways**]{.primary}: The real-time counts are biased [**well below**]{.primary} the finalized counts.
-* Systematic underreporting tends to lessen over time (the gap between the lines decreases).
-
-## Realistic limitation of nowcasting - Finalized data
-* Recall that real-time access to finalized data is limited as finalized values can take months to report (e.g., Jan. 7 is finalized 294 days later).
-* To nowcast accurately, we must rely on the [**best available approximation of finalized data**]{.primary} at the time of estimation (Feb. 25).
-
-```{r finalized-data-as-of-feb25}
-#| echo: true
-mortality_as_of_feb25 <- epix_as_of(mortality_archive, as_of_date)
-head(mortality_as_of_feb25)
-```
-
-## Ratio calculation & summary
-
-We then use these "finalized" and real-time values to compute the mean ratio:
-```{r ratio-calc-summary}
-#| echo: true
-# exclude date we're nowcasting for
-mortality_real_time_df = mortality_real_time_df |> filter(time_value != "2024-02-18") 
-mortality_as_of_feb25 = mortality_as_of_feb25 |> filter(time_value != "2024-02-18")
-ratio_real_time_to_feb25 <- mortality_real_time_df$mortality / mortality_as_of_feb25$mortality
-summary(ratio_real_time_to_feb25)
-```
-On average, the real-time rates are ~25.7% of the finalized.
-
-```{r boxplot-ratio}
+```{r nchs-plot-different-ver}
 #| echo: false
-ratio_df <- data.frame(ratio_real_time_to_feb25, mean_ratio = mean(ratio_real_time_to_feb25))
-
-# Create the boxplot with mean marked as a bold cross
-ggplot(ratio_df, aes(y = ratio_real_time_to_feb25)) +
-  geom_boxplot(fill = "lightblue", color = "black") +
-  geom_point(
-    aes(x = 0, y = mean_ratio),  # Place point at the mean
-    shape = 4,                  # Cross shape
-    size = 7,                   # Size of the cross
-    color = "darkblue",         # Color of the cross
-    stroke = 2                  # Boldness of the cross
-  ) +
-  labs(
-    title = "Distribution of Real-Time to Finalized Mortality Ratios",
-    y = "Real-Time to Finalized Ratio"
-  ) +
-  theme_minimal() +  # Minimal theme for clean look
-  theme(
-    plot.title = element_text(hjust = 0.5),  # Center the title
-    axis.text.x = element_blank()
-  ) +
-  coord_cartesian(ylim = c(0.2, 0.3))  # Limit y-axis between 0 and 0.5 to zoom in
+#| eval: true
+  
+versions = seq.Date(as.Date("2021-01-01"), nchs_archive$versions_end, by = "1 month")
+nchs_snapshots = map(versions, function(v) {
+  epix_as_of(nchs_archive, v) |>
+    mutate(version = v)}) |>
+  bind_rows() |>
+  mutate(latest = version == nchs_archive$versions_end)
 ```
-Tells us the distribution is right-skewed (mean > median) and so we should opt for the median.
+
+```{r nchs-plot-val-different-ver}
+#| echo: false
+#| fig-width: 9
+#| fig-height: 4
+#| out-height: "500px"
+
+ggplot(nchs_snapshots |> filter(!latest),
+       aes(x = time_value, y = mortality)) +
+  geom_line(aes(color = factor(version))) +
+  geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
+  facet_wrap(~ geo_value, scales = "free_y", ncol = 1) +
+  scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
+  labs(x = "", y = "Weekly covid deaths") +
+  scale_color_viridis_d(option = "B", end = .8) +
+  theme(legend.position = "none") +
+  geom_line(data = nchs_snapshots |> filter(latest),
+            aes(x = time_value, y = mortality),
+            inherit.aes = FALSE, color = "black")
+```
+
+## Aside: Do we need a burn-in/training set? 
+
+* Typical stat-ML practise suggests a train, validation, test split.
+* But our exploratory analysis covered all available data, is that fine?
 
 
-## Nowcasting on Feb. 25
+* Generally, for exploratory analysis, it is fine to not do train/test split. 
+  + These analyses do not involve model fitting, we have little risk of an overly optimistic performance evaluation (no overfitting on test data).
+* However, for a [**psuedo-prospective analysis**]{.primary}, the best practise is to do a train/test split.
+  + In such analysis, one would be fitting and validating many models, a train/test split provides a more rigorous control on overfitting to test set. 
 
-* Since the [**median ratio**]{.primary} between real-time and finalized values is [**0.250**]{.primary} (i.e., real-time values are typically 25% of the finalized), then the nowcast is
-```{r nowcast-feb25-point}
+## Ratio nowcaster: jumping from provisional to finalized value
+
+* Recall, the goal of nowcast at date $t$ is to use project the [*finalized value*]{.primary} of $y_t,$ given the information available on date $t$. 
+* A very simple nowcaster is the ratio between finalized and provisional value. 
+
+<br>
+
+How can we sensibly estimate this quantity? 
+
+<br>
+
+::: {.fragment .fade-in}
+
+* At nowcast date $t,$ would have recieved reports with versions up to and including $t.$
+* We need to build training samples, which
+  + correctly aligns finalized value against provisional value 
+  + uses features that would have been available at test time 
+  + have enough data to ensure sensible estimation results
+:::
+
+```{r nchs-ca-only}
+#| echo: false
+#| eval: true
+nchs_archive <- pub_covidcast(
+  source = "nchs-mortality",
+  signals = "deaths_covid_incidence_num",
+  geo_type = "state",
+  time_type = "week",
+  geo_values = "ca",  
+  time_values = epirange(202001, 202440),  
+  issues = "*"
+) |> 
+  select(geo_value, time_value, version = issue, mortality = value) |> 
+  as_epi_archive(compactify = TRUE)
+```
+
+
+## Ratio nowcaster: building training samples
+
+* At nowcast date $t,$ would have recieved reports with versions up to and including $t.$
+* We need to build training samples, which
+  + correctly aligns finalized value against provisional value 
+  + uses features that would have been available at test time 
+  + have enough samples to ensure sensible estimation results
+
+::: {.fragment .fade-in}
+* Build training samples by treating dates prior to date $t$ as actual nowcast dates.
+  + What is the provisional data on that date?
+  + Have we recieved finalized value for that date? 
+:::
+
+## Ratio nowcaster: building training samples
+
+* At an earlier nowcast date $t_0,$ we define 
+  + [**Provisional value**]{.primary} as the reported value of $Y_s$ with version $t_0.$ Here $s_0$ is the largest occurence date among all values reported up until $t_0.$
+  + [**Finalized value**]{.primary} as the (potentially unobserved) finalized value of $Y_{s_0}.$
+    - We only know in *hindsight* when reported value of $Y_{s_0}$ is finalized -- need an approximation. 
+
+::: {.fragment .fade-in}
+```{r revision-summary-time-near-latest-show-again}
+#| echo: false
+#| eval: true
+
+revision_data |> select(geo_value, time_value, time_near_latest) |> slice_sample(n = 5)
+quantile(revision_data$time_near_latest)
+```
+:::
+
+::: {.fragment .fade-in}
+We can say data reported 49 days after occurrence date is good enough to be considered finalized. 
+:::
+
+## Ratio nowcaster: test time feature
+
+* At test time $t,$ take provisional value to be $Y_s,$ where $s$ is the largest occureence date among all values reported up until time $t.$
+
+## Nowcasting at a single date: building training samples 
+
+::: {.fragment .fade-in}
+* Searching for provisional values, at previous hypothetical nowcast dates.
+
+```{r one-date-look-for-provisional}
 #| echo: true
-# Now we can nowcast properly:
-nowcast <- provisional *
-  1 / median(ratio_real_time_to_feb25)
+
+nowcast_date <- as.Date("2022-01-02"); window_length = 180
+
+initial_data <- nchs_archive$DT |>
+  group_by(geo_value, time_value) |>
+  filter(version == min(version)) |>
+  rename(initial_val = mortality) |>
+  select(geo_value, time_value, initial_val)
+
+```
+:::
+
+
+::: {.fragment .fade-in}
+* Searching for finalized values, at previous hypothetical nowcast dates.
+
+```{r one-date-look-for-final}
+#| echo: true
+#| 
+finalized_data <- epix_as_of(nchs_archive, nowcast_date) |>
+  filter(time_value >= nowcast_date - 49 - window_length & time_value <= nowcast_date - 49) |>
+  rename(finalized_val = mortality) |>
+  select(geo_value, time_value, finalized_val)
+```
+:::
+
+
+::: {.fragment .fade-in}
+* After searching for both provisional and finalized values, we merge them together and estimate the ratio. 
+```{r one-date-combine-provsional-and-final}
+#| echo: true
+  
+ratio <- finalized_data |>
+  inner_join(initial_data, by = c("geo_value", "time_value")) |>
+  mutate(ratio = finalized_val / initial_val) |>
+  pull(ratio) |>
+  mean(na.rm = TRUE)
+```
+:::
+
+## Nowcasting at a single date: test feature and actual nowcast 
+
+```{r one-date-test-feat and nowcast}
+#| echo: true
+
+last_avail <- epix_as_of(nchs_archive, nowcast_date) |>
+  slice_max(time_value) |>
+  pull(mortality) 
+
+nowcast <- last_avail * ratio
 nowcast
 ```
 
-* To get the accompanying 95% prediction interval, calculate the 2.5th and 97.5th percentiles:
 
-```{r nowcast-feb25-lower}
+## Nowcasting for multiple dates
+
+* All previous manipulations should really be seen as a template for all nowcast dates. 
+* The template computation sould be applied over all nowcast dates, [**but we must respect data versioning**]{.primary}! 
+* `epix_slide()` is designed just for this! It behaves similarly to `epi_slide`.
+* Key exception: `epix_slide()` is version aware: the sliding computation at any reference time $t$ is performed on [**data that would have been available as of t**]{.primary}.
+
+
+
+## Nowcasting for multiple dates via `epix_slide()`
+
+We begin by templatizing our previous operations. 
+
+```{r nowcaster-to-slide}
 #| echo: true
-percentile_97.5 <- quantile(ratio_real_time_to_feb25, 0.975) |> unname()
 
-(lower_PI <- provisional * 1 / percentile_97.5)
+nowcaster = function(x, g, t, wl=180, appx=49) {
+  
+
+  initial_data = x$DT |>
+    group_by(geo_value, time_value) |>
+    filter(version ==  min(version)) |>
+    filter(time_value >= t - wl - appx & time_value <= t - appx) |>
+    rename(initial_val = mortality) |>
+    select(geo_value, time_value, initial_val)
+
+  finalized_data = x$DT |>
+    group_by(geo_value, time_value) |>
+    filter(version ==  max(version)) |>
+    filter(time_value >= t - wl - appx & time_value <= t - appx) |>
+    rename(finalized_val = mortality) |>
+    select(geo_value, time_value, finalized_val)
+  
+  ratio = finalized_data |>
+    inner_join(initial_data, by = c("geo_value", "time_value")) |>
+    mutate(ratio = finalized_val / initial_val) |>
+    pull(ratio) |>
+    median(na.rm=TRUE)
+
+  last_avail = epix_as_of(x, t) |>
+    slice_max(time_value) |>
+    pull(mortality) 
+  
+  res = tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
+  
+  return(res)
+  
+}
+
 ```
 
-```{r nowcast-feb25-upper}
-#| echo: true
-percentile_2.5 <- quantile(ratio_real_time_to_feb25, 0.025) |> unname()
-(upper_PI <- provisional * 1 / percentile_2.5)
+## Nowcasting for multiple dates via `epix_slide()`
+
+```{r epix-slide-extract-nowcast-date}
+#| echo: false
+#| eval: true
+
+all_nowcast_dates = nchs_archive$DT |>
+  filter(time_value >= as.Date("2022-01-01")) |>
+  distinct(time_value) |>
+  pull(time_value)
 ```
 
-* So, the [**nowcast is 92**]{.primary} with 95% PI: [61, 140], which is much closer to the [**finalized value of 104**]{.primary} than the [**provisional value of 23**]{.primary}.
 
-## Summary of three main steps 
-So the main steps for this type of fixed lag nowcasting are...
+```{r nowcasts-slided}
+#| echo: true
+#| eval: true
 
-1. Obtain the [**provisional value**]{.primary} for the target.
+nowcasts = nchs_archive |>
+  group_by(geo_value) |>
+  epix_slide(
+    nowcaster,
+    .before=Inf,
+    .versions = all_nowcast_dates,
+    .all_versions = TRUE
+)
+```
 
-2. Estimate the ratio using the [**real-time**]{.primary} and [**"finalized"**]{.primary} data (for all previous dates that follow a consistent pattern in reporting). 
 
-3. Profit.
 
-```{r ratio-summary-steps}
+## Details of `epix_slide()`
+
+
+```{r epix-slide-demo-call-allversions-FALSE}
 #| echo: true
 #| eval: false
-#| code-fold: true
-#| code-summary: "Expand for the accompanying code"
-# Today
-as_of_date = as.Date("2024-02-25")
 
-# 1. Obtain the provisional value
-provisional <- epix_as_of(mortality_archive, as_of_date) |>
-  filter(time_value == as_of_date - 7) |>
-  pull(mortality)
-provisional
-
-# 2. Estimate the ratio 
-mortality_real_time_df <- map_dfr(dates, mortality_real_time) |> filter(time_value != "2024-02-18") # Real-time
-mortality_as_of_feb25 <- epix_as_of(mortality_archive, as_of_date) |> filter(time_value != "2024-02-18")  # "Finalized"
-
-ratio_real_time_to_feb25 <- mortality_real_time_df$mortality / mortality_as_of_feb25$mortality
-
-# 3. Profit.
-(nowcast <- provisional * 1 / median(ratio_real_time_to_feb25))
-
-(upper_PI <- provisional * 1 / quantile(ratio_real_time_to_feb25, 0.025))
-(lower_PI <- provisional * 1 / quantile(ratio_real_time_to_feb25, 0.975))
-
+epix_slide(
+  .x,
+  .f,
+  ...,
+  .before = Inf,
+  .versions = NULL,
+  .new_col_name = NULL,
+  .all_versions = FALSE
+)
 ```
 
-## Nowcasting mortality for multiple dates
 
-* [**Define Nowcast Function**]{.primary}:
-  * [**Input**]{.primary}: Takes in the dates to nowcast and the fixed lag
-  * [**Output**]{.primary}: The nowcasted mortality rates based on the ratio of real-time to finalized data.
-```{r nowcasting-multipl-dates-fun}
+* `.f` in `epix_slide()` can be specified with the same form of custom function as `epi_slide()`. 
+
+```{r epix-slide-form-of-custom-function}
 #| echo: true
-#| code-fold: true
-nowcast_function <- function(nowcast_date, fixed_lag) {
-  as_of_date = nowcast_date + fixed_lag
-  
-  # 1. Obtain the provisional value for the target.
-  provisional <- epix_as_of(mortality_archive, as_of_date) |>
-    filter(time_value == as_of_date - fixed_lag) |>
-    pull(mortality)
-  
-  #2. Estimate the ratio multiplier using
-  # real-time
-  dates_seq <- seq(start_time, (nowcast_date - fixed_lag), by = "week")
-  mortality_real_time <- map_dfr(dates_seq, mortality_real_time)
-  
-  # and "finalized" data
-  finalized <- epix_as_of(mortality_archive, as_of_date) |> filter(time_value >= start_time & time_value <= (nowcast_date - fixed_lag)) 
-  
-  ratios <- mortality_real_time$mortality / finalized$mortality
-  
-  # Remove infinite or NaN ratios (i.e., keep only finite values)
-  median_ratio <- median(ratios[is.finite(ratios)])
-  
-  #3. Profit.
-  nowcast <- provisional * (1 / median_ratio)
-  upper_PI <- provisional * (1 / quantile(ratios[is.finite(ratios)], 0.025))
-  lower_PI <- provisional * (1 / quantile(ratios[is.finite(ratios)], 0.975))
-  
-  # Return a dataframe with the nowcast and date
-  tibble(
-    time_value = nowcast_date,
-    nowcast = nowcast,
-    lower_PI = lower_PI,
-    upper_PI = upper_PI 
-  )
+#| eval: false
+
+function(x, g, t) {
+  # function body
 }
 ```
 
-## Map nowcast over multiple dates
-* We can use `map2()` to apply the function to a series of weeks (e.g., Jan. 28 to Mar. 24).
-* Returns a [**dataframe**]{.primary} with nowcasted results.
+* Mandatory variables of `.f` would have different forms depending on the value of `.all_versions`. 
 
-```{r map-nowcast-fun-multiple-dates}
+
+## Details of `epix_slide()`
+
+```{r epix-slide-demo-call-allversions-FALSE-again}
 #| echo: true
-# Apply Nowcast Function Over Multiple Dates
-nowcast_dates <- seq(as.Date("2024-01-28"), as.Date("2024-03-24"), by = "week")
-fixed_lag <- 7
-nowcast_results_df <- map2(nowcast_dates, fixed_lag, nowcast_function) |> list_rbind()
+#| eval: false
+#| code-line-numbers: "|8"
+
+epix_slide(
+  .x,                          
+  .f,                         
+  ...,                        
+  .before = Inf,             
+  .versions = NULL,           
+  .new_col_name = NULL,      
+  .all_versions = FALSE
+)
 ```
 
-Let's smooth with a rolling trailing mean (window size 4) & see the results:
+::: {.fragment .fade-in}
+* When `.all_versions = FALSE`, `epix_slide()` essentially iterates the templatized computation over snapshots. 
+* Said differently, when `.all_versions = FALSE`, data accessed at any sliding iteration [**only involves a single version**]{.primary}. 
+:::
 
-```{r smooth-print-res}
-# Smooth results: Apply rolling median to nowcast and bounds with a window size of 4
-library(zoo)
-nowcast_results_df <- nowcast_results_df |> 
-  mutate(across(.cols = -time_value,  
-                .fns = ~ zoo::rollapply(.x, width = 4, FUN = mean, partial = TRUE, align = "right"),
-                .names = "{.col}"))
-nowcast_results_df
+::: {.fragment .fade-in}
+* Hence: 
+  + `x`: an `epi_df` with same column names as archive's `DT`, minus the `version` column.
+  +  `g`: a one-row tibble containing the values of groupping variables of the associated group.
+  + `t`: the `ref_time_value` of the current window.
+  + `...`: additional arguments. 
+:::
+
+## Details of `epix_slide()`
+
+```{r epix-slide-demo-call-allversions-TRUE}
+#| echo: true
+#| eval: false
+#| code-line-numbers: "|8"
+
+epix_slide(
+  .x,                          
+  .f,                         
+  ...,                        
+  .before = Inf,             
+  .versions = NULL,           
+  .new_col_name = NULL,      
+  .all_versions = TRUE
+)
 ```
 
-## Visualize nowcast, real-time, and finalized values
-Finally, we can compare these nowcast results to the real-time and finalized values:
+::: {.fragment .fade-in}
+* When `.all_versions = FALSE`, data accessed at any sliding iteration involves versions [**up to and including .ref_time_value**]{.primary}. 
+:::
+
+::: {.fragment .fade-in}
+* Hence: 
+  + `x`: an `epi_archive`, with version up to and including `.ref_time_value`. 
+  +  `g`: a one-row tibble containing the values of groupping variables of the associated group.
+  + `t`: the `ref_time_value` of the current window.
+  + `...`: additional arguments. 
+:::
+
+
+## Details of `epix_slide()`
+
+```{r nowcasts-slide-demo-only, eval=FALSE}
+#| echo: true
+#| eval: false
+#| code-line-numbers: "|7,13,17"
+
+nowcasts <- nchs_archive |>
+  group_by(geo_value) |>
+  epix_slide(
+    nowcaster,
+    .before=Inf,
+    .versions = all_nowcast_dates,
+    .all_versions = TRUE
+)
+
+nowcaster <- function(x, g, t, wl=180, appx=49) {
+  
+
+  initial_data = x$DT |>
+    # Function body, omitted
+
+
+  finalized_data = x$DT |>
+    # Function body, omitted
+  
+}
+
+
+```
+
+
+
+## Visualize nowcasts
+
+
+We are now finally able to compare nowcasts against first available reports:
+
+```{r nowcast-subsetting}
+#| echo: false
+
+
+intial_val_extracter <- function(x, g, t, wl=180, appx=49) {
+  
+  last_avail = epix_as_of(x, t) |>
+    slice_max(time_value) |>
+    pull(mortality)
+  
+  res = tibble(geo_value = x$geo_value, target_date = t, value = last_avail)
+  
+  return(res)
+  
+}
+
+
+provisional_val = epix_slide(nchs_archive, intial_val_extracter,  .versions = all_nowcast_dates, .all_versions = TRUE)
+
+finalized_val = nchs_archive$DT |>
+  filter(time_value >= as.Date("2022-01-01")) |>
+  group_by(geo_value, time_value) |>
+  filter(version == max(version))
+
+```
+
+
 ```{r nowcast-fun-plot-results}
 #| echo: false
+
 ggplot() + 
-  geom_line(data = nowcast_results_df, aes(x = time_value, y = nowcast, color = "Nowcast")) +
-  geom_point(data = nowcast_results_df, aes(x = time_value, y = nowcast, color = "Nowcast"), shape = 16) +
-  geom_line(data = map_dfr(nowcast_dates, mortality_real_time), aes(x = time_value, y = mortality, color = "Real-Time")) +
-  geom_point(data = map_dfr(nowcast_dates, mortality_real_time), aes(x = time_value, y = mortality, color = "Real-Time"), shape = 16) +
-  geom_line(data = mortality_latest |> filter(time_value %in% nowcast_dates), aes(x = time_value, y = mortality, color = "Finalized")) +
-  geom_point(data = mortality_latest |> filter(time_value %in% nowcast_dates), aes(x = time_value, y = mortality, color = "Finalized"), shape = 16) +
-  geom_ribbon(data = nowcast_results_df, 
-              aes(x = time_value, ymin = lower_PI, ymax = upper_PI), 
-              alpha = 0.2, fill = "blue") +
+  geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
+  geom_point(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized"), shape = 16) +
+  geom_line(data = provisional_val, aes(x = target_date, y = value, color = "Provisional")) +
+  geom_point(data = provisional_val, aes(x = target_date, y = value, color = "Provisional"), shape = 16) +
+  geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
+  geom_point(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast"), shape = 16) +
+  # geom_ribbon(data = nowcast_results_df, 
+  #             aes(x = time_value, ymin = lower_PI, ymax = upper_PI), 
+  #             alpha = 0.2, fill = "blue") +
   ylab("Mortality") +
   xlab("Date") +
-  scale_color_manual(values = c("Nowcast" = "blue", "Real-Time" = "red", "Finalized" = "black")) + 
-  labs(color = "Mortality Type")  # Adds the legend title
+  scale_color_manual(name =  "", 
+    values = c("Nowcast" = "#71c5e8", "Provisional" = "#FF6900", "Finalized" = "black")) + 
+  theme(legend.position = "bottom")
 ```
-The real-time counts tend to be biased below the finalized counts. Nowcasted values tend to provide a much better approximation of the truth (at least for these dates).
+
+* The real-time counts tend to be biased below the finalized counts. Nowcasted values tend to provide a much better approximation of the truth (at least for these dates).
+
+
+## Smoothing nowcasts
+
+* Nowcasts are quite volatile, reflecting the provisional counts are far from complete. 
+* We can use a trailing average to smooth them.
+
+```{r smooth-nowcasts-epi-slide}
+#| echo: true
+
+smoothed_nowcasts <- epi_slide(
+  nowcasts |> as_epi_df(),
+  smoothed_nowcasts = mean(nowcast, na.rm = TRUE),
+  .window_size = as.difftime(3, units = "weeks")
+)
+
+```
+
+```{r nowcast-smoothed-vis}
+#| echo: false
+
+cbPalette = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+              "#0072B2", "#D55E00", "#CC79A7")
+
+ggplot() + 
+  geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
+  geom_point(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized"), shape = 16) +
+  geom_line(data = smoothed_nowcasts, aes(x = time_value, y = smoothed_nowcasts, color = "Smoothed")) +
+  geom_point(data = smoothed_nowcasts, aes(x = time_value, y = smoothed_nowcasts, color = "Smoothed"), shape = 16) +
+  geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
+  geom_point(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast"), shape = 16) +
+  # geom_ribbon(data = nowcast_results_df, 
+  #             aes(x = time_value, ymin = lower_PI, ymax = upper_PI), 
+  #             alpha = 0.2, fill = "blue") +
+  ylab("Mortality") +
+  xlab("Date") +
+  scale_color_manual(name = "", values = c("Nowcast" = "#71c5e8", "Smoothed" = "#97D700", "Finalized" = "black")) + 
+  theme(legend.position = "bottom")
+```
+
+
 
 ## Evaluation using MAE
 
@@ -1658,7 +1834,6 @@ The real-time counts tend to be biased below the finalized counts. Nowcasted val
 
 * Then for $y_{t}$ over times $t = 1, \dots, N$, then we may compute error metrics like mean absolute error (MAE).
 
-<!-- We'll see other error measures later on! For now, let's start with one that is simple and easy to interpret.-->
 
 * MAE measures the average absolute difference between the nowcast and finalized values. 
 
@@ -1672,50 +1847,33 @@ Let's numerically evaluate our point nowcasts for the provisional values of a ti
 
 <!-- Accuracy of nowcast is assessed by how close provisional estimates are to the finalized values to gauge the model's performance. -->
 
+
 ```{r mae-code}
-#| echo: true
+#| echo: false
 # Step 1: Join the mortality data with nowcast data
-mae_data <- mortality_latest |> 
-  filter(time_value %in% nowcast_dates) |>   
-  left_join(nowcast_results_df, by = "time_value") |> 
-  left_join(map_dfr(nowcast_dates, mortality_real_time) |> rename(real_time = mortality), by = c("geo_value", "time_value"))
+mae_data <- finalized_val |> 
+  select(-version) |>
+  inner_join(nowcasts |> select(-version), by = join_by("geo_value", "time_value" == "target_date")) |>
+  inner_join(initial_data, by = c("geo_value", "time_value")) |>
+  inner_join(smoothed_nowcasts |> select(-version, -nowcast), by = c("geo_value", "time_value"))
 
 # Step 2: Calculate the absolute error between actual and nowcasted values
 mae_data <- mae_data |> 
-  mutate(nc_abs_error = abs(mortality - nowcast),
-         rt_abs_error = abs(mortality - real_time))  
+  mutate(raw_nc_res = abs(mortality - nowcast),
+         prov_res = abs(mortality - initial_val),
+         smoothed_res = abs(mortality - smoothed_nowcasts))  
 
 # Step 3: Compute the MAE (mean of absolute errors)
 mae_value <- mae_data |> 
-  summarise(nc_MAE = mean(nc_abs_error),
-            rt_MAE = mean(rt_abs_error))
+  group_by(geo_value) |>
+  summarise(`Smoothed MAE` = mean(smoothed_res, na.rm = TRUE),
+            `Unsmoothed nowcast MAE` = mean(raw_nc_res, na.rm = TRUE),
+            `Provisional value MAE` = mean(prov_res, na.rm = TRUE)) |>
+  select(-geo_value) 
+  
 knitr::kable(mae_value)
 ```
 
-## Evaluation using MAE
-
-Finally, we may visualize the distribution of errors across time:
-```{r abs-error-plot}
-ggplot(mae_data) +
-  # Nowcast Absolute Error 
-  geom_point(aes(x = time_value, y = nc_abs_error), color = "blue", size = 2) +
-  geom_line(aes(x = time_value, y = nc_abs_error), color = "blue") +
-  # Horizontal line for Nowcast Mean Absolute Error
-  geom_hline(aes(yintercept = mean(nc_abs_error), color = "Nowcast MAE"), linetype = "dashed") +
-  
-  # Real-Time Absolute Error 
-  geom_point(aes(x = time_value, y = rt_abs_error), color = "red", size = 2) +
-  geom_line(aes(x = time_value, y = rt_abs_error), color = "red") +
-  # Horizontal line for Real-Time Mean Absolute Error
-  geom_hline(aes(yintercept = mean(rt_abs_error), color = "Real-Time MAE"), linetype = "dashed") +
-  
-  # Customize the x and y axes labels, legend & add title
-  xlab("Time") + ylab("Absolute Error") +
-  scale_color_manual(values = c("Real-Time MAE" = "red", "Nowcast MAE" = "blue")) +
-  labs(color = "Mean Absolute Error")
-```
-
-We can see that the absolute errors are almost always lower for nowcasting.
 
 # Nowcasting with Two Variables
 
@@ -1983,8 +2141,7 @@ So visualizing can provide an important perspective that is missed from a simple
 * [**Sliding Window Approach**]{.primary}: Predictions are based on [data up to the current time]{.primary}, ensuring no future information influences the nowcast.
 * [**Evaluation**]{.primary}: Predictions are compared with actual admissions using numerical and visual perspectives.
 
-
-# Case Study - Nowcasting Cases Using %CLI
+# Case Study - Nowcasting Cases Using %CLI 
 
 ## Goal of this case study
 
@@ -1997,7 +2154,7 @@ So visualizing can provide an important perspective that is missed from a simple
 
 ## Summary of main steps
 
-The workflow is similar to the previous example where we nowcasted using two variables, only more involved.
+The workflow is similar to the previous example where we nowcasted using two variables, only more involved. 
 The main steps are...
 
 1. [**Fetch Data**]{.primary}: Retrieve %CLI and COVID-19 case data (by specimen collection date) for MA.
@@ -2006,7 +2163,7 @@ The main steps are...
 
 3. [**Model & Prediction**]{.primary}: Fit a linear model to predict cases based on %CLI, trained on a 30-day rolling window.
 
-4. [**Nowcast Execution**]{.primary}: Use `epix_slide()` to nowcast the cases dynamically.
+4. [**Nowcast Execution**]{.primary}: Use `epix_slide` to nowcast the cases dynamically. 
 
 5. [**Visualization**]{.primary}: Plot actual vs. nowcasted cases with confidence intervals to assess model accuracy.
 
@@ -2044,11 +2201,11 @@ Brief summary of this data:
 ## Main steps to construct the `epi_archive`
 
 1. [**Load necessary Libraries**]{.primary}: Such as `tidyverse`, `readxl`, `epiprocess`.
-2. [**Process Each Date's Data**]{.primary}:
+2. [**Process Each Date's Data**]{.primary}: 
    * A function we'll make (`process_covid_data`) downloads and processes daily COVID-19 data from the MA gov Excel files on their website.
    * The data is cleaned and formatted with columns: `geo_value`, `time_value`, `version`, and values.
 3. [**Handle Missing Data**]{.primary}: Checks if a date's data is available (handle 404 errors).
-4. [**Create `epi_archive`**]{.primary}:
+4. [**Create `epi_archive`**]{.primary}: 
    * Combine processed data into a tibble.
    * Convert the tibble to an `epi_archive` object using `as_epi_archive()`.
 
@@ -2066,25 +2223,25 @@ library(epiprocess)
 # Function to download and process each Excel file for a given date
 process_covid_data <- function(Date) {
   # Generate the URL for the given date
-  url <- paste0("https://www.mass.gov/doc/covid-19-raw-data-", tolower(gsub("-0", "-", format(Date, "%B-%d-%Y"))), "/download")
+  url <- paste0("https://www.mass.gov/doc/covid-19-raw-data-", tolower(gsub("-0", "-", format(Date, "%B-%d-%Y"))), "/download") 
   # Applies gsub("-0", "-", ...) to replace any occurrence of -0 (such as in "April-01") with just - (resulting in "April-1").
-
+  
   # Check if the URL exists (handle the 404 error by skipping that date)
   response <- GET(url)
-
+  
   if (status_code(response) != 200) {
     return(NULL)  # Skip if URL doesn't exist (404)
   }
-
+  
   # Define the destination file path for the Excel file
   file_path <- tempfile(fileext = ".xlsx")
-
+  
   # Download the Excel file
   GET(url, write_disk(file_path, overwrite = TRUE))
-
+  
   # Read the relevant sheet from the Excel file
   data <- read_excel(file_path, sheet = "CasesByDate (Test Date)")
-
+  
   # Process the data: rename columns and convert Date
   data <- data |>
     rename(
@@ -2094,7 +2251,7 @@ process_covid_data <- function(Date) {
       Case_Average_7day = `7-day confirmed case average`
     ) |>
     mutate(Date = as.Date(Date))  # Convert to Date class
-
+  
   # Create a tibble with the required columns for the epi_archive
   tib <- tibble(
     geo_value = "ma",  # Massachusetts (geo_value)
@@ -2102,12 +2259,12 @@ process_covid_data <- function(Date) {
     version = Date,  # The extracted version date
     case_rate_7d_av = data$Case_Average_7day  # 7-day average case value
   )
-
+  
   return(tib)
 }
 ```
 
-## Fetch Data - Code breakdown
+## Fetch Data - Code breakdown 
 
 * This purpose of this function is to download and process each Excel file as of a date.
 * [**URL Creation**]{.primary}: Dynamically generates the URL based on the date, removing leading zeros in day values (e.g., "April-01" → "April-1").
@@ -2129,20 +2286,20 @@ process_covid_data <- function(Date) {
 process_data_for_date_range <- function(start_date, end_date) {
   # Generate a sequence of dates between start_date and end_date
   date_sequence <- seq(as.Date(start_date), as.Date(end_date), by = "day")
-
+  
   # Process data for each date and combine results
   covid_data_list <- lapply(date_sequence, function(Date) {
     process_covid_data(Date)  # Skip over dates with no data (NULLs will be ignored)
   })
-
+  
   # Combine all non-null individual tibbles into one data frame
   combined_data <- bind_rows(covid_data_list[!sapply(covid_data_list, is.null)])
-
+  
   # Convert the combined data into an epi_archive object
   if (nrow(combined_data) > 0) {
     epi_archive_data <- combined_data |>
       as_epi_archive(compactify = FALSE)
-
+    
     return(epi_archive_data)
   } else {
     message("No valid data available for the given date range.")
@@ -2174,7 +2331,7 @@ y <- process_data_for_date_range("2021-01-10", "2021-12-01")  # Raw .xlsx data i
 y
 ```
 
-* Alternatively, you may run the following to load `y` that was previously saved as an RDS file:
+* Alternatively, you may run the following to load `y` that was previously saved as an RDS file: 
 ```{r load-ma-case-data}
 #| echo: true
 #| eval: FALSE
@@ -2191,7 +2348,7 @@ y <- readRDS("_data/ma_case_archive.rds")
 
 ```{r fetch-outpatient-cli}
 #| echo: true
-# Step 1: Fetch Versioned Data
+# Step 1: Fetch Versioned Data 
 x <- pub_covidcast(
   source = "doctor-visits",
   signals = "smoothed_adj_cli",
@@ -2237,15 +2394,15 @@ lm_mod_pred <- function(data, ...) {
   # Make predictions
   predictions = predict(model,
                         newdata = data |>
-                          fill(percent_cli, .direction = "down") |>
+                          fill(percent_cli, .direction = "down") |> 
                           filter(time_value == max(time_value)),
                         interval = "prediction", level = 0.9)
-
+  
   # Pull off real-time value for later comparison to the nowcast value
   real_time_val = data |> filter(time_value == max(time_value)) |> pull(case_rate_7d_av)
-
+  
   # Could clip predictions and bounds at 0
-  return(data.frame(predictions, actual_nowcast_date = max(data$time_value), real_time_val = real_time_val))
+  return(data.frame(predictions, actual_nowcast_date = max(data$time_value), real_time_val = real_time_val)) 
 }
 ```
 
@@ -2258,8 +2415,8 @@ lm_mod_pred <- function(data, ...) {
 ```{r nowcasting-epix-slide-cases}
 #| echo: true
 # Define the reference time points (to give the training/test split)
-targeted_nowcast_dates <- seq(as.Date("2021-04-01"), as.Date("2021-11-01"), by = "1 month")
-ref_time_values = targeted_nowcast_dates + 1 # + 1 because the case data is 1 day latent.
+targeted_nowcast_dates <- seq(as.Date("2021-04-01"), as.Date("2021-11-01"), by = "1 month") 
+ref_time_values = targeted_nowcast_dates + 1 # + 1 because the case data is 1 day latent. 
 # Determine this from revision_summary(y)
 
 # Use epix_slide to perform the nowcasting with a training-test split
@@ -2285,7 +2442,7 @@ Merge the nowcast results with the latest data for more direct comparison:
 ```{r join-with-actual-cases}
 #| echo: true
 x_latest <- epix_as_of(archive, max(archive$DT$version)) |>
-  select(-percent_cli)
+  select(-percent_cli) 
 
 res <- nowcast_res |> left_join(x_latest, by = join_by(geo_value, time_value))
 
@@ -2314,7 +2471,7 @@ ggplot(res, aes(x = time_value)) +
   # Adjust colors
   scale_color_manual(values = c("Finalized Cases (7-dav)" = "black",
                                 "Nowcast" = "#1f78b4",
-                                "Real Time" = "darkred")) +
+                                "Real Time" = "darkred")) + 
   scale_fill_manual(values = c("Pred. Interval" = "#a6cee3")) + # Light blue
   # Improve the theme
   theme_minimal() +
@@ -2334,12 +2491,12 @@ ggplot(res, aes(x = time_value)) +
 ```{r mae-code-cases}
 #| echo: true
 # Calculate the absolute error between actual and nowcasted COVID-19 cases
-mae_data_cases <- res |>
+mae_data_cases <- res |> 
   mutate(nc_abs_error = abs(case_rate_7d_av - fit),  # Nowcast vs Finalized cases (7-day average)
          rt_abs_error = abs(case_rate_7d_av - real_time_val))  # Real-Time vs Finalized cases
 
 # Compute the MAE (mean of absolute errors)
-mae_value_cases <- mae_data_cases |>
+mae_value_cases <- mae_data_cases |> 
   summarise(nc_MAE = mean(nc_abs_error),
             rt_MAE = mean(rt_abs_error))
 knitr::kable(mae_value_cases)
@@ -2351,18 +2508,18 @@ knitr::kable(mae_value_cases)
 ```{r abs-error-plot-cases}
 # Plot the absolute errors for Nowcast and Real-Time vs Finalized COVID-19 cases
 ggplot(mae_data_cases) +
-  # Nowcast Absolute Error
+  # Nowcast Absolute Error 
   geom_point(aes(x = time_value, y = nc_abs_error), color = "#1f78b4", size = 2) +
   geom_line(aes(x = time_value, y = nc_abs_error), color = "#1f78b4") +
   # Horizontal line for Nowcast Mean Absolute Error
   geom_hline(aes(yintercept = mean(nc_abs_error), color = "Nowcast MAE"), linetype = "dashed") +
-
-  # Real-Time Absolute Error
+  
+  # Real-Time Absolute Error 
   geom_point(aes(x = time_value, y = rt_abs_error), color = "darkred", size = 2) +
   geom_line(aes(x = time_value, y = rt_abs_error), color = "darkred") +
   # Horizontal line for Real-Time Mean Absolute Error
   geom_hline(aes(yintercept = mean(rt_abs_error), color = "Real-Time MAE"), linetype = "dashed") +
-
+  
   # Customize the x and y axes labels, legend & add title
   xlab("Date") + ylab("Absolute Error") +
   scale_color_manual(values = c("Real-Time MAE" = "darkred", "Nowcast MAE" = "#1f78b4")) +
@@ -2392,3 +2549,38 @@ Main Steps:
 
 Overall, nowcasting, based on the linear model, provided a closer approximation of true cases compared to the real-time values.
 
+
+
+## Aside on nowcasting
+
+* To some Epis, "nowcasting" can be equated with "estimate the time-varying instantaneous reproduction number, $R_t$"
+
+* Ex. using the number of reported COVID-19 cases in British Columbia between Jan. 2020 and Apr. 15, 2023. 
+
+<!-- This data is the number of reported COVID-19 cases in British Columbia between January 2020 and April 15, 2023. The values are.up-to-date as of August 2023. -->
+```{r rtestim}
+#| fig-width: 9
+#| fig-height: 3
+#| out-height: "400px"
+#| label: nowcasting
+library(rtestim)
+source(here::here("_code/bccovid.R"))
+
+p1 <- bccovid|>
+  ggplot(aes(date, cases)) + 
+  geom_line(colour = primary) +
+  geom_vline(xintercept = ymd("2023-04-15"), colour = secondary,
+             linewidth = 2) +
+  labs(y = "BC Covid-19 cases", x = "Date") +
+  scale_y_continuous(expand = expansion(c(0, NA)))
+bc_rt <- estimate_rt(bccovid$cases, x = bccovid$date, 
+                     lambda = c(1e6, 1e5))
+p2 <- plot(confband(bc_rt, lambda = 1e5)) + 
+  coord_cartesian(ylim = c(0.5, 2)) +
+  scale_y_continuous(expand = expansion(0))
+cowplot::plot_grid(p1, p2)
+```
+
+* Group built [`{rtestim}`](https://dajmcdon.github.io/rtestim) doing for this nonparametrically.
+
+* We may come back to this later...
