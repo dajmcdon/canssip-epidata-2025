@@ -894,12 +894,40 @@ pred_arx_geo_pool <- usa_archive_dv |>
 )
 ```
 
+```{r arx-no-geo-pooling}
+ma_archive_dv <- usa_archive_dv$DT |> filter(geo_value == "ma") |> as_epi_archive()
+ny_archive_dv <- usa_archive_dv$DT |> filter(geo_value == "ny") |> as_epi_archive() 
+tx_archive_dv <- usa_archive_dv$DT |> filter(geo_value == "tx") |> as_epi_archive()
+
+pred_arx_no_geo_pool <- function(archive, ahead = 28, lags = 0){
+  archive |>
+    epix_slide(
+      ~ arx_forecaster(epi_data = .x,
+                       outcome = "deaths", 
+                       predictors = c("deaths", "doctor_visits"), 
+                       trainer = linear_reg() |> set_engine("lm"),
+                       args_list = arx_args_list(
+                         lags = lags,
+                         ahead = ahead,
+                         quantile_levels = c(0.1, 0.9))
+                       )$predictions |>
+          pivot_quantiles_wider(.pred_distn),
+    .before = w, 
+    .versions = fc_time_values
+    )}
+
+pred_no_geo_pool_28 <- rbind(pred_arx_no_geo_pool(ca_archive_dv),
+                             pred_arx_no_geo_pool(ma_archive_dv), 
+                             pred_arx_no_geo_pool(ny_archive_dv), 
+                             pred_arx_no_geo_pool(tx_archive_dv))
+```
+
+
+```{r arx-geo-pooling-plot-ca, eval=FALSE}
 ## Predictions (geo-pooling): California
+#[Error is worse]{.primary} than without geo-pooling, 
+#but much [better coverage]{.primary} (close to nominal 80%)
 
-[Error is worse]{.primary} than without geo-pooling, 
-but much [better coverage]{.primary} (close to nominal 80%)
-
-```{r arx-geo-pooling-plot-ca}
 #| fig-align: left
 pred_arx_geo_pool |>
   filter(geo_value == "ca") |>
@@ -915,23 +943,66 @@ pred_arx_geo_pool |>
   theme(legend.title = element_blank())
 ```
 
-```{r error-arx-geo-pooling}
+```{r error-arx-geo-pooling, eval=FALSE}
 pred_ca_geo_pool <- pred_arx_geo_pool |> filter(geo_value == "ca")
 getAccuracy(ca, pred_ca_geo_pool, "CA")
 ```
 
 
-## Predictions (geo-pooling)
+## Predictions (geo-pooling, $h=28$)
+
+```{r finalized-ma-ny-tx}
+ma <- df |> filter(geo_value == "ma")
+ny <- df |> filter(geo_value == "ny")
+tx <- df |> filter(geo_value == "tx")
+```
 
 ```{r arx-geo-pooling-plot}
 #| fig-align: left
 pred_arx_geo_pool |>
   filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = epix_as_of(usa_archive_dv, version = usa_archive_dv$versions_end) |> 
-              filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
-              mutate(deaths = pmax(0, deaths)), 
-             aes(x = time_value, y = deaths),
+  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
+    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
+  geom_line(col = tertiary) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = tertiary) +
+  geom_vline(xintercept = t0_date) +    
+  geom_vline(xintercept = t0_date + 28, lty = 2) +
+  facet_wrap(vars(geo_value), scales = 'free_y') +
+  labs(x = "", y = "Deaths per 100k people") +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.position = "none")
+
+```
+
+```{r error-geo-pooling-all-states}
+rbind(getAccuracy(ca,
+                  pred_arx_geo_pool |> 
+                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
+                  "CA"),
+      getAccuracy(ma, 
+                  pred_arx_geo_pool |> 
+                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
+                  "MA"),
+      getAccuracy(ny,
+                  pred_arx_geo_pool |> 
+                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
+                  "NY"),
+      getAccuracy(tx,
+                  pred_arx_geo_pool |> 
+                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
+                  "TX"))
+```
+
+
+## Predictions (without geo-pooling, $h=28$)
+
+```{r arx-no-geo-pooling-plot}
+#| fig-align: left
+pred_no_geo_pool_28 |>
+  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+  ggplot(aes(target_date, .pred)) +
+  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
     inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
@@ -944,28 +1015,144 @@ pred_arx_geo_pool |>
 
 ```
 
-```{r error-geo-pooling-all-states}
-final_data = epix_as_of(usa_archive_dv, version = usa_archive_dv$versions_end) |> 
-  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
-  mutate(deaths = pmax(0, deaths))
-
-rbind(getAccuracy(final_data |> filter(geo_value == "ma"), 
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "ma" & 
-                             target_date %in% (final_data |> filter(geo_value == "ma"))$time_value), 
+```{r error-no-geo-pooling-all-states}
+rbind(getAccuracy(ca,
+                  pred_no_geo_pool_28 |> 
+                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
+                  "CA"),
+      getAccuracy(ma, 
+                  pred_no_geo_pool_28 |> 
+                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
                   "MA"),
-      getAccuracy(final_data |> filter(geo_value == "ny"), 
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "ny" & 
-                             target_date %in% (final_data |> filter(geo_value == "ny"))$time_value), 
+      getAccuracy(ny,
+                  pred_no_geo_pool_28 |> 
+                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
                   "NY"),
-      getAccuracy(final_data |> filter(geo_value == "tx"),
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "tx" & 
-                             target_date %in% (final_data |> filter(geo_value == "tx"))$time_value), 
+      getAccuracy(tx,
+                  pred_no_geo_pool_28 |> 
+                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
                   "TX"))
 ```
 
+## Geo-pooling or not?
+
+For horizon $h=28$ we observe that
+
+* [Geo-pooled]{.primary} predictions have actual [coverage near the nominal 80%]{.primary} while 
+non-geo-pooled predictions have lower coverage
+
+* Point predictions [without geo-pooling]{.primary} are significantly [better]{.primary}
+than with geo-pooling for [California]{.primary} only
+
+* Point predictions [without geo-pooling]{.primary} for the other states are less stable 
+and can largely [overshoot]{.primary} the target 
+
+If we decrease the horizon to $h=7$, the benefits of geo-pooling in stabilizing the point predictions 
+for these four states disappear (short horizons are easier to predict)
+
+
+```{r arx-geo-pooling-h7}
+pred_arx_geo_pool_7 <- usa_archive_dv |>
+  epix_slide(
+    ~ arx_forecaster(epi_data = .x,
+                     outcome = "deaths", 
+                     predictors = c("deaths", "doctor_visits"), 
+                     trainer = linear_reg() |> set_engine("lm"),
+                     args_list = arx_args_list(
+                       lags = 0, #c(0, 7, 14),
+                       ahead = 7,
+                       quantile_levels = c(0.1, 0.9))
+                     )$predictions |>
+        pivot_quantiles_wider(.pred_distn),
+  .before = w, 
+  .versions = fc_time_values
+)
+
+pred_no_geo_pool_7 <- rbind(pred_arx_no_geo_pool(ca_archive_dv, ahead = 7),
+                            pred_arx_no_geo_pool(ma_archive_dv, ahead = 7), 
+                            pred_arx_no_geo_pool(ny_archive_dv, ahead = 7), 
+                            pred_arx_no_geo_pool(tx_archive_dv, ahead = 7))
+```
+
+
+## Predictions (geo-pooling, $h = 7$)
+
+```{r arx-geo-pooling-plot-h7}
+#| fig-align: left
+pred_arx_geo_pool_7 |>
+  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+  ggplot(aes(target_date, .pred)) +
+  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
+    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
+  geom_line(col = tertiary) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = tertiary) +
+  geom_vline(xintercept = t0_date) +    
+  geom_vline(xintercept = t0_date + 28, lty = 2) +
+  facet_wrap(vars(geo_value), scales = 'free_y') +
+  labs(x = "", y = "Deaths per 100k people") +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.position = "none")
+
+```
+
+```{r error-geo-pooling-all-states-h7}
+rbind(getAccuracy(ca,
+                  pred_arx_geo_pool_7 |> 
+                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
+                  "CA"),
+      getAccuracy(ma, 
+                  pred_arx_geo_pool_7 |> 
+                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
+                  "MA"),
+      getAccuracy(ny,
+                  pred_arx_geo_pool_7 |> 
+                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
+                  "NY"),
+      getAccuracy(tx,
+                  pred_arx_geo_pool_7 |> 
+                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
+                  "TX"))
+```
+
+
+## Predictions (without geo-pooling, $h=7$)
+
+```{r arx-no-geo-pooling-plot-h7}
+#| fig-align: left
+pred_no_geo_pool_7 |>
+  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+  ggplot(aes(target_date, .pred)) +
+  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
+    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
+  geom_line(col = primary) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_vline(xintercept = t0_date) +    
+  geom_vline(xintercept = t0_date + 28, lty = 2) +
+  facet_wrap(vars(geo_value), scales = 'free_y') +
+  labs(x = "", y = "Deaths per 100k people") +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
+  theme(legend.position = "none")
+
+```
+
+```{r error-no-geo-pooling-all-states-h7}
+rbind(getAccuracy(ca,
+                  pred_no_geo_pool_7 |> 
+                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
+                  "CA"),
+      getAccuracy(ma, 
+                  pred_no_geo_pool_7 |> 
+                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
+                  "MA"),
+      getAccuracy(ny,
+                  pred_no_geo_pool_7 |> 
+                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
+                  "NY"),
+      getAccuracy(tx,
+                  pred_no_geo_pool_7 |> 
+                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
+                  "TX"))
+```
 
 ## Quantile regression
 
@@ -1000,44 +1187,18 @@ pred_qr_geo_pool <- usa_archive_dv |>
 )
 ```
 
-## Predictions (geo-pooling + quantile regression): California
 
-```{r qr-geo-pooling-plot-ca}
-#| fig-align: left
-pred_qr_geo_pool |>
-  filter(geo_value == "ca") |>
-  ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca,
-            aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + 28, lty = 2) +
-  labs(x = "", y = "Deaths per 100k people") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.title = element_blank())
-```
-
-```{r error-qr-geo-pooling}
-pred_ca_qr_geo_pool <- pred_qr_geo_pool |> filter(geo_value == "ca")
-getAccuracy(ca, pred_ca_qr_geo_pool, "CA")
-```
-
-
-## Predictions (geo-pooling + quantile regression)
+## Predictions (geo-pooling + quantile regression, $h=28$)
 
 ```{r qr-geo-pooling-plot}
 #| fig-align: left
 pred_qr_geo_pool |>
   filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = epix_as_of(usa_archive_dv, version = usa_archive_dv$versions_end) |> 
-              filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
-              mutate(deaths = pmax(0, deaths)), 
-             aes(x = time_value, y = deaths),
+  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
     inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_line(col = tertiary) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = tertiary) +
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + 28, lty = 2) +
   facet_wrap(vars(geo_value), scales = 'free_y') +
@@ -1048,20 +1209,21 @@ pred_qr_geo_pool |>
 ```
 
 ```{r error-qr-geo-pooling-all-states}
-rbind(getAccuracy(final_data |> filter(geo_value == "ma"), 
+rbind(getAccuracy(ca,
                   pred_qr_geo_pool |> 
-                    filter(geo_value == "ma" & 
-                             target_date %in% (final_data |> filter(geo_value == "ma"))$time_value), 
+                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
+                  "CA"),
+      getAccuracy(ma, 
+                  pred_qr_geo_pool |> 
+                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
                   "MA"),
-      getAccuracy(final_data |> filter(geo_value == "ny"), 
+      getAccuracy(ny,
                   pred_qr_geo_pool |> 
-                    filter(geo_value == "ny" & 
-                             target_date %in% (final_data |> filter(geo_value == "ny"))$time_value), 
+                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
                   "NY"),
-      getAccuracy(final_data |> filter(geo_value == "tx"),
+      getAccuracy(tx,
                   pred_qr_geo_pool |> 
-                    filter(geo_value == "tx" & 
-                             target_date %in% (final_data |> filter(geo_value == "tx"))$time_value), 
+                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
                   "TX"))
 ```
 
@@ -1289,11 +1451,12 @@ A more robust option: simple median of base model forecasts
 $$
 \hat{y}^{\text{med}}_{t+h|t} = \mathrm{median}\Big\{ \hat{y}^j_{t+h|t} : j = 1,\dots,p \Big\}
 $$
-### Example from the Covid-19 Forecast Hub  
+
+## Example from the Covid-19 Forecast Hub  
   
 ![](gfx/cramer.png)
 
-### Two key goals of ensembling
+## Two key goals of ensembling
 
 1 [Compete-with-best]{.primary}: ensemble should have accuracy competitive with best individual constituent model
 
@@ -1301,7 +1464,7 @@ $$
 
 Typically these are hard to accomplish simultaneously, and untrained methods excel at point 2, whereas trained methods can achieve point 1
 
-### Linear stacking
+## Linear stacking
 
 One of the simplest trained ensemble methods is to directly fit a weighted 
 combination of base forecasts to optimize accuracy (MSE, MAE, etc.), often 
@@ -1330,7 +1493,7 @@ in time series cross-validation)
 
 * Recalibration methods aim at adjusting the intervals so that nominal coverage $\approx$ empirical coverage
 
-### Quantile tracking
+## Quantile tracking
 
 Quantile tracking is a method for producing calibrated prediction intervals 
 from base forecasts and scores. In the simplest case, we can take the score
@@ -1347,7 +1510,7 @@ $$e_t = |y_t - \hat y_{t|t-1}|$$
     $$
 * Therefore we the reduced the problem of producing prediction intervals $I_{t|t-1}^{1-\alpha}$ to one of tracking a quantile of $e_t$
 
-### Quantile updates
+## Quantile updates
 
 We begin with some estimate $\hat{q}_{t_0+1}^{1-\alpha}$ based on a burn-in set.
 Then repeat the following updates as $t$ increases, for a step size $\eta > 0$: 
