@@ -1145,12 +1145,19 @@ rbind(getAccuracy(ca,
                   "TX"))
 ```
 
+## What are these ARX intervals?
+
+* `{epipredict}` takes quantiles of training residuals to form its prediction intervals
+* In comparison to traditional (parametric) intervals from `lm()`, this is more flexible
+* It can in principle adapt to asymmetric or heavy-tailed error distributions
+
+Taking quantiles of training residuals can be problematic if the model is overfit. 
+Quantile regression provides an alternative, wherein we estimate these quantiles directly
+
 ## Quantile regression
 
-* Quantile regression is a different estimation method, which directly targets conditional 
-quantiles of the outcome over time
-
-* It [needs more data]{.primary} to estimate quantiles appropriately, so
+Now we directly target conditional quantiles of the outcome over time. Estimating tail 
+quantiles [requires more data]{.primary}, so
 
   * unsuitable for settings with small training set (e.g. trailing window on one state)
   
@@ -1177,7 +1184,6 @@ pred_qr_geo_pool <- usa_archive_dv |>
   .versions = fc_time_values
 )
 ```
-
 
 ## Predictions (geo-pooling + quantile regression, $h=28$)
 
@@ -1217,7 +1223,6 @@ rbind(getAccuracy(ca,
                     filter(geo_value == "tx" & target_date %in% tx$time_value), 
                   "TX"))
 ```
-
 
 # Building a forecaster
 
