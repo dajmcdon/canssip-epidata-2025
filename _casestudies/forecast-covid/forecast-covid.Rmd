@@ -422,6 +422,7 @@ epi_pred_cv_trailing <- epi_slide(
   .ref_time_values = fc_time_values,
   .new_col_name = "fc"
 ) |>
+  # split tibble-type column `fc` into multiple columns with names prefixed by `fc_`:
   unpack(fc, names_sep = "_")
 
 # they match exactly

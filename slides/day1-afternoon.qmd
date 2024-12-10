@@ -2035,10 +2035,8 @@ nowcast_res <- archive |>
   epix_slide(
     .f = lm_mod_pred,
     .before = 14,  # 14-day training period
-    .versions = ref_time_values, 
-    .new_col_name = "res"
+    .versions = ref_time_values
   ) |>
-  unnest() |> # Nesting creates a list-column of data frames; unnesting flattens it back out into regular columns. 
   mutate(targeted_nowcast_date = targeted_nowcast_dates, time_value = actual_nowcast_date) |>
   ungroup()
 
@@ -2425,10 +2423,8 @@ nowcast_res <- archive |>
   epix_slide(
     .f = lm_mod_pred,  # Pass the function defined above
     .before = 30,   # Training period of 30 days
-    .versions = ref_time_values, # Determines the day where training data goes up to (not inclusive)
-    .new_col_name = "res"
+    .versions = ref_time_values # Determines the day where training data goes up to (not inclusive)
   ) |>
-  unnest() |>
   mutate(targeted_nowcast_date = targeted_nowcast_dates,
          time_value = actual_nowcast_date)
 
