@@ -1356,7 +1356,7 @@ rbind(getAccuracy(ca,
 
 :::
 
-## Under the hood of `arx_forecaster()
+## Under the hood of `arx_forecaster()`
 
 ```{r forecaster-from-scratch}
 #| echo: true
@@ -1387,9 +1387,8 @@ ewf <- epi_workflow(rec, eng, frost)
 trained_ewf <- fit(ewf, data = ca)
 
 # Make predictions from the end of our training data
-fcasts <- forecast(trained_ewf)
-
 # we could have made predictions using the same model on ANY test data
+fcasts <- forecast(trained_ewf)
 ```
 
 ## Predicting influenza hospitalizations
@@ -1477,12 +1476,9 @@ climatological_model <- function(epi_data, forecast_date, ahead, window_size = 3
     mutate(
       forecast_date = forecast_date,
       target_end_date = forecast_date + ahead * 7,
-      quantile = as.numeric(sub("%", "", quantile)) / 100
+      quantile = as.numeric(sub("%", "", quantile)) / 100,
+      value = pmax(0, value)
     )
-  if (!geo_agg) {
-    naive_preds <- naive_preds |> group_by(geo_value)
-  }
-  naive_preds <- naive_preds |> mutate(value = pmax(0, value))
   if (geo_agg) {
     naive_preds <- naive_preds |>
       expand_grid(filtered |> distinct(geo_value, pop)) |>
