@@ -579,7 +579,7 @@ case_rates_df <- case_rates_df |>
   as_epi_df(as_of = as.Date("2024-01-01")) |>
   group_by(geo_value) |>
   epi_slide_mean(scaled_cases, .window_size = 14, na.rm = TRUE) |>
-  rename(smoothed_scaled_cases = slide_value_scaled_cases)
+  rename(smoothed_scaled_cases = scaled_cases_14dav)
 head(case_rates_df)
 ```
 
