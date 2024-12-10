@@ -1688,14 +1688,14 @@ epix_slide(
 ```
 
 ::: {.fragment .fade-in}
-* When `.all_versions = FALSE`, data accessed at any sliding iteration involves versions [**up to and including .ref_time_value**]{.primary}. 
+* When `.all_versions = FALSE`, data accessed at any sliding iteration involves versions [**up to and including .version**]{.primary}. 
 :::
 
 ::: {.fragment .fade-in}
 * Hence: 
-  + `x`: an `epi_archive`, with version up to and including `.ref_time_value`. 
+  + `x`: an `epi_archive`, with version up to and including `.version`. 
   +  `g`: a one-row tibble containing the values of groupping variables of the associated group.
-  + `t`: the `ref_time_value` of the current window.
+  + `t`: the `.version` of the current window.
   + `...`: additional arguments. 
 :::
 
@@ -2026,7 +2026,7 @@ Note that this code is intentionally simple; while it can be refined to handle c
 #| echo: true
 # Define the reference time points for nowcasting
 targeted_nowcast_dates <- seq(as.Date("2023-04-15"), as.Date("2023-06-15"), by = "1 week")
-ref_time_values = targeted_nowcast_dates + 2  # Adjust for the systematic 2-day latency in the response
+versions = targeted_nowcast_dates + 2  # Adjust for the systematic 2-day latency in the response
 # Determine this from revision_summary(y1, print_inform = TRUE) 
 
 # Perform nowcasting using epix_slide
@@ -2035,7 +2035,7 @@ nowcast_res <- archive |>
   epix_slide(
     .f = lm_mod_pred,
     .before = 14,  # 14-day training period
-    .versions = ref_time_values
+    .versions = versions
   ) |>
   mutate(targeted_nowcast_date = targeted_nowcast_dates, time_value = actual_nowcast_date) |>
   ungroup()
@@ -2412,9 +2412,9 @@ lm_mod_pred <- function(data, ...) {
 ## Nowcasting with `epix_slide()`
 ```{r nowcasting-epix-slide-cases}
 #| echo: true
-# Define the reference time points (to give the training/test split)
+# Define the reference time points / versions (to give the training/test split)
 targeted_nowcast_dates <- seq(as.Date("2021-04-01"), as.Date("2021-11-01"), by = "1 month") 
-ref_time_values = targeted_nowcast_dates + 1 # + 1 because the case data is 1 day latent. 
+versions = targeted_nowcast_dates + 1 # + 1 because the case data is 1 day latent. 
 # Determine this from revision_summary(y)
 
 # Use epix_slide to perform the nowcasting with a training-test split
@@ -2423,7 +2423,7 @@ nowcast_res <- archive |>
   epix_slide(
     .f = lm_mod_pred,  # Pass the function defined above
     .before = 30,   # Training period of 30 days
-    .versions = ref_time_values # Determines the day where training data goes up to (not inclusive)
+    .versions = versions # Determines the day where training data goes up to (not inclusive)
   ) |>
   mutate(targeted_nowcast_date = targeted_nowcast_dates,
          time_value = actual_nowcast_date)

@@ -80,7 +80,7 @@ if (!file.exists(file_path)) {
                                       day_of_week_end = 7L) {
     agg_method <- arg_match(agg_method)
     keys <- key_colnames(epi_arch, exclude = "time_value")
-    ref_time_values <- epi_arch$DT$version %>%
+    versions <- epi_arch$DT$version %>%
       unique() %>%
       sort()
     if (agg_method == "sum") {
@@ -90,8 +90,7 @@ if (!file.exists(file_path)) {
     }
     too_many_tibbles <- epix_slide(
       epi_arch,
-      .before = 99999999L,
-      .versions = ref_time_values,
+      .versions = versions,
       function(x, group, ref_time) {
         ref_time_last_week_end <-
           floor_date(ref_time, "week", day_of_week_end - 1) # this is over by 1
