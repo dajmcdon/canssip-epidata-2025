@@ -65,12 +65,13 @@ ca <- ca %>%
   select(-pop)
 ```
 
-Now, use `epi_slide()`, to calculate trailing 7 day averages of cases and deaths.
+Now, use `epi_slide_mean()`, to calculate trailing 7 day averages of cases and deaths.
 
 ```{r trailing-averages}
 ca <- ca %>%
-  epi_slide(cases = mean(cases), before = 6) %>%
-  epi_slide(deaths = mean(deaths), before = 6) 
+  epi_slide_mean(c(cases, deaths), .window_size = 7) %>%
+  select(-cases, -deaths) %>%
+  rename(cases = cases_7dav, deaths = deaths_7dav)
 ```
 
 Visualize the data.
@@ -411,15 +412,16 @@ epi_pred_cv_trailing <- epi_slide(
                    trainer = linear_reg() %>% set_engine("lm"),
                    args_list = arx_args_list(lags = k-1, ahead = 1L)
                    )$predictions,
-  # notice that `before` is not simply equal to w-1. That's because previously, 
-  # when considering a window from t to t+w, we had access to y_t, ..., y_{t+w} 
-  # and also to x_{t-k}, ..., x_{t+w-k}. (That's because of how we structured 
+  # notice that `.window_size` is not simply equal to w. That's because previously, 
+  # when considering a window from t to t+w-1, we had access to y_t, ..., y_{t+w-1} 
+  # and also to x_{t-k}, ..., x_{t+w-1-k}. (That's because of how we structured 
   # the dataframe after manually lagging x.) So we were cheating by saying that 
-  # the trailing window had length w, as its actual size was w+k! 
-  before = (w+k-1), 
-  ref_time_values = fc_time_values,
-  new_col_name = "fc"
-)
+  # the trailing window had length w, as its actual size was (t+w-1)-(t-k)+1 = w+k! 
+  .window_size = w + k,
+  .ref_time_values = fc_time_values,
+  .new_col_name = "fc"
+) |>
+  unpack(fc, names_sep = "_")
 
 # they match exactly
 head(epi_pred_cv_trailing %>% select(fc_.pred, fc_target_date))
