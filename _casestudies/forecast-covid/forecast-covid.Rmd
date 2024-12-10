@@ -70,6 +70,7 @@ Now, use `epi_slide_mean()`, to calculate trailing 7 day averages of cases and d
 ```{r trailing-averages}
 ca <- ca %>%
   epi_slide_mean(c(cases, deaths), .window_size = 7) %>%
+  epi_slide_mean(deaths, .window_size = 7) %>%
   select(-cases, -deaths) %>%
   rename(cases = cases_7dav, deaths = deaths_7dav)
 ```
@@ -223,13 +224,13 @@ MASE <- function(truth, prediction) {
 ```
 
 ```{r training-error}
-pred_train <- predict(reg_lagged)
-train$pred_train <- c(rep(NA, k), pred_train)
+pred_train <- predict(reg_lagged, train)
+train$pred_train <- pred_train
 
-errors <- data.frame("MSE" = MSE(train$deaths[-(1:k)], pred_train), 
-                     "MAE"= MAE(train$deaths[-(1:k)], pred_train), 
-                     "MAPE" = MAPE(train$deaths[-(1:k)], pred_train), 
-                     "MASE" = MASE(train$deaths[-(1:k)], pred_train), 
+errors <- data.frame("MSE" = MSE(train$deaths[-seq_len(7+k-1)], pred_train[-seq_len(7+k-1)]), 
+                     "MAE"= MAE(train$deaths[-seq_len(7+k-1)], pred_train[-seq_len(7+k-1)]), 
+                     "MAPE" = MAPE(train$deaths[-seq_len(7+k-1)], pred_train[-seq_len(7+k-1)]), 
+                     "MASE" = MASE(train$deaths[-seq_len(7+k-1)], pred_train[-seq_len(7+k-1)]), 
                      row.names = "training")
 errors
 ```
