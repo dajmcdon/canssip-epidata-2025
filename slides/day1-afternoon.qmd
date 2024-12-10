@@ -1882,7 +1882,9 @@ knitr::kable(mae_value)
 * The ratio model predicts the finalized value of $Y_t$ from $Y_{s}$, the last value included in the version $t$ report.
 * $Y_s$ is the closest in time we can get to $Y_t$, but we also expect it to be the least reliable value in version $t$.
 * Can we add $Y_{s - 1}$, $Y_{s - 2}$, and even other data sources to the model to try to find a good mix of relevant and reliable signals?
-* Regressions models will let us do that; let's start by adding $Y_{s - 1}$, etc.
+* Regressions models will let us do that.
+* Let's start "simple": let's try predicting $Y_t$ with whichever of $Y_{t - 1}$
+  and $Y_{t - 2}$ are available in version $t$.
 
 ##
 
