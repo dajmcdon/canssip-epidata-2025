@@ -2297,13 +2297,13 @@ ratio_nowcasts_archive <- nowcasts |>
 
 nowcast_comparison <-
   list(
-    locf_nowcasts |> rename(prediction_locf = prediction),
+    # locf_nowcasts |> rename(prediction_locf = prediction),
+    ratio_nowcasts_archive$DT |> as_tibble() |> rename(nowcast_date = version, target_date = time_value),
     reg1_nowcasts |> rename(prediction_reg1 = prediction),
-    reg2_nowcasts |> rename(prediction_reg2 = prediction),
-    ratio_nowcasts_archive$DT |> as_tibble() |> rename(nowcast_date = version, target_date = time_value)#,
+    reg2_nowcasts |> rename(prediction_reg2 = prediction)#,
     #   get_predictor_training_data(nchs_ca_archive, "mortality", 14L, "mortality_lag14_realtime") |>
     #     transmute(geo_value, nowcast_date = time_value, target_date = time_value, mortality_lag14_realtime)
-  ) |>
+    ) |>
   lapply(select, -any_of("version")) |>
   reduce(full_join, by = c("geo_value", "nowcast_date", "target_date")) |>
   full_join(nchs_ca_archive |> epix_as_of(nchs_ca_archive$versions_end),
@@ -2311,11 +2311,13 @@ nowcast_comparison <-
   pivot_longer(starts_with("prediction"), names_to = "Nowcaster", values_to = "prediction") |>
   mutate(Nowcaster = recode(Nowcaster,
                             prediction_locf = "LOCF",
+                            prediction_ratio = "LOCF ratio model",
                             prediction_reg1 = "Regression 1",
                             prediction_reg2 = "Regression 2",
                             .default = Nowcaster))
 
 nowcast_comparison |>
+  filter(target_date >= min(all_nowcast_dates) - 35) |>
   ggplot() +
   geom_line(aes(target_date, mortality)) +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
@@ -2327,9 +2329,15 @@ nowcast_comparison |>
 ## Evaluations
 
 ```{r regression-nowcast-eval-comparison}
+n_models <- length(unique(nowcast_comparison$Nowcaster))
+
 nowcast_comparison |>
   # Filter evaluation based on target stability
   filter(target_date <= nchs_ca_archive$versions_end - 49) |>
+  # Filter evaluated tasks to those with all models available
+  group_by(target_date) |>
+  filter(sum(!is.na(prediction)) == n_models) |>
+  ungroup() |>
   summarize(.by = Nowcaster,
             MAE = mean(abs(mortality - prediction)),
             MAPE = 100*mean(abs(mortality - prediction)/abs(mortality)))
