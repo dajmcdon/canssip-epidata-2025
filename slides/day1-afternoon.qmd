@@ -2075,8 +2075,7 @@ test <- training_test |> filter(time_value == trial_nowcast_date)
 
 fit <- training |>
   select(all_of(predictor_descriptions$predictor_name), mortality_semistable) |>
-  # Fit a linear model by trying to minimize MAE (mean absolute error):
-  quantreg::rq(formula = mortality_semistable ~ ., tau = 0.5)
+  lm(formula = mortality_semistable ~ .)
 
 pred <- tibble(
   nowcast_date = trial_nowcast_date,
@@ -2116,6 +2115,7 @@ We'll wrap our nowcasting code in a function and `epix_slide()` again.
         it's possible but a bit tricky to combine with our weekly-resolution
         weekly-cadence archive.
     * Exclude a potential predictor if it doesn't have much training data available.
+* Allow for linear regression or quantile regression at the median level (tau = 0.5)
 
 ```{r regression-nowcaster-function}
 #| echo: true
@@ -2179,9 +2179,15 @@ regression_nowcaster <- function(archive, settings, return_info = FALSE) {
   test <- training_test |>
     filter(time_value == nowcast_date)
 
-  fit <- training |>
-    select(any_of(predictor_descriptions$predictor_name), mortality_semistable) |>
-    quantreg::rq(formula = mortality_semistable ~ ., tau = 0.5)
+  if (isTRUE(settings$median)) {
+    fit <- training |>
+      select(any_of(predictor_descriptions$predictor_name), mortality_semistable) |>
+      quantreg::rq(formula = mortality_semistable ~ ., tau = 0.5)
+  } else {
+    fit <- training |>
+      select(any_of(predictor_descriptions$predictor_name), mortality_semistable) |>
+      lm(formula = mortality_semistable ~ .)
+  }  
 
   pred <- tibble(
     geo_value = "ca",
@@ -2255,6 +2261,7 @@ compare two different configurations:
 
 * one with just mortality-based predictions
 * one that also uses hospitalizations as a predictor
+* and two that use quantile reg instead of linear reg
 
 ```{r regression-model-settings}
 #| echo: true
@@ -2281,6 +2288,9 @@ reg2_settings <- list(
   min_n_training_intersection = 20, # or else raise error
   max_n_training_intersection = Inf # or else filter down rows
 )
+
+reg3_settings <- c(reg1_settings, median = TRUE)
+reg4_settings <- c(reg2_settings, median = TRUE)
 ```
 
 ```{r regression-run-nowcasts-backtesting}
@@ -2321,12 +2331,18 @@ reg2_nowcasts <- hosp_mort_archive |>
              .versions = all_nowcast_dates + 4, # assume we nowcast on Thursday, same day as assumed NCHS release
              .all_versions = TRUE)
 
+reg3_nowcasts <- nchs_ca_archive |>
+  epix_slide(~ regression_nowcaster(.x, reg3_settings), .versions = all_nowcast_dates, .all_versions = TRUE)
+
+reg4_nowcasts <- hosp_mort_archive |>
+  epix_slide(~ regression_nowcaster(.x, reg4_settings),
+             .versions = all_nowcast_dates + 4, # assume we nowcast on Thursday, same day as assumed NCHS release
+             .all_versions = TRUE)
 ```
 
-## Comparison
+## Data wrangling
 
-```{r regression-nowcast-plot-comparison}
-#| fig-width: 9
+```{r regression-nowcast-wrangling}
 
 ratio_nowcasts_archive <- nowcasts |>
   filter(geo_value == "ca") |>
@@ -2339,7 +2355,9 @@ nowcast_comparison <-
     locf_nowcasts |> rename(prediction_locf = prediction),
     ratio_nowcasts_archive$DT |> as_tibble() |> rename(nowcast_date = version, target_date = time_value),
     reg1_nowcasts |> rename(prediction_reg1 = prediction),
-    reg2_nowcasts |> rename(prediction_reg2 = prediction)#,
+    reg2_nowcasts |> rename(prediction_reg2 = prediction),
+    reg3_nowcasts |> rename(prediction_reg3 = prediction),
+    reg4_nowcasts |> rename(prediction_reg4 = prediction)#,
     #   get_predictor_training_data(nchs_ca_archive, "mortality", 14L, "mortality_lag14_realtime") |>
     #     transmute(geo_value, nowcast_date = time_value, target_date = time_value, mortality_lag14_realtime)
     ) |>
@@ -2351,12 +2369,37 @@ nowcast_comparison <-
   mutate(Nowcaster = recode(Nowcaster,
                             prediction_locf = "LOCF",
                             prediction_ratio = "LOCF ratio model",
-                            prediction_reg1 = "Regression 1",
-                            prediction_reg2 = "Regression 2",
+                            prediction_reg1 = "LinReg model",
+                            prediction_reg2 = "LinReg + hosp",
+                            prediction_reg3 = "QuantReg model",
+                            prediction_reg4 = "QuantReg + hosp",
                             .default = Nowcaster))
+```
+
+## Comparison: linear regression
+
+```{r regression-nowcast-plot-linreg}
+#| fig-width: 9
 
 nowcast_comparison |>
-  filter(target_date >= min(all_nowcast_dates) - 35) |>
+  filter(target_date >= min(all_nowcast_dates) - 35,
+         !(Nowcaster %in% c("QuantReg model", "QuantReg + hosp"))) |>
+  ggplot() +
+  geom_line(aes(target_date, mortality)) +
+  geom_line(aes(target_date, prediction, color = Nowcaster)) +
+  scale_color_delphi() +
+  xlab("Date") +
+  ylab("Mortality")
+```
+
+## Comparison: quantile regression
+
+```{r regression-nowcast-plot-quantreg}
+#| fig-width: 9
+
+nowcast_comparison |>
+  filter(target_date >= min(all_nowcast_dates) - 35,
+         !(Nowcaster %in% c("LinReg model", "LinReg + hosp"))) |>
   ggplot() +
   geom_line(aes(target_date, mortality)) +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
@@ -2385,7 +2428,7 @@ nowcast_comparison |>
 
 ## Mea culpa
 
-This quickly became very complicated and we've glossed over some core concepts.
+This quickly became complicated and we've glossed over some core concepts.
 We'll explain concepts of regression, lagged features, and evaluation more
 carefully tomorrow.
 
