@@ -1142,7 +1142,7 @@ ggplot(snapshots |> filter(!latest),
 
 ## Backfill American edition
 
-* Again, we can see a similar systematic underestimation problem for COVID-19 morality rates in CA. <!-- 2023-2024 -->
+* Again, we can see a similar systematic underestimation problem for COVID-19 mortality rates in CA. <!-- 2023-2024 -->
 
 * This plot also illustrates the [**revision process**]{.primary} - how the reported mortality changes & increases across multiple updates until it stabilizes at the final value (black line).
 
@@ -1442,7 +1442,7 @@ nchs_archive <- pub_covidcast(
 ## Ratio nowcaster: building training samples
 
 * At an earlier nowcast date $t_0,$ we define 
-  + [**Provisional value**]{.primary} as the reported value of $Y_s$ with version $t_0.$ Here $s_0$ is the largest occurence date among all values reported up until $t_0.$
+  + [**Provisional value**]{.primary} as the reported value of $Y_{s_0}$ with version $t_0.$ Here $s_0$ is the largest occurence date among all values reported up until $t_0.$
   + [**Finalized value**]{.primary} as the (potentially unobserved) finalized value of $Y_{s_0}.$
     - We only know in *hindsight* when reported value of $Y_{s_0}$ is finalized -- need an approximation. 
 
@@ -1462,7 +1462,7 @@ We can say data reported 49 days after occurrence date is good enough to be cons
 
 ## Ratio nowcaster: test time feature
 
-* At test time $t,$ take provisional value to be $Y_s,$ where $s$ is the largest occureence date among all values reported up until time $t.$
+* At test time $t,$ take provisional value to be $Y_s,$ where $s$ is the largest occurence date among all values reported up until time $t.$
 
 ## Nowcasting at a single date: building training samples 
 
@@ -2671,7 +2671,7 @@ process_covid_data <- function(Date) {
 * [**Tibble Creation**]{.primary}: Constructs a tibble with `geo_value`, `time_value`, `version`, and `case_rate_7d_av` to later compile into an `epi_archive` (you can think of an `epi_archive` as being a comprised of many `epi_df`s).
 
 
-## Fetch Data - Process eange of dates
+## Fetch Data - Process range of dates
 * Note that `process_covid_data()` works on one date at a time.
 * So now, we need a function that iterates over a date range and applies `process_covid_data()` to each date & combines the resulting tibbles into an `epi_archive`.
 * We call this function `process_data_for_date_range()`...
