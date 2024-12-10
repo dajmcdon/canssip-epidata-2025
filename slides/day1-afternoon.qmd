@@ -2289,6 +2289,8 @@ reg2_nowcasts <- hosp_mort_archive |>
 ## Comparison
 
 ```{r regression-nowcast-plot-comparison}
+#| fig-width: 9
+
 ratio_nowcasts_archive <- nowcasts |>
   filter(geo_value == "ca") |>
   rename(time_value = target_date,
@@ -2297,7 +2299,7 @@ ratio_nowcasts_archive <- nowcasts |>
 
 nowcast_comparison <-
   list(
-    # locf_nowcasts |> rename(prediction_locf = prediction),
+    locf_nowcasts |> rename(prediction_locf = prediction),
     ratio_nowcasts_archive$DT |> as_tibble() |> rename(nowcast_date = version, target_date = time_value),
     reg1_nowcasts |> rename(prediction_reg1 = prediction),
     reg2_nowcasts |> rename(prediction_reg2 = prediction)#,
@@ -2329,8 +2331,9 @@ nowcast_comparison |>
 ## Evaluations
 
 ```{r regression-nowcast-eval-comparison}
-n_models <- length(unique(nowcast_comparison$Nowcaster))
+#| echo: true
 
+n_models <- length(unique(nowcast_comparison$Nowcaster))
 nowcast_comparison |>
   # Filter evaluation based on target stability
   filter(target_date <= nchs_ca_archive$versions_end - 49) |>
