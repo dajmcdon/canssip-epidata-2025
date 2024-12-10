@@ -891,18 +891,18 @@ archive_cases_dv_subset
 
 ```{r plot-revision-patterns}
 #| fig-width: 7
-# ggplot(snapshots |> filter(!latest),
-#        aes(x = time_value, y = percent_cli)) +  
-#   geom_line(aes(color = factor(version))) + 
-#   geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
-#   facet_wrap(~ geo_value, scales = "free_y", nrow = 1) +
-#   scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
-#   labs(x = "", y = "% of doctor's visits with\n Covid-like illness") + 
-#   scale_color_viridis_d(option = "B", end = .8) +
-#   theme(legend.position = "none") +
-#   geom_line(data = snapshots |> filter(latest),
-#             aes(x = time_value, y = percent_cli), 
-#             inherit.aes = FALSE, color = "black")
+ ggplot(snapshots |> filter(!latest),
+        aes(x = time_value, y = percent_cli)) +  
+   geom_line(aes(color = factor(version))) + 
+   geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
+   facet_wrap(~ geo_value, scales = "free_y", nrow = 1) +
+   scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
+   labs(x = "", y = "% of doctor's visits with\n Covid-like illness") + 
+   scale_color_viridis_d(option = "B", end = .8) +
+   theme(legend.position = "none") +
+   geom_line(data = snapshots |> filter(latest),
+             aes(x = time_value, y = percent_cli), 
+             inherit.aes = FALSE, color = "black")
 ```
 
 ## Finalized data
@@ -1032,6 +1032,7 @@ revision_data |> select(geo_value, time_value, min_lag) |> slice_sample(n = 10)
 * [**Question:**]{.primary} How long does it take for the reported value to be close to the finalized value? 
 
 ```{r revision-summary-time-near-latest-demo}
+#| echo: true
 revision_data |> select(geo_value, time_value, time_near_latest) |> slice_sample(n = 10)
 ```
 * It generally takes at least 4 weeks for reported value to be within 20\% (default in `revision_summary()`) of the finalized value. 
@@ -1063,7 +1064,7 @@ check_when_finalized <- function(epi_archive, start_date = NULL, end_date = NULL
     filter(mortality == mortality_finalized) |>
     group_by(geo_value, time_value) |>
     summarize(min_version = min(version), .groups = 'drop') |>
-    mutate(diff = min_version - time_value)
+    mutate(time_to_final = min_version - time_value)
   
   return(finalized_version_data)
 }
@@ -1077,11 +1078,7 @@ res <- check_when_finalized(nchs_archive,
 
 head(res)
 ```
-Here is a look at its quantiles:
-```{r summary-diff}
-#| echo: false
-summary(as.numeric(res$diff))
-```
+
 
 * [**Conclusion**]{.primary}: The revision behavior is pretty long-tailed. Value reported 4 weeks later is reasonably close to the finalized value. 
 
@@ -1298,7 +1295,7 @@ ratio <- finalized_data |>
   inner_join(initial_data, by = c("geo_value", "time_value")) |>
   mutate(ratio = finalized_val / initial_val) |>
   pull(ratio) |>
-  mean(na.rm = TRUE)
+  median(na.rm = TRUE)
 ```
 
 ## Nowcasting at a single date: test feature construction
@@ -1317,10 +1314,15 @@ last_avail <- epix_as_of(nchs_archive, nowcast_date) |>
 #| echo: true
 
 nowcast <- last_avail * ratio
-nowcast
+finalized_val <- epix_as_of(nchs_archive, nchs_archive$versions_end) |>
+  filter(time_value == nowcast_date) |>
+pull(mortality)
+
+nowcast_final = data.frame(Nowcast = nowcast, `Finalized value` = finalized_val, check.names=FALSE)
+knitr::kable(nowcast_final)
+
 ```
 
-TODO for XS: we need to compare to the finalized value!
 
 ## Nowcasting for multiple dates
 
@@ -1328,7 +1330,6 @@ TODO for XS: we need to compare to the finalized value!
 * The template computation sould be applied over all nowcast dates, [**but we must respect data versioning**]{.primary}! 
 * `epix_slide()` is designed just for this! It behaves similarly to `epi_slide`.
 * Key exception: `epix_slide()` is version aware: the sliding computation at any reference time $t$ is performed on [**data that would have been available as of t**]{.primary}.
-
 
 
 ## Nowcasting for multiple dates via `epix_slide()`
@@ -1364,7 +1365,8 @@ nowcaster = function(x, g, t, wl=180, appx=approx_final_lag) {
   last_avail = epix_as_of(x, t) |>
     slice_max(time_value) |>
     pull(mortality) 
-  
+
+
   res = tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
   
   return(res)
@@ -1373,6 +1375,27 @@ nowcaster = function(x, g, t, wl=180, appx=approx_final_lag) {
 
 ```
 
+## Sanity check of `epix_slide()`
+
+```{r nowcast-san-check}
+#| echo: true
+#| eval: true
+
+slided_nowcast_1d = epix_slide(
+  .x = nchs_archive,
+  .f = nowcaster,
+  .before = Inf,
+  .versions = nowcast_date,
+  .all_versions = TRUE
+)
+
+nowcast_check = data.frame(`Manual nowcast` = nowcast, `Slided nowcast` = slided_nowcast_1d$nowcast, check.names = FALSE)
+knitr::kable(nowcast_check)
+
+
+```
+
+
 ## Nowcasting for multiple dates via `epix_slide()`
 
 ```{r epix-slide-extract-nowcast-date}
@@ -1380,7 +1403,7 @@ nowcaster = function(x, g, t, wl=180, appx=approx_final_lag) {
 #| eval: true
 
 all_nowcast_dates = nchs_archive$DT |>
-  filter(time_value >= as.Date("2022-01-01")) |>
+  filter(time_value >= as.Date("2021-01-10")) |>
   distinct(time_value) |>
   pull(time_value)
 ```
@@ -1502,7 +1525,7 @@ epix_slide(
 ```{r nowcasts-slide-demo-only, eval=FALSE}
 #| echo: true
 #| eval: false
-#| code-line-numbers: "|7,13,17"
+#| code-line-numbers: "|7"
 
 nowcasts <- nchs_archive |>
   group_by(geo_value) |>
@@ -1512,19 +1535,45 @@ nowcasts <- nchs_archive |>
     .versions = all_nowcast_dates,
     .all_versions = TRUE
 )
+```
 
-nowcaster <- function(x, g, t, wl=180, appx=approx_final_lag) {
-  
+## Details of `epix_slide()`
+
+```{r nowcaster-to-slide-again}
+#| echo: true
+#| code-line-numbers: "|4,11"
+
+nowcaster = function(x, g, t, wl=180, appx=approx_final_lag) {
 
   initial_data = x$DT |>
-    # Function body, omitted
-
+    group_by(geo_value, time_value) |>
+    filter(version ==  min(version)) |>
+    filter(time_value >= t - wl - appx & time_value <= t - appx) |>
+    rename(initial_val = mortality) |>
+    select(geo_value, time_value, initial_val)
 
   finalized_data = x$DT |>
-    # Function body, omitted
+    group_by(geo_value, time_value) |>
+    filter(version ==  max(version)) |>
+    filter(time_value >= t - wl - appx & time_value <= t - appx) |>
+    rename(finalized_val = mortality) |>
+    select(geo_value, time_value, finalized_val)
+  
+  ratio = finalized_data |>
+    inner_join(initial_data, by = c("geo_value", "time_value")) |>
+    mutate(ratio = finalized_val / initial_val) |>
+    pull(ratio) |>
+    median(na.rm=TRUE)
+
+  last_avail = epix_as_of(x, t) |>
+    slice_max(time_value) |>
+    pull(mortality) 
+  
+  res = tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
+  
+  return(res)
   
 }
-
 
 ```
 
@@ -1537,7 +1586,6 @@ We are now finally able to compare nowcasts against first available reports:
 
 ```{r nowcast-subsetting}
 #| echo: false
-
 
 intial_val_extracter <- function(x, g, t, wl=180, appx=approx_final_lag) {
   
@@ -1555,7 +1603,7 @@ intial_val_extracter <- function(x, g, t, wl=180, appx=approx_final_lag) {
 provisional_val = epix_slide(nchs_archive, intial_val_extracter,  .versions = all_nowcast_dates, .all_versions = TRUE)
 
 finalized_val = nchs_archive$DT |>
-  filter(time_value >= as.Date("2022-01-01")) |>
+  filter(time_value >= as.Date("2021-01-10")) |>
   group_by(geo_value, time_value) |>
   filter(version == max(version))
 
@@ -1567,14 +1615,8 @@ finalized_val = nchs_archive$DT |>
 
 ggplot() + 
   geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
-  geom_point(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized"), shape = 16) +
   geom_line(data = provisional_val, aes(x = target_date, y = value, color = "Provisional")) +
-  geom_point(data = provisional_val, aes(x = target_date, y = value, color = "Provisional"), shape = 16) +
   geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
-  geom_point(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast"), shape = 16) +
-  # geom_ribbon(data = nowcast_results_df, 
-  #             aes(x = time_value, ymin = lower_PI, ymax = upper_PI), 
-  #             alpha = 0.2, fill = "blue") +
   ylab("Mortality") +
   xlab("Date") +
   scale_color_manual(name =  "", 
@@ -1609,14 +1651,8 @@ cbPalette = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 
 ggplot() + 
   geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
-  geom_point(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized"), shape = 16) +
   geom_line(data = smoothed_nowcasts, aes(x = time_value, y = smoothed_nowcasts, color = "Smoothed")) +
-  geom_point(data = smoothed_nowcasts, aes(x = time_value, y = smoothed_nowcasts, color = "Smoothed"), shape = 16) +
   geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
-  geom_point(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast"), shape = 16) +
-  # geom_ribbon(data = nowcast_results_df, 
-  #             aes(x = time_value, ymin = lower_PI, ymax = upper_PI), 
-  #             alpha = 0.2, fill = "blue") +
   ylab("Mortality") +
   xlab("Date") +
   scale_color_manual(name = "", values = c("Nowcast" = "#71c5e8", "Smoothed" = "#97D700", "Finalized" = "black")) + 
