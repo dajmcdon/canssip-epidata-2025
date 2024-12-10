@@ -75,7 +75,6 @@ if (!file.exists(file_path_1) | !file.exists(file_path_2)) {
           epi_slide_mean(death_rate, .window_size = 7L, .suffix = "_7d_av") |>
           epi_slide_mean(dv, .window_size = 7L, .suffix = "_7d_av") |>
           ungroup()
-          )
       }
     ) |>
     rename(
