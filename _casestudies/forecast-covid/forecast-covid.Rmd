@@ -444,8 +444,9 @@ epi_pred_cv <- epi_slide(
                    )$predictions,
   before = Inf, 
   ref_time_values = fc_time_values,
-  new_col_name = "fc"
-)
+  .new_col_name = "fc"
+) |>
+  unpack(fc, names_sep = "_")
 
 # they match exactly
 head(epi_pred_cv %>% select(fc_.pred, fc_target_date))
@@ -460,13 +461,13 @@ pred_all_past <- rep(NA, length = n - t0)
 n_ahead <- 7
 
 for (t in (t0+1):n) {
-    reg_all_past = lm(deaths ~ lagged_cases, data = ca, 
-                      subset = (1:n) <= (t-n_ahead)) 
-    pred_all_past[t-t0] = predict(reg_all_past, newdata = data.frame(ca[t, ]))
+  reg_all_past = lm(deaths ~ lagged_cases, data = ca, 
+                    subset = (1:n) <= (t-n_ahead)) 
+  pred_all_past[t-t0] = predict(reg_all_past, newdata = data.frame(ca[t, ]))
 }
 
 test$pred_cv_7 <- pred_all_past
-    
+
 
 fc_time_values_7 <- seq(
   from = as.Date("2021-02-23"),
@@ -484,8 +485,9 @@ epi_pred_cv_7 <- epi_slide(
                    )$predictions,
   before = Inf, 
   ref_time_values = fc_time_values_7,
-  new_col_name = "fc"
-)
+  .new_col_name = "fc"
+) |>
+  unpack(fc, names_sep = "_")
 
 # they match
 head(epi_pred_cv_7 %>% select(fc_.pred, fc_target_date))
@@ -724,8 +726,9 @@ ar_all_past <- epi_slide(
                    )$predictions,
   before = Inf, 
   ref_time_values = fc_time_values,
-  new_col_name = "all_past"
-) 
+  .new_col_name = "all_past"
+) |>
+  unpack(all_past, names_sep = "_")
 
 ar_trailing <- epi_slide(
   ca, 
@@ -737,8 +740,9 @@ ar_trailing <- epi_slide(
                    )$predictions,
   before = w, 
   ref_time_values = fc_time_values,
-  new_col_name = "trailing"
-)
+  .new_col_name = "trailing"
+) |>
+  unpack(trailing, names_sep = "_")
 ```
 
 ```{r plot-ar-predictions}
@@ -949,8 +953,9 @@ arx_all_past <- epi_slide(
                    )$predictions,
   before = Inf, 
   ref_time_values = fc_time_values,
-  new_col_name = "all_past"
-) 
+  .new_col_name = "all_past"
+) |>
+  unpack(all_past, names_sep = "_")
 
 arx_trailing <- epi_slide(
   ca, 
@@ -963,8 +968,9 @@ arx_trailing <- epi_slide(
                    )$predictions,
   before = (w+k-1), 
   ref_time_values = fc_time_values,
-  new_col_name = "trailing"
-)
+  .new_col_name = "trailing"
+) |>
+  unpack(trailing, names_sep = "_")
 
 
 ```
