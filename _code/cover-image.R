@@ -2,11 +2,11 @@ library(epiprocess)
 library(tidyverse)
 primary <- "#941120"
 x <- archive_cases_dv_subset
-x_latest <- epix_as_of(x, max_version = max(x$DT$version))
+x_latest <- epix_as_of(x, max(x$DT$version))
 self_max = max(x$DT$version)
 versions = seq(as.Date("2020-06-01"), self_max - 1, by = "1 month")
 snapshots_all <- map_dfr(versions, function(v) {
-  epix_as_of(x, max_version = v) %>% mutate(version = v)}) %>%
+  epix_as_of(x, v) %>% mutate(version = v)}) %>%
   bind_rows(x_latest %>% mutate(version = self_max)) %>%
   mutate(latest = version == self_max)
 snapshots <- snapshots_all %>%

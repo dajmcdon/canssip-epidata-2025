@@ -1584,7 +1584,7 @@ pred_all_past = pred_trailing <- matrix(NA, ncol = 4, nrow = 0)
 w <- 30 # trailing window size
 
 for (fc_date in fc_time_values) {
-  data <- epix_as_of(ca_archive, max_version = as.Date(fc_date))
+  data <- epix_as_of(ca_archive, as.Date(fc_date))
   data$lagged_deaths <- dplyr::lag(data$deaths, 1)
   data$lagged_cases <- dplyr::lag(data$cases, k)
   
