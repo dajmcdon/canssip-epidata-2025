@@ -997,34 +997,6 @@ pred_arx_geo_pool <- usa_archive_dv |> epix_slide(
 )
 ```
 
-```{r arx-no-geo-pooling}
-ma_archive_dv <- usa_archive_dv$DT |> filter(geo_value == "ma") |> as_epi_archive()
-ny_archive_dv <- usa_archive_dv$DT |> filter(geo_value == "ny") |> as_epi_archive() 
-tx_archive_dv <- usa_archive_dv$DT |> filter(geo_value == "tx") |> as_epi_archive()
-
-pred_arx_no_geo_pool <- function(archive, ahead = 28, lags = 0){
-  archive |>
-    epix_slide(
-      ~ arx_forecaster(epi_data = .x,
-                       outcome = "deaths", 
-                       predictors = c("deaths", "doctor_visits"), 
-                       trainer = linear_reg() |> set_engine("lm"),
-                       args_list = arx_args_list(
-                         lags = lags,
-                         ahead = ahead,
-                         quantile_levels = c(0.1, 0.9))
-                       )$predictions |>
-          pivot_quantiles_wider(.pred_distn),
-    .before = w, 
-    .versions = fc_time_values
-    )}
-
-pred_no_geo_pool_28 <- rbind(pred_arx_no_geo_pool(ca_archive_dv),
-                             pred_arx_no_geo_pool(ma_archive_dv), 
-                             pred_arx_no_geo_pool(ny_archive_dv), 
-                             pred_arx_no_geo_pool(tx_archive_dv))
-```
-
 
 ```{r arx-geo-pooling-plot-ca, eval=FALSE}
 ## Predictions (geo-pooling): California
@@ -1097,6 +1069,35 @@ rbind(getAccuracy(ca,
                   "TX"))
 ```
 
+## Predict without geo-pooling
+
+```{r arx-no-geo-pooling}
+#| echo: true
+pred_arx_no_geo_pool <- function(archive, ahead = 28, lags = 0){
+  archive |>
+    epix_slide(
+      ~ group_by(.x, geo_value) |> 
+        group_map(.keep = TRUE, function(group_data, group_key) {
+          arx_forecaster(epi_data = group_data,
+                         outcome = "deaths", 
+                         predictors = c("deaths", "doctor_visits"), 
+                         trainer = linear_reg() |> set_engine("lm"),
+                         args_list = arx_args_list(
+                           lags = lags,
+                           ahead = ahead,
+                           quantile_levels = c(0.1, 0.9))
+                         )$predictions |>
+            pivot_quantiles_wider(.pred_distn)
+        }) |>
+        list_rbind(),
+    .before = w, 
+    .versions = fc_time_values
+    )}
+
+pred_no_geo_pool_28 <- pred_arx_no_geo_pool(usa_archive_dv$DT |> 
+                                              filter(geo_value %in% c("ca", "ma", "ny", "tx")) |> 
+                                              as_epi_archive())
+```
 
 ## Predictions (without geo-pooling, $h=28$)
 
@@ -1166,10 +1167,9 @@ pred_arx_geo_pool_7 <- usa_archive_dv |>
   .versions = fc_time_values
 )
 
-pred_no_geo_pool_7 <- rbind(pred_arx_no_geo_pool(ca_archive_dv, ahead = 7),
-                            pred_arx_no_geo_pool(ma_archive_dv, ahead = 7), 
-                            pred_arx_no_geo_pool(ny_archive_dv, ahead = 7), 
-                            pred_arx_no_geo_pool(tx_archive_dv, ahead = 7))
+pred_no_geo_pool_7 <- pred_arx_no_geo_pool(usa_archive_dv$DT |> 
+                                              filter(geo_value %in% c("ca", "ma", "ny", "tx")) |> 
+                                              as_epi_archive(), ahead = 7)
 ```
 
 
