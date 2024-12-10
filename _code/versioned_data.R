@@ -50,8 +50,8 @@ if (!file.exists(file_path_1) | !file.exists(file_path_2)) {
       function(x, gk, rtv) {
         x |>
           group_by(geo_value) |>
-          epi_slide_mean(case_rate, .window_size = 7L, .new_col_names = "case_rate_7d_av") |>
-          epi_slide_mean(death_rate, .window_size = 7L, .new_col_names = "death_rate_7d_av") |>
+          epi_slide_mean(case_rate, .window_size = 7L, .suffix = "_7d_av") |>
+          epi_slide_mean(death_rate, .window_size = 7L, .suffix = "_7d_av") |>
           ungroup()
       }
     ) |>
@@ -72,8 +72,8 @@ if (!file.exists(file_path_1) | !file.exists(file_path_2)) {
       function(x, gk, rtv) {
         x |>
           group_by(geo_value) |>
-          epi_slide_mean(death_rate, .window_size = 7L, .new_col_names = "death_rate_7d_av") |>
-          epi_slide_mean(dv, .window_size = 7L, .new_col_names = "dv_7d_av") |>
+          epi_slide_mean(death_rate, .window_size = 7L, .suffix = "_7d_av") |>
+          epi_slide_mean(dv, .window_size = 7L, .suffix = "_7d_av") |>
           ungroup()
           )
       }
