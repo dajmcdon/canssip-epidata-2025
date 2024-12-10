@@ -17,6 +17,7 @@ library(epidatasets)
 theme_set(theme_bw())
 ```
 
+
 ## Outline
 
 1. Essentials of `{dplyr}` and `{tidyr}` 
@@ -1617,10 +1618,14 @@ ggplot() +
   geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
   geom_line(data = provisional_val, aes(x = target_date, y = value, color = "Provisional")) +
   geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
+<<<<<<< Updated upstream
+=======
+  geom_point(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast"), shape = 16) +
+  scale_color_delphi() +
+>>>>>>> Stashed changes
   ylab("Mortality") +
   xlab("Date") +
-  scale_color_manual(name =  "", 
-    values = c("Nowcast" = "#71c5e8", "Provisional" = "#FF6900", "Finalized" = "black")) + 
+  scale_color_delphi() +
   theme(legend.position = "bottom")
 ```
 
@@ -1653,9 +1658,17 @@ ggplot() +
   geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
   geom_line(data = smoothed_nowcasts, aes(x = time_value, y = smoothed_nowcasts, color = "Smoothed")) +
   geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
+<<<<<<< Updated upstream
+=======
+  geom_point(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast"), shape = 16) +
+  # geom_ribbon(data = nowcast_results_df, 
+  #             aes(x = time_value, ymin = lower_PI, ymax = upper_PI), 
+  #             alpha = 0.2, fill = "blue") +
+  scale_color_delphi() +
+>>>>>>> Stashed changes
   ylab("Mortality") +
   xlab("Date") +
-  scale_color_manual(name = "", values = c("Nowcast" = "#71c5e8", "Smoothed" = "#97D700", "Finalized" = "black")) + 
+  scale_color_delphi() +
   theme(legend.position = "bottom")
 ```
 
