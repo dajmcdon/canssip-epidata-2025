@@ -70,7 +70,6 @@ Now, use `epi_slide_mean()`, to calculate trailing 7 day averages of cases and d
 ```{r trailing-averages}
 ca <- ca %>%
   epi_slide_mean(c(cases, deaths), .window_size = 7) %>%
-  epi_slide_mean(deaths, .window_size = 7) %>%
   select(-cases, -deaths) %>%
   rename(cases = cases_7dav, deaths = deaths_7dav)
 ```
@@ -431,7 +430,7 @@ head(test %>% select(pred_trailing_cv, time_value))
 ```
 
 The method fitting on all past data up to the forecasting date can be 
-implemented by changing `before = Inf` in `epi_slide`.
+implemented by changing `.before = Inf` in `epi_slide`.
 
 ```{r epipredict-cv}
 # slide an arx_forecaster with appropriate outcome, predictions and lags
@@ -443,8 +442,8 @@ epi_pred_cv <- epi_slide(
                    trainer = linear_reg() %>% set_engine("lm"),
                    args_list = arx_args_list(lags = k-1, ahead = 1L)
                    )$predictions,
-  before = Inf, 
-  ref_time_values = fc_time_values,
+  .before = Inf, 
+  .ref_time_values = fc_time_values,
   .new_col_name = "fc"
 ) |>
   unpack(fc, names_sep = "_")
@@ -484,8 +483,8 @@ epi_pred_cv_7 <- epi_slide(
                    trainer = linear_reg() %>% set_engine("lm"),
                    args_list = arx_args_list(lags = k-n_ahead, ahead = n_ahead)
                    )$predictions,
-  before = Inf, 
-  ref_time_values = fc_time_values_7,
+  .before = Inf,
+  .ref_time_values = fc_time_values_7,
   .new_col_name = "fc"
 ) |>
   unpack(fc, names_sep = "_")
@@ -725,8 +724,8 @@ ar_all_past <- epi_slide(
                    trainer = linear_reg() %>% set_engine("lm"),
                    args_list = arx_args_list(lags = 0L, ahead = 1L)
                    )$predictions,
-  before = Inf, 
-  ref_time_values = fc_time_values,
+  .before = Inf, 
+  .ref_time_values = fc_time_values,
   .new_col_name = "all_past"
 ) |>
   unpack(all_past, names_sep = "_")
@@ -739,8 +738,8 @@ ar_trailing <- epi_slide(
                    trainer = linear_reg() %>% set_engine("lm"),
                    args_list = arx_args_list(lags = 0L, ahead = 1L)
                    )$predictions,
-  before = w, 
-  ref_time_values = fc_time_values,
+  .before = w, 
+  .ref_time_values = fc_time_values,
   .new_col_name = "trailing"
 ) |>
   unpack(trailing, names_sep = "_")
@@ -952,8 +951,8 @@ arx_all_past <- epi_slide(
                    args_list = arx_args_list(lags = list(0, k-1), 
                                              ahead = 1L)
                    )$predictions,
-  before = Inf, 
-  ref_time_values = fc_time_values,
+  .before = Inf, 
+  .ref_time_values = fc_time_values,
   .new_col_name = "all_past"
 ) |>
   unpack(all_past, names_sep = "_")
@@ -967,8 +966,8 @@ arx_trailing <- epi_slide(
                    args_list = arx_args_list(lags = list(0, k-1), 
                                              ahead = 1L)
                    )$predictions,
-  before = (w+k-1), 
-  ref_time_values = fc_time_values,
+  .before = (w+k-1), 
+  .ref_time_values = fc_time_values,
   .new_col_name = "trailing"
 ) |>
   unpack(trailing, names_sep = "_")
@@ -1552,8 +1551,8 @@ fc_time_values <- seq(
 
 data_archive <- data_archive %>%
   epix_slide(
-    before = Inf, 
-    ref_time_values = fc_time_values,
+    .before = Inf, 
+    .versions = fc_time_values,
     function(x, gk, rtv) {
       x %>%
         epi_slide_mean(case_rate, .window_size = 7L, .suffix = "_7d_av") %>%
@@ -1585,7 +1584,7 @@ pred_all_past = pred_trailing <- matrix(NA, ncol = 4, nrow = 0)
 w <- 30 # trailing window size
 
 for (fc_date in fc_time_values) {
-  data <- epix_as_of(ca_archive, max_version = as.Date(fc_date))
+  data <- epix_as_of(ca_archive, as.Date(fc_date))
   data$lagged_deaths <- dplyr::lag(data$deaths, 1)
   data$lagged_cases <- dplyr::lag(data$cases, k)
   
@@ -1729,14 +1728,12 @@ forecaster <- function(x) {
 
 arx_preds <- data %>%
   epix_slide(~ forecaster(.x),
-    before = 120, ref_time_values = fc_time_values,
-    names_sep = NULL
+    .before = 120, .versions = fc_time_values
   ) %>%
   mutate(engine_type = quantile_reg()$engine) %>%
   mutate(ahead_val = target_date - forecast_date)
 
-x_latest <- epix_as_of(data, 
-                       max_version = max(data$versions_end))
+x_latest <- epix_as_of(data, data$versions_end)
 ```
 
 
