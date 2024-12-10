@@ -27,6 +27,8 @@ theme_set(theme_bw())
 
 1. Basic Nowcasting using `{epiprocess}`
 
+1. Nowcasting with One Variable
+
 1. Nowcasting with Two Variables
 
 1. Case Study - Nowcasting Cases Using %CLI
@@ -694,6 +696,7 @@ attr(edf, "metadata")
 1. Correlating signals across location or time 
 1. Computing growth rates
 1. Detecting and removing outliers
+1. Calculating summaries with rolling windows
 1. Dealing with revisions 
 
 ## Features - Correlations at different lags
@@ -818,7 +821,7 @@ edfg |>
 ```{r outlier-ex}
 #| echo: true
 #| message: false
-edfo <- filter(edf, geo_value %in% c("ut", "ca")) |>
+edfo <- filter(edf, geo_value %in% c("ca", "ut")) |>
   select(geo_value, time_value, case_rate) |>
   as_epi_df() |>
   group_by(geo_value) |>
@@ -862,6 +865,127 @@ edfo |>
 ```
 
 
+## Features -- sliding a computation on an `epi_df`
+
+* It is often useful to compute rolling summaries of signals. 
+
+* These depend on the reference time, and are computed separately over geographies (and other groups). 
+
+* For example, a trailing average can smooth out daily variation.
+
+* In `epiprocess`, this is achieved by `epi_slide()`.
+
+```{r epi-slide-example-call}
+#| echo: true
+#| eval: false
+
+epi_slide(
+  .x,
+  .f,
+  ...,
+  .window_size = NULL,
+  .align = c("right", "center", "left"),
+  .ref_time_values = NULL,
+  .new_col_name = NULL,
+  .all_rows = FALSE
+)
+```
+
+For example, we can use `epi_slide()` to compute a trailing 7-day average. 
+
+## Features -- sliding a computation on an `epi_df`
+
+* The simplest way to use `epi_slide` is tidy evaluation. 
+
+* For a grouped `epi_df`, `epi_slide()` applies the computation to groups [separately]{.primary}. 
+
+```{r, grouped-df-to-slide}
+#| echo: false
+
+cases_edf <- cases_df |>
+  group_by(geo_value) |>
+  as_epi_df()
+
+```
+
+```{r epi-slide-tidy-eval}
+#| echo: true
+
+cases_7dav <- epi_slide(
+  .x = cases_edf,
+  cases_7dav = mean(raw_cases, na.rm = TRUE),
+  .window_size = 7,
+  .align = "right"
+)
+```
+
+
+```{r epi-slide-tidy-eval-display-result}
+#| echo: false
+
+cases_7dav |>
+  arrange(geo_value, time_value) |>
+  group_by(geo_value) |>
+  slice_min(time_value, n = 2) |>
+  as_tibble() |>
+  print()
+
+```
+
+
+
+## Features -- sliding a computation on an `epi_df`
+
+`epi_slide` also accepts custom functions of a certain form. 
+
+```{r epi-slide-custom-fucntion-mandatory-form}
+#| eval: false
+#| echo: true
+
+custom_function <- function(x, g, t, ...) {
+  
+  # Function body
+  
+}
+```
+
+* `x`: the data frame with all the columns with original object [except]{.primary} groupping vars. 
+* `g`: the one-row tibble with values of gropping vars of the given group. 
+* `t`: the `.ref_time_value` of the current window. 
+* `...`: additional arguments. 
+
+
+## Features -- sliding a computation on an `epi_df`
+
+```{r slide-apply-custom-function}
+#| echo: true
+#| code-line-numbers: "|9-17"
+
+mean_by_hand <- function(x, g, t, ...) {
+  data.frame(cases_7dav = mean(x$raw_cases, na.rm = TRUE))
+}
+
+cases_mean_custom_f = epi_slide(
+    .x = cases_edf,
+    .f = mean_by_hand,
+    .window_size = 7,
+    .align = "right"
+)
+
+```
+
+
+
+```{r epi-slide-custom-function-display-result}
+cases_mean_custom_f |>
+  arrange(geo_value, time_value) |>
+  slice_min(time_value, n = 2) |>
+  as_tibble() |>
+  print()
+```
+
+
+
 ## `epi_archive`: Collection of `epi_df`s
 
 * full version history of a data set
@@ -873,41 +997,117 @@ edfo |>
 
 Epidemiology data gets revised frequently.
 
-* We may want to use the data [as it looked in the past]{.primary} 
+* We may want to use the data [as it looked in the past].{.primary} 
 * or we may want to examine [the history of revisions]{.primary}.
 :::
 
 ## `epi_archive`: Collection of `epi_df`s
 
-Subset of daily COVID-19 doctor visits (Optum) and cases (JHU CSSE) from 6 states in `archive` format:
+Subset of daily COVID-19 doctor visits (Optum) and cases (JHU CSSE) from all U.S. states in `archive` format:
 
 ```{r archive-ex}
 #| echo: true
-archive_cases_dv_subset
+archive_cases_dv_subset_all_states |> head()
 ```
+
+## Features -- sliding computation over `epi_df`s
+
+* We can apply a computation over different snapshots in an `epi_archive`.
+
+```{r}
+#| echo: true
+#| eval: false
+
+epix_slide(
+  .x,
+  .f,
+  ...,
+  .before = Inf,
+  .versions = NULL,
+  .new_col_name = NULL,
+  .all_versions = FALSE
+)
+
+```
+
+This functionality is very helpful in version aware forecasting. We will return with a concrete example. 
   
-## Revision patterns
+
+## Features -- summarize revision behavior
+
+* `revision_summary()` is a helper function that summarizes revision behavior of an `epix_archive`.
+
+```{r epiprocess-revision-summary-demo}
+#| echo: true
+#| eval: true
+
+revision_data <- revision_summary(
+  archive_cases_dv_subset,
+  case_rate_7d_av,
+  drop_nas = TRUE,
+  print_inform = FALSE, # NOT the default, to save space
+  min_waiting_period = as.difftime(60, units = "days"),
+  within_latest = 0.2,
+  quick_revision = as.difftime(3, units = "days"),
+  few_revisions = 3,
+  abs_spread_threshold = NULL,
+  rel_spread_threshold = 0.1,
+  compactify_tol = .Machine$double.eps^0.5,
+  should_compactify = TRUE
+)
+```
+
+## Features -- summarize revision behavior
+
+```{r epiprocess-revision-summary-results}
+#| echo: true
+
+head(revision_data)
+```
+
+
+
+## Visualize revision patterns
+
+```{r create-snapshots-of-data}
+#| echo: false
+#| eval: true
+
+versions <- seq(as.Date("2020-07-01"), as.Date("2021-11-30"), by = "1 month")
+max_version <- max(versions)
+
+snapshots <- map(versions, \(v) {
+  epix_as_of(archive_cases_dv_subset_all_states, v) |>
+    mutate(version = v) |>
+    filter(geo_value %in% c("ca", "ut"))
+  }) |>
+  bind_rows() |>
+  mutate(latest = version == max_version) 
+
+```
+
 
 
 ```{r plot-revision-patterns}
 #| fig-width: 7
-# ggplot(snapshots |> filter(!latest),
-#        aes(x = time_value, y = percent_cli)) +  
-#   geom_line(aes(color = factor(version))) + 
-#   geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
-#   facet_wrap(~ geo_value, scales = "free_y", nrow = 1) +
-#   scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
-#   labs(x = "", y = "% of doctor's visits with\n Covid-like illness") + 
-#   scale_color_viridis_d(option = "B", end = .8) +
-#   theme(legend.position = "none") +
-#   geom_line(data = snapshots |> filter(latest),
-#             aes(x = time_value, y = percent_cli), 
-#             inherit.aes = FALSE, color = "black")
+ggplot(snapshots |> filter(!latest),
+       aes(x = time_value, y = percent_cli)) +  
+  geom_line(aes(color = factor(version))) + 
+  geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
+  facet_wrap(~ geo_value, scales = "free_y", nrow = 1) +
+  scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
+  labs(x = "", y = "% of doctor's visits with\n Covid-like illness") + 
+  scale_color_viridis_d(option = "B", end = .8) +
+  theme(legend.position = "none") +
+  geom_line(data = snapshots |> filter(latest),
+            aes(x = time_value, y = percent_cli), 
+            inherit.aes = FALSE, color = "black")
 ```
 
-## Finalized data
+  
+## Types of prediction
 
-  * Counts are revised as time proceeds
+* Counts are revised as time proceeds
 * Want to know the [final]{.primary} value 
 * Often not available until weeks/months later
 
@@ -923,6 +1123,8 @@ archive_cases_dv_subset
   
   Nowcasting
 : At time $t$, predict the final value for time $t$
+
+
 
 # Basic Nowcasting in the Epiverse
 
@@ -2382,4 +2584,3 @@ cowplot::plot_grid(p1, p2)
 * Group built [`{rtestim}`](https://dajmcdon.github.io/rtestim) doing for this nonparametrically.
 
 * We may come back to this later...
-
