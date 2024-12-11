@@ -359,14 +359,7 @@ Here are 1 to 2 word summaries of the key `dplyr` functions:
 
 > "Happy families are all alike; every unhappy family is unhappy in its own way." — Leo Tolstoy  
 
-* [**Tidy datasets**]{.primary} are like happy families: consistent, standardized, and easy to work with.  
-* [**Messy datasets**]{.primary} are like unhappy families: each one messy in its own unique way.  
-In this section:
-* We'll define what makes data *tidy* and how to transform between the tidy and messy formats.
-
-## Tidy data and Tolstoy
-
-![](gfx/tidy_messy_data.jpg){style="width: 60%;"}
+![](gfx/tidy_messy_data.jpg){style="width: 40%;"}
 
 <small>[Artwork by @allison_horst](https://x.com/allison_horst)</small>
 
