@@ -552,24 +552,32 @@ head(case_rates_df)
 
 Congratulations for making it through this crash course! That's all for this `glimpse()` into the tidyverse.
 
+# Epiverse Software Ecosystem
+
+
 ## Epi. data processing with `epiprocess`
 
-* `epiprocess` is a package that offers additional functionality to pre-process such epidemiological data.
+* `epiprocess` is a package that offers additional functionality to pre-process epidemiological data.
 * You can work with an `epi_df` like you can with a tibble by using dplyr verbs.
 * For example, on `cases_df`, we can easily use `epi_slide_mean()` to calculate trailing 14 day averages of cases:
 
 ```{r trailing-average-ex}
 #| echo: true
+#| output-location: column
 case_rates_df <- case_rates_df |>
   as_epi_df(as_of = as.Date("2024-01-01")) |>
   group_by(geo_value) |>
-  epi_slide_mean(scaled_cases, .window_size = 14, na.rm = TRUE) |>
+  epi_slide_mean(
+    scaled_cases, 
+    .window_size = 14, 
+    na.rm = TRUE
+  ) |>
   rename(smoothed_scaled_cases = scaled_cases_14dav)
-head(case_rates_df)
+case_rates_df
 ```
 
 ## Epi. data processing with `epiprocess`
-It is easy to produce an autoplot the smoothed confirmed daily cases for each `geo_value`:
+It is easy to produce an autoplot of the smoothed confirmed daily cases for each `geo_value`:
 ```{r autoplot-ex}
 #| echo: true
 case_rates_df |>
@@ -586,14 +594,14 @@ ggplot(case_rates_df) +
   geom_line(aes(x = time_value, y = scaled_cases, color = geo_value), size = 0.25) +
   geom_line(aes(x = time_value, y = smoothed_scaled_cases, color = geo_value), size = 1) +
   facet_wrap(vars(geo_value), nrow = 1, scales = "free") +
-  ylab("Cases per 100k") +
-  theme_bw() +
+  ylab("Cases per 100k") + xlab("Reference date") +
+  scale_color_delphi() +
   theme(legend.position = "none") +
   guides(x =  guide_axis(angle = 25))
 ```
 Now, before exploring some more features of `epiprocess`, let's have a look at the epiverse software ecosystem it's part of...
 
-# Epiverse Software Ecosystem
+
 
 ## The epiverse ecosystem
 Interworking, community-driven, packages for epi tracking & forecasting.
@@ -712,6 +720,9 @@ rbind(
   mutate(lag = as.factor(lag)) |>
   ggplot(aes(cor)) +
   geom_density(aes(fill = lag, col = lag), alpha = 0.5) +
+  scale_fill_delphi() +
+  scale_color_delphi() +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
   labs(x = "Correlation", y = "Density", fill = "Lag", col = "Lag")
 ```
 
@@ -766,9 +777,7 @@ edfg <- filter(edf, geo_value %in% c("ut", "ca")) |>
 ```
 
 ```{r plot-growth-rates-ex}
-#| fig-align: center
-#| fig-width: 12
-#| fig-height: 5
+#| fig-width: 10
 edfg |>
   select(-death_rate) |>
   mutate(`Growth Rate` = gr_cases) |>
@@ -783,8 +792,7 @@ edfg |>
   geom_hline(aes(yintercept = 0),
              data = tibble(name = "Growth Rate"),
              linetype = "dashed") +
-  theme_bw() +
-  scale_x_date(name = "Date") +
+  scale_x_date(name = "Reference date", date_breaks = "6 months", date_labels = "%b %Y") +
   scale_y_continuous(name = NULL)
 ```
 
@@ -839,12 +847,12 @@ edfo |>
   ) |> 
   ggplot(aes(x = time_value)) +
   geom_line(aes(y = value, color = name)) +
-  scale_color_brewer(palette = "Set1", name = "") +
+  scale_color_manual(name = "", values = c(primary, tertiary)) +
   geom_hline(yintercept = 0) +
   facet_wrap(vars(geo_value), scales = "free_y", nrow = 1) +
   scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
-  labs(x = "Date", y = "COVID-19 case rates") +
-  theme(legend.position = c(.075, .8), 
+  labs(x = "Reference date", y = "COVID-19 case rates") +
+  theme(legend.position = c(.15, .8), 
         legend.background = element_rect(fill = NA), 
         legend.key = element_rect(fill = NA))
 ```
@@ -1308,9 +1316,7 @@ values_final <- epix_as_of(nchs_archive, max(nchs_archive$versions_end))
 
 ```{r final-vs-revisions-plot}
 #| echo: false
-#| fig-width: 9
-#| fig-height: 4
-#| out-height: "500px"
+#| fig-width: 7
 ggplot(value_at_lags, aes(x = time_value, y = mortality)) +  
   geom_line(aes(color = factor(lag))) + 
   facet_wrap(~ geo_value, scales = "free_y", ncol = 1) +
@@ -1340,9 +1346,7 @@ nchs_snapshots = map(versions, function(v) {
 
 ```{r nchs-plot-val-different-ver}
 #| echo: false
-#| fig-width: 9
-#| fig-height: 4
-#| out-height: "500px"
+#| fig-width: 7
 
 ggplot(nchs_snapshots |> filter(!latest),
        aes(x = time_value, y = mortality)) +
@@ -1524,41 +1528,29 @@ We begin by templatizing our previous operations.
 
 ```{r nowcaster-to-slide}
 #| echo: true
-
-nowcaster = function(x, g, t, wl=180, appx=approx_final_lag) {
-  
-
-  initial_data = x$DT |>
+nowcaster <- function(x, g, t, wl=180, appx=approx_final_lag) {
+  initial_data <- x$DT |>
     group_by(geo_value, time_value) |>
     filter(version ==  min(version)) |>
     filter(time_value >= t - wl - appx & time_value <= t - appx) |>
     rename(initial_val = mortality) |>
     select(geo_value, time_value, initial_val)
-
-  finalized_data = x$DT |>
+  finalized_data <- x$DT |>
     group_by(geo_value, time_value) |>
     filter(version ==  max(version)) |>
     filter(time_value >= t - wl - appx & time_value <= t - appx) |>
     rename(finalized_val = mortality) |>
     select(geo_value, time_value, finalized_val)
-  
-  ratio = finalized_data |>
+  ratio <- finalized_data |>
     inner_join(initial_data, by = c("geo_value", "time_value")) |>
     mutate(ratio = finalized_val / initial_val) |>
     pull(ratio) |>
-    median(na.rm=TRUE)
-
-  last_avail = epix_as_of(x, t) |>
+    median(na.rm = TRUE)
+  last_avail <-  epix_as_of(x, t) |>
     slice_max(time_value) |>
     pull(mortality) 
-
-
-  res = tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
-  
-  return(res)
-  
+  tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
 }
-
 ```
 
 ## Sanity check of `epix_slide()`
@@ -1727,40 +1719,30 @@ nowcasts <- nchs_archive |>
 
 ```{r nowcaster-to-slide-again}
 #| echo: true
-#| code-line-numbers: "|4,11"
-
-nowcaster = function(x, g, t, wl=180, appx=approx_final_lag) {
-
-  initial_data = x$DT |>
+#| code-line-numbers: "|3,9"
+nowcaster <- function(x, g, t, wl=180, appx=approx_final_lag) {
+  initial_data <- x$DT |>
     group_by(geo_value, time_value) |>
     filter(version ==  min(version)) |>
     filter(time_value >= t - wl - appx & time_value <= t - appx) |>
     rename(initial_val = mortality) |>
     select(geo_value, time_value, initial_val)
-
-  finalized_data = x$DT |>
+  finalized_data <- x$DT |>
     group_by(geo_value, time_value) |>
     filter(version ==  max(version)) |>
     filter(time_value >= t - wl - appx & time_value <= t - appx) |>
     rename(finalized_val = mortality) |>
     select(geo_value, time_value, finalized_val)
-  
-  ratio = finalized_data |>
+  ratio <- finalized_data |>
     inner_join(initial_data, by = c("geo_value", "time_value")) |>
     mutate(ratio = finalized_val / initial_val) |>
     pull(ratio) |>
     median(na.rm=TRUE)
-
-  last_avail = epix_as_of(x, t) |>
+  last_avail <- epix_as_of(x, t) |>
     slice_max(time_value) |>
     pull(mortality) 
-  
-  res = tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
-  
-  return(res)
-  
+  tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
 }
-
 ```
 
 
@@ -1798,16 +1780,14 @@ finalized_val = nchs_archive$DT |>
 
 ```{r nowcast-fun-plot-results}
 #| echo: false
-
+#| fig-width: 7
 ggplot() + 
   geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
   geom_line(data = provisional_val, aes(x = target_date, y = value, color = "Provisional")) +
   geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
-  scale_color_delphi() +
   ylab("Mortality") +
-  xlab("Date") +
-  scale_color_delphi() +
-  theme(legend.position = "bottom")
+  xlab("Reference date") +
+  scale_color_delphi(name = "")
 ```
 
 * The real-time counts tend to be biased below the finalized counts. Nowcasted values tend to provide a much better approximation of the truth (at least for these dates).
@@ -1831,7 +1811,7 @@ smoothed_nowcasts <- epi_slide(
 
 ```{r nowcast-smoothed-vis}
 #| echo: false
-
+#| fig-width: 7
 cbPalette = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
               "#0072B2", "#D55E00", "#CC79A7")
 
@@ -1840,11 +1820,9 @@ ggplot() +
   geom_line(data = provisional_val, aes(x = target_date, y = value, color = "Provisional")) +
   geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
   geom_line(data = smoothed_nowcasts, aes(x = time_value, y = smoothed_nowcasts, color = "Smoothed")) +
-  scale_color_delphi() +
+  scale_color_delphi(name = "") +
   ylab("Mortality") +
-  xlab("Date") +
-  scale_color_delphi() +
-  theme(legend.position = "bottom")
+  xlab("Reference date")
 ```
 
 
@@ -2248,6 +2226,8 @@ compare two different configurations:
 * one that also uses hospitalizations as a predictor
 * and two that use quantile reg instead of linear reg
 
+## Model settings
+
 ```{r regression-model-settings}
 #| echo: true
 
@@ -2372,7 +2352,7 @@ nowcast_comparison |>
   geom_line(aes(target_date, mortality)) +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
   scale_color_delphi() +
-  xlab("Date") +
+  xlab("Reference date") +
   ylab("Mortality")
 ```
 
@@ -2387,8 +2367,8 @@ nowcast_comparison |>
   ggplot() +
   geom_line(aes(target_date, mortality)) +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
-  scale_color_delphi() +
-  xlab("Date") +
+  scale_color_delphi(name = "") +
+  xlab("Reference date") +
   ylab("Mortality")
 ```
 
