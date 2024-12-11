@@ -1605,7 +1605,7 @@ knitr::kable(nowcast_check)
 #| eval: true
 
 all_nowcast_dates = nchs_archive$DT |>
-  filter(time_value >= as.Date("2021-01-10")) |>
+  filter(time_value >= as.Date("2022-01-01")) |>
   distinct(time_value) |>
   pull(time_value)
 ```
@@ -2036,7 +2036,6 @@ The first value here is a version of $Y_{\text{2020-11-30}}$ as it was reported 
 
 ```{r regression-trial-nowcast-predictors-data}
 #| echo: true
-#| eval: false
 predictors <- predictor_descriptions |>
   pmap(function(varname, lag_days, predictor_name) {
     get_predictor_training_data(nchs_ca_past_archive, varname, lag_days, predictor_name)
@@ -2069,7 +2068,7 @@ reported at our trial nowcast date $t$.
 
 ```{r regression-trial-nowcast-fit}
 #| echo: true
-#| eval: false
+
 training_test <- full_join(predictors, target, by = c("geo_value", "time_value"))
 
 training <- training_test |> drop_na()
@@ -2092,7 +2091,7 @@ pred
 
 ```{r regression-trial-nowcast-pred}
 #| echo: true
-#| eval: false
+
 pred
 ```
 
@@ -2296,7 +2295,7 @@ reg4_settings <- c(reg2_settings, median = TRUE)
 ```
 
 ```{r regression-run-nowcasts-backtesting}
-#| eval: false
+
 hhs_hosp_archive <- pub_covidcast(
   source = "hhs",
   signals = "confirmed_admissions_covid_1d_7dav",
@@ -2346,7 +2345,6 @@ reg4_nowcasts <- hosp_mort_archive |>
 ## Data wrangling
 
 ```{r regression-nowcast-wrangling}
-#| eval: false
 ratio_nowcasts_archive <- nowcasts |>
   filter(geo_value == "ca") |>
   rename(time_value = target_date,
@@ -2383,7 +2381,6 @@ nowcast_comparison <-
 
 ```{r regression-nowcast-plot-linreg}
 #| fig-width: 7
-#| eval: false
 nowcast_comparison |>
   filter(target_date >= min(all_nowcast_dates) - 35,
          !(Nowcaster %in% c("QuantReg model", "QuantReg + hosp"))) |>
@@ -2399,7 +2396,6 @@ nowcast_comparison |>
 
 ```{r regression-nowcast-plot-quantreg}
 #| fig-width: 7
-#| eval: false
 
 nowcast_comparison |>
   filter(target_date >= min(all_nowcast_dates) - 35,
@@ -2416,7 +2412,6 @@ nowcast_comparison |>
 
 ```{r regression-nowcast-eval-comparison}
 #| echo: true
-#| eval: false
 
 n_models <- length(unique(nowcast_comparison$Nowcaster))
 nowcast_comparison |>
