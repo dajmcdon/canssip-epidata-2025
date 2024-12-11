@@ -1800,6 +1800,7 @@ ggplot() +
 
 ```{r smooth-nowcasts-epi-slide}
 #| echo: true
+#| fig-width: 7
 
 smoothed_nowcasts <- epi_slide(
   nowcasts |> as_epi_df(),
@@ -2306,8 +2307,6 @@ reg4_nowcasts <- hosp_mort_archive |>
              .all_versions = TRUE)
 ```
 
-## Data wrangling
-
 ```{r regression-nowcast-wrangling}
 ratio_nowcasts_archive <- nowcasts |>
   filter(geo_value == "ca") |>
@@ -2334,8 +2333,8 @@ nowcast_comparison <-
   mutate(Nowcaster = recode(Nowcaster,
                             prediction_locf = "LOCF",
                             prediction_ratio = "LOCF ratio model",
-                            prediction_reg1 = "LinReg model",
-                            prediction_reg2 = "LinReg + hosp",
+                            prediction_reg1 = "Regression model",
+                            prediction_reg2 = "Regression + hosp",
                             prediction_reg3 = "QuantReg model",
                             prediction_reg4 = "QuantReg + hosp",
                             .default = Nowcaster))
@@ -2363,7 +2362,7 @@ nowcast_comparison |>
 
 nowcast_comparison |>
   filter(target_date >= min(all_nowcast_dates) - 35,
-         !(Nowcaster %in% c("LinReg model", "LinReg + hosp"))) |>
+         !(Nowcaster %in% c("Regression model", "Regression + hosp"))) |>
   ggplot() +
   geom_line(aes(target_date, mortality)) +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
