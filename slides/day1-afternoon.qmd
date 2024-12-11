@@ -1786,6 +1786,7 @@ ggplot() +
   geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
   ylab("Mortality") +
   xlab("Reference date") +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
   scale_color_delphi(name = "")
 ```
 
@@ -1811,7 +1812,8 @@ smoothed_nowcasts <- epi_slide(
 
 ```{r nowcast-smoothed-vis}
 #| echo: false
-#| fig-width: 7
+#| fig-width: 7.5
+#| fig-height: 2.5
 cbPalette = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
               "#0072B2", "#D55E00", "#CC79A7")
 
@@ -1822,6 +1824,7 @@ ggplot() +
   geom_line(data = smoothed_nowcasts, aes(x = time_value, y = smoothed_nowcasts, color = "Smoothed")) +
   scale_color_delphi(name = "") +
   ylab("Mortality") +
+  scale_y_continuous(expand = expansion(c(0, .05))) +
   xlab("Reference date")
 ```
 
