@@ -1199,7 +1199,7 @@ Recall, we need to watch out for:
 * [**Latency**]{.primary} the time difference between date of reference and date of the initial report
 * [**Backfill**]{.primary} how data for a given date is updated after initial report. 
 
-`revision_summary()` provides a sumamry to both aspects.  
+`revision_summary()` provides a summary of both aspects.  
 
 ```{r inspect-revision_summary}
 #| echo: true
