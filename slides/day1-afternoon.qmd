@@ -74,7 +74,6 @@ Our focus will be on basic operations like selecting and filtering data.
 <small>[Source](https://towardsdatascience.com/data-manipulation-in-r-with-dplyr-3095e0867f75)</small>
 </div>
 
-
 ## Downloading JHU CSSE COVID-19 case data
 
 * Let's start with something familiar... Here's a task for you:
@@ -102,8 +101,9 @@ cases_df_api <- pub_covidcast(
 Now we only really need a few columns here...
 ```{r head-jhu-dplyr-demo-data}
 #| echo: true
-cases_df <- cases_df_api |>
-  select(geo_value, time_value, raw_cases = value) # We'll talk more about this soon :)
+# Base R way for now...
+cases_df <- cases_df_api[,c("geo_value", "time_value", "value")] 
+names(cases_df)[names(cases_df) == "value"] <- "raw_cases"
 ```
 
 ## Ways to inspect the dataset
@@ -120,8 +120,7 @@ and tail to view the last six
 tail(cases_df)  # Last 6 rows
 ```
 
-## Ways to inspect the dataset
-Now, for our first foray into the `tidyverse`...
+<!-- ## Ways to inspect the dataset
 
 Use `glimpse()` to get a compact overview of the dataset.
 
@@ -129,6 +128,7 @@ Use `glimpse()` to get a compact overview of the dataset.
 #| echo: true
 glimpse(cases_df)
 ```
+-->
 
 <!-- ## Creating tibbles
 
@@ -149,7 +149,7 @@ The `select()` function is used to pick specific columns from your dataset.
 
 ```{r select-columns}
 #| echo: true
-select(cases_df, geo_value, time_value)  # Select the 'geo_value' and 'time_value' columns
+select(cases_df, time_value, raw_cases)  # Select the 'time_value' and 'raw_cases' columns
 ```
 
 ## Selecting columns with `select()`
@@ -158,7 +158,7 @@ You can exclude columns by prefixing the column names with a minus sign `-`.
 
 ```{r select-columns-exclude}
 #| echo: true
-select(cases_df, -raw_cases)  # Exclude the 'raw_cases' column from the dataset
+select(cases_df, -geo_value)  # Exclude the 'geo_value' column from the dataset
 ```
 
 <!-- ## Extracting columns with `pull()`
@@ -199,7 +199,7 @@ filter(cases_df, geo_value == "nc", raw_cases > 500)  # Filter for NC with raw d
 
 ```{r select-filter-combine}
 #| echo: true
-select(filter(cases_df, geo_value == "nc", raw_cases > 1000), time_value, raw_cases) |> 
+select(filter(cases_df, geo_value == "nc", raw_cases > 500), time_value, raw_cases) |> 
   head()
 ```
 
@@ -213,20 +213,10 @@ select(filter(cases_df, geo_value == "nc", raw_cases > 1000), time_value, raw_ca
 #| echo: true
 # This code reads more like poetry!
 cases_df |> 
-  filter(geo_value == "nc", raw_cases > 1000) |> 
+  filter(geo_value == "nc", raw_cases > 500) |> 
   select(time_value, raw_cases) |> 
   head()
 ```
-
-## Key practices in `dplyr`
-
-* Use [**tibbles**]{.primary} for easier data handling.
-* Use `head()`, `tail()`, and `glimpse()` for quick data inspection.
-* Use `select()` and `filter()` for data manipulation.
-* Chain functions with `|>` for cleaner code.
-
-<!-- * Use `pull()` to extract columns as vectors. --> 
-
 
 ## Grouping data with `group_by()`
 
@@ -317,7 +307,7 @@ cases_df |>
   summarise(median_cases = median(raw_cases))
 ```
 
-## Using `count()` to aggregate data
+<!-- ## Using `count()` to aggregate data
 `count()` is a shortcut for grouping and summarizing the data.
 
 For example, if we want to get the total number of complete rows for each state, then
@@ -340,12 +330,30 @@ cases_count <- cases_df |>
 cases_count # Let's see what the counts are.
 ```
 
-## Key practices in `dplyr`: Round 2
+-->
 
+## Key practices learned
+
+* Use `head()` and `tail()` for quick data inspection.
+* Use `select()` and `filter()` for data manipulation.
+* Chain functions with `|>`.
 * Use `group_by()` to group data by one or more variables before applying functions.
 * Use `mutate` to create new columns or modify existing ones by applying functions to existing data.
 * Use `summarise` to reduce data to summary statistics (e.g., mean, median).
-* `count()` is a convenient shortcut for counting rows by group without needing `group_by()` and `summarise()`.
+
+## 1 to 2 word summaries of the `dplyr` functions
+
+Here are 1 to 2 word summaries of the key `dplyr` functions:
+
+1. `select()`: Choose columns
+
+1. `filter()`: Subset rows
+
+1. `mutate()`: Create columns
+
+1. `group_by()`: Group by
+
+1. `summarise()`: Numerical summary
 
 ## Tidy data and Tolstoy
 
@@ -361,7 +369,6 @@ In this section:
 ![](gfx/tidy_messy_data.jpg){style="width: 60%;"}
 
 <small>[Artwork by @allison_horst](https://x.com/allison_horst)</small>
-
 
 ## What is tidy data?
 
@@ -384,8 +391,6 @@ head(cases_df)
 ## Making data wider with `pivot_wider()`
 * To convert data from long format to wide/messy format use `pivot_wider()`.
 * For example, let's try creating a column for each time value in `cases_df`:
-
-<!-- Example. Spreadsheet from hell -->
 
 ```{r pivot-wider-ex}
 #| echo: true
@@ -415,20 +420,6 @@ tidy_cases_df <- messy_cases_df |>
 # View the result
 head(tidy_cases_df, n = 3) # Notice the class of time_value here
 ```
-
-##  Tidying messy data with `pivot_longer()`
-
-* When we used `pivot_longer()`, the `time_value` column is converted to a character class because the column names are treated as strings.
-* So, to truly get the original `cases_df` we need to convert `time_value` back to the `Date` class.
-* Then, we can use `identical()` to check if the two data frames are exactly the same.
-```{r check-identical}
-#| echo: true
-tidy_cases_df = tidy_cases_df |> mutate(time_value = as.Date(time_value))
-
-identical(tidy_cases_df |> arrange(time_value), cases_df)
-```
-
-Great. That was a success!
 
 ## Introduction to joins in `dplyr`
 * Joining datasets is a powerful tool for combining info. from multiple sources.
