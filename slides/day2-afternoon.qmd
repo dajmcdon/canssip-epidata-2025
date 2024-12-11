@@ -1306,7 +1306,7 @@ pred_qr_geo_pool <- usa_archive_dv |>
 ## Predictions (geo-pooling + quantile regression, $h=28$)
 
 ```{r qr-geo-pooling-plot}
-#| fig-align: left
+#| fig-width: 7
 pred_qr_geo_pool |>
   filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
   ggplot(aes(target_date, .pred)) +
@@ -1446,6 +1446,7 @@ Specifically:
 4. Point forecast + 23 quantiles
 5. Response is [NHSN Weekly Hospitalizations](https://data.cdc.gov/Public-Health-Surveillance/Weekly-Hospital-Respiratory-Data-HRD-Metrics-by-Ju/mpgq-jmmr/about_data)
 
+From here on, the emphasis is "how" to make these adjustments. Ran out of time to evaluate!
 
 ## Aside: data issues
 
