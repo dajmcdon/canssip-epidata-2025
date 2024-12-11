@@ -1189,7 +1189,6 @@ nchs_archive <- pub_covidcast(
 ) |> 
   select(geo_value, time_value, version = issue, mortality = value) |> 
   as_epi_archive(compactify = TRUE)
-
 ```
 
 
