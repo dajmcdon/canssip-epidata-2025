@@ -228,12 +228,10 @@ verify_setup()
 
 * In table form, panel data is a time index + one or more locations/keys.
 
-* **Ex**: The % of outpatient doctor visits that are COVID-related in WA from Dec. 2021 to Feb. 2022 ([docs](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html)):
-```{r panel-wa-ex}
-head(epix_as_of(dv_wa, max(dv_wa$DT$version)))
+* **Ex**: The % of outpatient doctor visits that are COVID-related in CA from June 2020 to Dec. 2021 ([docs](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html)):
+```{r panel-ca-ex}
+dv_versioned_panel_final |> filter(geo_value == "ca") |> select(-version)
 ```
-
-<!-- Example: The estimated % of outpatient doctor visits that are COVID-related in WA from Dec. 2021 to Feb. 2022 -->
 
 ## Examples of panel data - COVID-19 cases
 
@@ -427,7 +425,7 @@ ggplot(ca |>
 
 * This is because individual-level data has delayed availability:
     
-[Person comes to ER → Has some tests → Admitted → Tests come back → Entered into the system → ...]{.fourth-colour}
+[Person comes to ER → Admitted → Has some tests → Tests come back → Entered into the system → ...]{.fourth-colour}
 
 * So, a "Hospital admission" may not attributable to a particular condition
 until a few days have passed (the patient may even have been released)
@@ -525,10 +523,6 @@ and subject to [**revision**]{.primary} <!--over time (ex. consider Dec. 1's `pe
 #| echo: false
 head(x_dt_with_diff) |> as_tibble()
 ```
-
-<!-- min_lag: the minimum time to any value min(as.integer(version) - as.integer(time_value)  -->
-<!-- max_lag: the amount of time until the final (new) version -->
-<!-- revision_summary computes some basic statistics about the revision behavior of an archive, returning a tibble summarizing the revisions per time_value+epi_key features. -->
 
 ## Revision triangle, Outpatient visits in WA 2022 
 
@@ -1027,7 +1021,7 @@ print(res['result'], res['message'], len(res['epidata']))
 * Anonymous API access is subject to some restrictions:
   <small>public datasets only; 60 requests per hour; only two parameters may have multiple selections</small>
 
-* API key grants priviledged access; can be obtained by [registering with us](https://api.delphi.cmu.edu/epidata/admin/registration_form) 
+* API key grants privileged access; can be obtained by [registering with us](https://api.delphi.cmu.edu/epidata/admin/registration_form) 
 
 * Privileges of registration: no rate limit; no limit on multiple selections
 
@@ -1172,8 +1166,6 @@ Change `geo_type` and `geo_values` in the previous example
 ```{r state-jhu-pub-covidcast}
 #| echo: true
 #| eval: false
-# Obtain the most up-to-date version of the smoothed covid-like illness (CLI)
-# signal from the COVID-19 Trends and Impact survey for all states
 jhu_state_cases <- pub_covidcast(
   source = "jhu-csse",
   signals = "confirmed_7dav_incidence_prop",
