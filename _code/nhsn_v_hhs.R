@@ -70,7 +70,7 @@ to_compare <- df %>%
   mutate(time_value = as.Date(weekendingdate), geo_value = tolower(jurisdiction), nhsn = totalconfflunewadm) %>%
   select(-weekendingdate, -jurisdiction, -totalconfflunewadm) %>%
   full_join(hhs_arch, by = join_by(geo_value, time_value)) %>%
-  select(time_value, geo_value, old_source = nhsn, new_source = hhs)
+  select(time_value, geo_value, old_source = hhs, new_source = nhsn)
 
 saveRDS(
   df |>

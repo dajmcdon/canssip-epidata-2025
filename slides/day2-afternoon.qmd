@@ -1555,131 +1555,130 @@ ggplot() +
   xlab("Reference date")
 ```
 
-## Flu data archive
+## Almost our production forecaster (helper functions)
 
-```{r load-flu-data}
-source(here::here("_code/weekly_hhs.R"))
+```{r prod-funs}
+#| echo: true
+roll_modular_multivec <- function(col, index, window_size, modulus = 53) {
+  tib <- tibble(col = col, index = index) |>
+    arrange(index) |>
+    tidyr::nest(data = col, .by = index)
+  out <- double(nrow(tib))
+  for (iter in seq_along(out)) {
+    entries <- (iter - window_size):(iter + window_size) %% modulus
+    entries[entries == 0] <- modulus
+    out[iter] <- with(
+      purrr::list_rbind(tib$data[entries]),
+      median(col, na.rm = TRUE)
+    )
+  }
+  tibble(index = unique(tib$index), climate_pred = out)
+}
+
+climatological_feature <- function(epi_data, window_size = 3) {
+  epi_data |>
+    filter(season != "2020/21", season != "2021/22") |> # drop weird years)
+    select(nhsn, epiweek, geo_value) |>
+    reframe(roll_modular_multivec(nhsn, epiweek, window_size, 53), .by = geo_value) |>
+    mutate(climate_pred = pmax(0, climate_pred)) |>
+    rename(epiweek = index)
+}
 ```
 
-```{r show-flu-data}
-weekly_archive
+## Almost our production forecaster (data munging)
 
-flu <- weekly_archive$DT |> 
-  filter(version == "2023-11-15") |>
+```{r prod-munging}
+#| echo: true
+climate <- climatological_feature(climate_data |> select(nhsn, epiweek, season, geo_value))
+nssp <- pub_covidcast( # time_value is first day of the epiweek
+  source = "nssp",
+  signal = "pct_ed_visits_influenza",
+  time_type = "week",
+  geo_type = "state",
+  geo_values = "*"
+) |>
+  select(geo_value, time_value, nssp = value)
+
+flu_data <- hhs_v_nhsn |>
+  select(time_value, geo_value, hhs = new_source) |>
+  left_join(nssp |> mutate(time_value = time_value + 6), by = join_by(geo_value, time_value))
+
+n_geos <- n_distinct(flu_data$geo_value)
+max_time_value <- max(flu_data$time_value)
+empty_data <- tibble(
+  time_value = rep(max_time_value + days(1:3 * 7), each = n_geos),
+  geo_value = rep(unique(flu_data$geo_value), times = 3),
+  nssp = NA, hhs = NA
+)
+
+flu_data <- flu_data |>
+  filter(month(time_value) %in% 8:12, year(time_value) %nin% c(2020, 2021)) |>
+  add_row(empty_data) |>
+  mutate(epiweek = epiweek(time_value)) |>
+  left_join(climate, by = join_by(geo_value, epiweek)) |>
+  select(!epiweek) |>
+  filter(geo_value %nin% c("as", "vi", "gu", "mp", "usa")) |>
+  arrange(geo_value, time_value) |>
   as_epi_df()
 ```
 
-## Build forecaster
+## Almost our production forecaster (workflow)
 
-```{r forecaster-flu}
+```{r prod-fcaster}
 #| echo: true
-# A preprocessing "recipe" that turns raw data into features / response
-r <- epi_recipe(flu) |>
-  #drop_non_seasons() |>
+r <- epi_recipe(flu_data) |>
   step_population_scaling(
-    hhs,
+    hhs, nssp,
     df = epidatasets::state_census,
     df_pop_col = "pop",
     create_new = FALSE,
     rate_rescaling = 1e5,
     by = c("geo_value" = "abbr")) |>
+  recipes::step_mutate(hhs = hhs^(1/4), nssp = nssp^(1/4), climate_pred = climate_pred^(1/4)) |>
   step_epi_lag(hhs, lag = c(0, 7, 14)) |>
-  step_epi_ahead(hhs, ahead = 14) |>
+  step_epi_lag(nssp, lag = c(0, 7, 14)) |>
+  step_epi_ahead(hhs, ahead = 21) |>
+  step_epi_ahead(climate_pred, ahead = 21, role = "predictor") |>
   step_epi_naomit()
 
-# Training engine
-e <- quantile_reg(quantile_levels = c(0.01, 0.025, 1:19 / 20, 0.975, 0.99)) # 23 ForecastHub quantiles
+e <- quantile_reg(quantile_levels = c(0.1, 0.25, 0.5, 0.75, 0.9)) 
 
-# A post-processing routine describing what to do to the predictions
 f <- frosting() |>
   layer_predict() |>
-  layer_threshold(.pred, lower = 0) |> # predictions / intervals should be non-negative
-  layer_population_scaling(
-    .pred, 
-    df = epidatasets::state_census,
-    df_pop_col = "pop",
-    create_new = FALSE,
-    rate_rescaling = 1e5,
-    by = c("geo_value" = "abbr")) |>
-  layer_add_target_date() |>
-  layer_add_forecast_date()
-
-# Bundle up the preprocessor, training engine, and postprocessor
-# We use quantile regression
+  layer_threshold(.pred, lower = 0)
 ewf <- epi_workflow(r, e, f)
+trained_ewf <- ewf |> fit(flu_data)
 
-# Fit it to data (we could fit this to ANY data that has the same format)
-trained_ewf <- ewf |> fit(flu)
-
-# examines the recipe to determine what we need to make the prediction
-latest <- get_test_data(r, flu)
-
-# we could make predictions using the same model on ANY test data
-preds <- trained_ewf |> predict(new_data = latest)
+preds <- forecast(trained_ewf) |>
+  left_join(epidatasets::state_census |> select(pop, abbr), join_by(geo_value == abbr)) |>
+  mutate(
+    .pred = .pred^4 * pop / 1e5,
+    forecast_date = time_value + days(7),
+    target_date = forecast_date + days(14),
+    time_value = NULL,
+    pop = NULL
+  )
 ```
 
-## Predictions at one forecast date
+## Plot our forecasts
 
-```{r pred-one-forecast-date}
-preds |> pivot_quantiles_wider(.pred)
+```{r plot-prod}
+#| fig-width: 7
+preds_wide <- preds |> pivot_quantiles_wider(.pred) |>
+  filter(geo_value %in% geos)
+ggplot() +
+  geom_linerange(data = preds_wide, aes(x = target_date, ymin = `0.1`, ymax = `0.9`),
+                 color = primary, alpha = .2, linewidth = 2) +
+  geom_linerange(data = preds_wide, aes(x = target_date, ymin = `0.25`, ymax = `0.75`),
+                 color = primary, alpha = .4, linewidth = 2) +
+  geom_line(data = flu_data |> filter(time_value > "2024-09-01", geo_value %in% geos),
+            aes(time_value, hhs)) +
+  geom_point(data = preds_wide, aes(x = target_date, y = `0.5`), color = base) +
+  facet_wrap(~geo_value, scales = "free_y") +
+  geom_vline(xintercept = max_time_value + days(7), color = "grey40") +
+  scale_y_continuous(expand = expansion(c(0, .05)))
 ```
 
-## Slide forecaster
-
-```{r slide-flu-forecaster}
-#| echo: true
-flu_forecast <- function(epi_archive, forecast_date, ahead = 14) {
-  flu <- epi_archive$DT |> 
-    filter(version == forecast_date) |>
-    as_epi_df()
-
-  r <- epi_recipe(flu) |>
-    #drop_non_seasons() |>
-    step_population_scaling(
-      hhs,
-      df = epidatasets::state_census,
-      df_pop_col = "pop",
-      create_new = FALSE,
-      rate_rescaling = 1e5,
-      by = c("geo_value" = "abbr")) |>
-    step_epi_lag(hhs, lag = c(0, 7, 14)) |>
-    step_epi_ahead(hhs, ahead = ahead) |>
-    step_epi_naomit()
-  
-  ewf <- epi_workflow(r, e, f)
-  trained_ewf <- ewf |> fit(flu)
-  latest <- get_test_data(r, flu)
-  preds <- trained_ewf |> predict(new_data = latest)
-  return(preds)
-}
-
-forecast_dates <- seq.Date(as.Date("2023-10-04"), as.Date("2024-03-27"), by = 7L)
-forecasts <- bind_rows(map(forecast_dates, 
-                           ~ flu_forecast(weekly_archive, forecast_date = .x, ahead = 14)))
-```
-
-## Version-aware predictions
-
-```{r plot-flu-predictions}
-forecasts |>
-  pivot_quantiles_wider(.pred) |>
-  filter(geo_value %in% c("ca", "fl", "ny", "tx")) |>
-  ggplot(aes(x = target_date)) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = 0.2) +
-  #geom_vline(data = data_at_fc, aes(color = factor(version), xintercept = version), lty = 2) +
-  geom_line(
-    data = weekly_archive$DT |> 
-      filter(geo_value %in% c("ca", "fl", "ny", "tx") &
-               time_value >= min(forecasts$forecast_date)),
-    aes(x = time_value, y = hhs, color = factor(version)),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5
-  ) +
-  geom_line(aes(y = `0.5`, color = factor(time_value))) +
-  geom_point(aes(y = `0.5`, color = factor(time_value)), size = 1) +
-  facet_wrap(vars(geo_value)) +
-  labs(x = "", y = "Hospitalizations") +
-  theme(legend.position = "none")
-```
 
 # Advanced Topics
 
