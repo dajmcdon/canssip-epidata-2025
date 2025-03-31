@@ -1,8 +1,8 @@
 ---
 talk-title: "Introduction to Panel Data in Epidemiology"
 talk-short-title: "Understanding Data"
-talk-subtitle: "InsightNet Forecasting Workshop 2024"
-talk-date: "11 December -- Morning"
+talk-subtitle: "CANSSI Prairies &mdash; Epi Forecasting Workshop 2025"
+talk-date: "Lecture 1"
 format: revealjs
 ---
 
@@ -21,7 +21,7 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 ## Outline
 
-1. The Delphi Research Group
+1. About Me
 
 1. Workshop Overview and System Setup
 
@@ -31,14 +31,16 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 1. Epidata Repository and API
 
-1. Find Data Sources and Signals
-
-1. `{epidatr}`
+1. `{epidatr}` and Other Data
 
 1. Versioning in `{epidatr}`
 
 
-# The Delphi Research Group
+# About me
+
+## Daniel J. McDonald
+
+
 
 ## About Delphi
 
@@ -102,12 +104,13 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 ## A disclaimer
 
-- Our backgrounds are primarily in statistics and computer science
-- This obviously influences our way of thinking and our approach to 
+- My background is primarily in statistics and computer science
+- This obviously influences my way of thinking and my approach to 
   nowcasting and forecasting
-- We don't have nearly as much experience with traditional epi models
-  but we do have opinions about the pros/cons. Ask us at any point if
-  you have a question about why we're doing things a certain way
+- I don't have nearly as much experience with traditional epi models,
+  but I do have opinions about the pros/cons. 
+- Ask me at any point if
+  you have a question about why I'm doing things a certain way
   
 ## One last slide
 
@@ -220,15 +223,18 @@ verify_setup()
 
 ## Panel data
 
-* [**Panel data**](https://en.wikipedia.org/wiki/Panel_data) or longitudinal data, contain cross-sectional measurements of subjects over time.
+* [**Panel data**](https://en.wikipedia.org/wiki/Panel_data) or longitudinal data, 
+contain cross-sectional measurements of subjects over time.
 
-* Since we're working with aggregated data, the subjects are geographic units (e.g. counties, states). 
+* Since we're working with aggregated data, the subjects are geographic units 
+(e.g. provinces, states). 
 
-<!-- and not individuals.--> 
 
 * In table form, panel data is a time index + one or more locations/keys.
 
-* **Ex**: The % of outpatient doctor visits that are COVID-related in CA from June 2020 to Dec. 2021 ([docs](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html)):
+* The % of outpatient doctor visits that are COVID-related in CA from June 2020 
+to Dec. 2021 ([docs](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html)):
+
 ```{r panel-ca-ex}
 dv_versioned_panel_final |> filter(geo_value == "ca") |> select(-version)
 ```
@@ -840,92 +846,11 @@ The [main endpoint](https://cmu-delphi.github.io/delphi-epidata/api/covidcast.ht
 A [variety of other endpoints](https://cmu-delphi.github.io/delphi-epidata/api/README.html) international historical data for COVID-19, influenza, dengue, norovirus
 
 
-## Some of our data sources
-
-
-### Ongoing Sources:
-
-Insurance claims
-: %Covid `{inpatient, outpatient}`, by `county x day`
-
-Google Symptom searches
-: 7 symptoms groups, by `county x day`
-
-Quidel/Ortho antigen tests
-: %Covid by `age group x county x day`
-
-NCHS Deaths
-: all-cause, pneumonia, flu, Covid, by `state x week`
-
-NSSP ED visits
-: %Covid, %flu, %RSV, by `county x week`  (new!)
-
-NWSS Covid
-: wastewater by `sampling-site x day`  (in progress)
-
-## Some of our data sources
-### Active during pandemic, could be restarted for the next PHE:
-
-HHS Hosp/ICU beds
-: Covid, flu, by `{age-group x {state x day, facility x week}}`
-
-CTIS ("Delphi Facebook Survey")
-: many dozens of questions, by `county x day`
-
-STLT-reported
-: `{cases, deaths}` via `{JHU, USAFacts}`, by `country x day`
-
-Safegraph mobility
-: misc measures by `{county x day, county x week}`
-
 
 
 ## Severity pyramid
 
 ![](gfx/severity-pyramid.svg){fig-align=center}
-
-
-
-# Find Data Sources & Signals
-
-## Finding data sources and signals of interest
-
-Diverse Data Streams
-
-* [**Variety of Data**]{.primary}: medical claims data, cases and deaths, mobility data
-* [**Geographic Coverage**]{.primary}: includes multiple regions, making it comprehensive yet complex
-* [**Challenge**]{.primary}: difficulty in pinpointing the specific data stream of interest
-
-Using the Documentation
-
-* [**Comprehensive Listings**]{.primary}: details on data sources and signals for [various endpoints](https://cmu-delphi.github.io/delphi-epidata/api/covidcast_signals.html)
-
-Docs are great for a deep dive into the data, while the apps & tools are useful to see what's available...
-
-
-
-
-## Some tools to explore more easily
-
-
-[Signal discovery app](https://delphi.cmu.edu/signals/), find available epi-signals in Delphi Epidata and elsewhere in the community
-
-<br>
-
-[Signal visualization tool](https://delphi.cmu.edu/epivis/)
-
-<br>
-[Signal dashboard](https://delphi.cmu.edu/covidcast/)  
-
-<br>
-"classic" [map-based version](https://delphi.cmu.edu/covidcast/classic/) visualize a core set of COVID-19 and flu indicators
-
-<br>
-[Covidcast signal export app](https://delphi.cmu.edu/covidcast/export/)
- 
-<br>
-[Dashboard builder](https://delphi.cmu.edu/covidcast/dashboard/)
-
 
 
 

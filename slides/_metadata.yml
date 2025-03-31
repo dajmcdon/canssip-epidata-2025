@@ -1,12 +1,11 @@
-author: "Alice Cima, Rachel Lobay, Daniel McDonald, Ryan Tibshirani"
-repo-address: "[cmu-delphi/insightnet-workshop-2024](https://github.com/cmu-delphi/insightnet-workshop-2024)"
+author: "Daniel J. McDonald"
+repo-address: "[dajmcdon/epidata-workshop-2025](https://github.com/dajmcdon/epidata-workshop-2025)"
 
 
 format:
   revealjs:
     theme: [default, themer.scss]
     css: tachyons-minimal.css
-    logo: "gfx/delphi.jpg"
     chalkboard: true
     width: 1600
     height: 900

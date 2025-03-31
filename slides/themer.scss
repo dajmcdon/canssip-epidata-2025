@@ -1,48 +1,157 @@
 /*-- scss:defaults --*/
 
 // import google fonts
+@import url('https://fonts.googleapis.com/css2?family=Gilda+Display&family=Red+Hat+Display:ital,wght@0,300..900;1,300..900&display=swap');
 
+$light-colors: (
+  "ubclblue": #6495ed,
+  "orange": #FFa319,
+  "yellow": #f9c80e,
+  "brown": #a15e49,
+  "teal": lighten(#17bebb, 20%),
+  "green": #177245,
+  "lavender": #A393BF,
+  "grey": #6c7888,
+  "white": #fbfcff, // full blue, bit less green and red to match the primary colour
+);
 
-// @import url("https://fonts.googleapis.com/css2?family=EB+Garamond");
-// @import url("https://fonts.googleapis.com/css2?family=Commissioner");
+$dark-colors: (
+  "black": #00162e, // darker version of primary
+  "ubcblue": #002145,
+  "claret": #a41623
+);
 
-$primary: #002676;
-$secondary: #941120;
-$tertiary: #f9c80e;
-$fourth-colour: #45ba6c;
+$colors: map-merge($light-colors, $dark-colors);
 
-// $font-family-sans-serif:  "Commissioner", "Source Sans Pro", Helvetica, sans-serif, !default;
-// $presentation-font-size-root: 40px;
-$body-bg: #fefefe;
-$presentation-heading-color: $primary;
+@function theme-color($color) {
+  @return map-get($colors, $color);
+}
+
+$primary: theme-color("ubcblue");
+$secondary: theme-color("claret");
+$tertiary: theme-color("yellow");
+$fourth-colour: theme-color("green");
+$fifth-colour: theme-color("lavender");
+
+$font-family-sans-serif: 'Red Hat Display', sans-serif;
+$presentation-heading-font: 'Gilda Display', serif;
+
+$body-bg: theme-color("white");
+$body-color: theme-color("black"); // darker version of primary
+$presentation-heading-color: lighten($primary, 10%);
 $presentation-font-size-root: 36px;
 
 $link-color: $secondary;
+$text-muted: $secondary;
 $callout-color-note: $primary;
 $callout-color-tip: $fourth-colour;
 $callout-color-important: $secondary;
 $callout-color-caution: $tertiary;
 
+// darken($body-bg, 2%);
+$code-block-border-color: darken($body-bg, 10%);
+$code-block-bg: #ffffff;
 $code-block-font-size: .65em;
 
 /*-- scss:rules --*/
 
-.primary {color: $secondary;}
-.secondary {color: $tertiary;}
-.tertiary {color: $primary;}
+.monotype {
+  font-family: $font-family-monospace;
+}
+
+@each $name, $color in $colors {
+  .reveal .slides section .fragment.hl-#{$name} {
+    opacity: unset;
+    visibility: unset;
+
+    &.visible {
+      background-color: lighten($color, 10%);
+    }
+
+    &.current-fragment {
+      background-color: $color;
+    }
+  }
+  .#{$name} {
+    color: $color;
+  }
+}
+
+.reveal .slide figure>figcaption {
+  color: theme-color("grey");
+}
+
+@each $name, $color in $dark-colors {
+  .reveal .slides section .fragment.hl-#{$name} {
+    &.visible { color: $body-bg; }
+    &.current-fragment { color: $body-bg; }
+  }
+}
+
+
+.primary {color: $primary;}
+.secondary {color: $secondary;}
+.tertiary {color: $tertiary;}
+.grey {color: theme-color("grey");}
 .fourth-colour {color: $fourth-colour;}
-.fstyle {
-  color: "#bcbcbc";
-  font-size: 0.75em;
-}
-.small {
-  font-size: 0.75em;
-}
+.small {font-size: 0.75em;}
+.smallest {font-size: 0.5em;}
 
 
 .reveal .slides section div.callout {
   font-size: 1em;
 }
+
+.inverse {
+  color: $body-bg;
+  .slide-background-content {
+    background-color: $primary;
+  }
+  h1, h2, h3 {
+    color: $body-bg;
+  }
+
+  a {
+    color: $body-bg;
+  }
+}
+
+.box-text {
+  color: theme-color("black");
+  font-size: 1.2em;
+  background-color: $body-bg;
+  border: 5px;
+  border-style: solid;
+  border-color: theme-color("claret");
+  padding: 3em;
+}
+
+.cover-box-black {
+  color: theme-color("black");
+  background-color: $body-bg;
+  padding: 1em;
+}
+
+.cover-box-secondary {
+  color: $secondary;
+  background-color: $body-bg;
+  padding: 0 10em 0 0;
+}
+
+.cover-box-tertiary {
+  color: $tertiary;
+  background-color: $body-bg;
+  padding: 1em;
+}
+
+
+
+ul {list-style: none;}
+ol li::marker {color: lighten($primary, 10%);}
+ul li::marker {color: lighten($primary, 10%);}
+dt {color: lighten($primary, 10%);}
+
+
 
 //.reveal .callout.callout-style-simple .callout-body,
 //.reveal .callout.callout-style-default .callout-body,
@@ -51,6 +160,10 @@ $code-block-font-size: .65em;
 //  font-size: 1.2em;
 //}
 
+
+.reveal div.callout.callout-style-default div.callout-content {
+  background-color: #ffffff;
+}
 .reveal .callout.callout-style-default .callout-icon::before,
 .reveal .callout.callout-style-simple .callout-icon::before {
   height: 2.5rem;
@@ -63,46 +176,21 @@ $code-block-font-size: .65em;
 }
 
 .reveal div.sourceCode {
+  border: none;
   margin-bottom: 10px !important;
 }
 
 
-// .reveal pre code {
-//  border-style: solid;
-//  border-color: $code-block-border-color;
-//  border-width: 1px;
-//  border-radius: .5;
-//}
-
-
-ol {
-  padding-left: 0.5em;
-}
-
-
-ul {
- 	list-style: none; /* Remove default bullets */
-}
-
-
-ul li::marker {
-	color: $primary;
-}
-
-dt {
-  color: $secondary;
-}
-
-dd {
-  padding-bottom: .5em;
-}
-
-
-
-
-
 .reveal code {
-  color: #1E90FF;
+  color: theme-color("ubclblue");
+}
+
+.reveal pre code {
+  padding-left: 10px;
+  border: 2px solid;
+  border-radius: 4px;
+  border-color: darken($body-bg, 10%);
+  background-color: #ffffff;
 }
 
 .scrollable-output {
