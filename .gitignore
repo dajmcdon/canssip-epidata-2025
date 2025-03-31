@@ -2,6 +2,7 @@
 _site
 
 # Ignore local changes for now
+_freeze/
 *_freeze/
 *_files/
 
