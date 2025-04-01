@@ -9,7 +9,6 @@ $light-colors: (
   "yellow": #f9c80e,
   "brown": #a15e49,
   "teal": lighten(#17bebb, 20%),
-  "green": #177245,
   "lavender": #A393BF,
   "grey": #6c7888,
   "white": #fbfcff, // full blue, bit less green and red to match the primary colour
@@ -18,7 +17,8 @@ $light-colors: (
 $dark-colors: (
   "black": #00162e, // darker version of primary
   "ubcblue": #002145,
-  "claret": #a41623
+  "claret": #a41623,
+  "green": #177245
 );
 
 $colors: map-merge($light-colors, $dark-colors);

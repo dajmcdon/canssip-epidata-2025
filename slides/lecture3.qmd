@@ -1,16 +1,16 @@
 ---
-talk-title: "Quick Tour of Time Series Forecasting"
-talk-short-title: "Time Series"
-talk-subtitle: "InsightNet Forecasting Workshop 2024"
-talk-date: "12 December -- Morning"
+title: "Quick Tour of Time Series Forecasting"
+short-title: "Time Series"
+org: "CANSSI Prairies &mdash; Epi Forecasting Workshop 2025"
+subtitle: "Lecture 3"
 format: revealjs
 ---
 
-{{< include _titleslide.qmd >}}
+\DeclareMathOperator{minimize}{minimize}
 
-```{r ggplot-theme}
+```{r setup}
 #| cache: false
-ggplot2::theme_set(ggplot2::theme_bw())
+source(here::here("slides", "_code", "setup.R"))
 ```
 
 

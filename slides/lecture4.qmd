@@ -1,18 +1,17 @@
 ---
-talk-title: "Forecasting With `{epipredict}` and Other Advanced Topics"
-talk-short-title: "Forecasting"
-talk-subtitle: "InsightNet Forecasting Workshop 2024"
-talk-date: "12 December -- Afternoon"
+title: "Forecasting With `{epipredict}` and Other Advanced Topics"
+short-title: "Forecasting"
+subtitle: "Lecture 4"
+org: "CANSSI Prairies &mdash; Epi Forecasting Workshop 2025"
 format: revealjs
 ---
 
 
-{{< include _titleslide.qmd >}}
+\DeclareMathOperator{minimize}{minimize}
 
-
-```{r ggplot-theme}
+```{r setup}
 #| cache: false
-ggplot2::theme_set(ggplot2::theme_bw())
+source(here::here("slides", "_code", "setup.R"))
 ```
 
 

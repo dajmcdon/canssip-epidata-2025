@@ -5,6 +5,10 @@ repo-address: "[dajmcdon/epidata-workshop-2025](https://github.com/dajmcdon/epid
 format:
   revealjs:
     theme: [default, themer.scss]
+    template-partials:
+      - title-slide.html
+    title-slide-attributes:
+      data-background-image: gfx/cover-art-1.svg
     css: tachyons-minimal.css
     chalkboard: true
     width: 1600
@@ -24,7 +28,7 @@ format:
     code-overflow: wrap
     code-block-height: 800px
     lang: en-CA
-    footer: "{{< meta talk-short-title >}} --- {{< meta repo-address >}}"
+    footer: "{{< meta short-title >}} --- {{< meta repo-address >}}"
 
 execute:
   echo: false

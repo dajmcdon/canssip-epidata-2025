@@ -1,20 +1,19 @@
 ---
-talk-title: "Data Cleaning, Versioning, Nowcasting With `{epiprocess}`"
-talk-short-title: "Nowcasting"
-talk-subtitle: "InsightNet Forecasting Workshop 2024"
-talk-date: "11 December -- Afternoon"
+org: "CANSSI Prairies &mdash; Epi Forecasting Workshop 2025"
+title: "Data Cleaning, Versioning, Nowcasting With `{epiprocess}`"
+subtitle: "Lecture 2"
+short-title: "Nowcasting"
 format: revealjs
 ---
-  
-{{< include _titleslide.qmd >}}
 
-```{r theme-load-pkg}
+\DeclareMathOperator{minimize}{minimize}
+
+```{r setup}
 #| cache: false
-library(tidyverse)
+source(here::here("slides", "_code", "setup.R"))
 library(epidatr)
 library(epipredict)
 library(epidatasets)
-theme_set(theme_bw())
 ```
 
 
