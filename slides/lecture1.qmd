@@ -21,8 +21,6 @@ load(here::here("_data", "day1m_queries.rda"))
 
 ## Outline
 
-\DeclareMathOperator*{\minimize}{minimize}
-
 1. About Me
 
 1. Workshop Overview and System Setup
@@ -122,104 +120,7 @@ load(here::here("_data", "day1m_queries.rda"))
   will be a resource for you beyond this workshop
   
 
-## System setup -- Passive viewing
-
-<br>
-
-### All of the slides are at 
-
-<br>
-
-[<https://cmu-delphi.github.io/insightnet-workshop-2024>]{style="text-align: center;"}
-
-<br>
-
-### The source code is in the Repo 
-
-<br>
-
-<https://github.com/cmu-delphi/insightnet-workshop-2024>
-
-<br>
-
-This is enough, but we hope you'll want to work through the code as we go along.
-
-<br>
-
-[Detailed versions of the next few slides are shown at the Repo Link above.]{.secondary}
-
-## System setup -- Required software 
-
-<br>
-
-### We assume you already have
-
-<br>
-
-1. `R`
-
-<br>
-
-2. An IDE. We'll use RStudio, but you can use VSCode or Emacs or Whatnot
-
-## System setup -- Downloading the materials
-
-### Easy way: 
-
-1. Click the [Big Green Button]{.fourth-colour} that says <kbd>< > Code ▾</kbd>
-2. Choose [Download Zip]{.primary}
-3. Open the Zip directory and then Open `insightnet-workshop-2024.Rproj`
-
-### More expert (local `git` user):
-
-1. Click the [Big Green Button]{.fourth-colour} that says <kbd>< > Code ▾</kbd>
-2. Copy the URL.
-3. Open RStudio, select File > New Project > Version Control. Paste there and proceed.
-
-### Even more expert (wants `github` remote):
-
-1. Click the Grey Button that says <kbd>⑂ Fork ▾</kbd>
-2. Proceed along the same lines as above.
-
-## System setup -- Installing required packages
-
-We will use a [lot]{.tertiary} of packages.
-
-### We've tried to make it so you can get them all at once (with the right versions)
-
-🤞 We hope this works... 🤞
-[Note that you can "Copy to Clipboard"]{.fourth-colour}
-
-<br>
-
-In RStudio:
-
-``` r
-install.packages("pak") # good for installing from non-CRAN sources
-pak::pkg_install("cmu-delphi/InsightNetFcast24", dependencies = TRUE)
-InsightNetFcast24::verify_setup()
-```
-
-<br>
-
-Hopefully, you see:
-```{r}
-#| message: true
-cli::cli_alert_success("You should be good to go!")
-```
-
-Ask for help if you see something like:
-```{r}
-#| error: true
-verify_setup <- function() {
-  cli::cli_abort(c(
-    "The following packages do not have the correct version:",
-    "i" = "Installed: {.pkg epipredict 0.2.0}.",
-    "i" = "Required: {.pkg epipredict == 0.1.5}."
-  ))
-}
-verify_setup()
-```
+## System setup
 
 # Panel Data {.inverse}
 
@@ -292,6 +193,20 @@ The $x$-axis is
 Not "date of event"
 
 :::
+
+## More disclaimers...
+
+* Most of this workshop will focus on panel data
+
+* Typical for the tasks my group has focused on
+
+* Typically analyze [aggregate signals]{.secondary}
+
+* [Simultaneously across geographies]{.secondary}
+
+* Contrasts with "single geo models"
+
+* Not working with "line list data"
 
 
 
@@ -534,7 +449,7 @@ Many data sources are subject to revisions:
 
 <br>
 
-[An accurate revision log is crucial for researchers building forecasts]{.secondary}
+[An accurate revision log is crucial for researchers building nowcasts and forecasts]{.secondary}
 
 <br>
 
@@ -590,7 +505,7 @@ p1 <- dv_311_as_of |>
   labs(title = "DV-CLI", x = "", y = "% doctor's visits due to CLI",
        color = "As of:") +
   theme_bw() + 
-  scale_color_viridis_d(end = .9, begin = .1)
+  scale_color_delphi()
 
 p2 <- cases_311_as_of |>
   mutate(as_of = fct_relabel(factor(as_of), function(x) strftime(x, "%b %d"))) |>
@@ -599,7 +514,7 @@ p2 <- cases_311_as_of |>
   labs(title = "Cases", x = "", y = "Cases per 100,000 people",
        color = "As of:") +
   theme_bw() + 
-  scale_color_viridis_d(end = .9, begin = .1)
+  scale_color_delphi()
 
 suppressWarnings(leg <- cowplot::get_legend(
   p1 + 
@@ -641,10 +556,11 @@ reinhart[-1] <- map(
 reinhart <- list_rbind(reinhart)
 
 g1 <- ggplot(reinhart |> filter(source == "jhu-csse"), aes(x = time_value, y = value)) +
-  geom_vline(xintercept = sa_anomaly_date, color = "gray", linetype = "dashed",
+  geom_vline(xintercept = sa_anomaly_date, 
+             color = fifth_colour,
              alpha = 0.75) +
   scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
-  geom_line() +
+  geom_line(color = ubclblue) +
   labs(x = "", y = "Cases", title = "Cases") +
   theme_bw()
 
@@ -659,7 +575,7 @@ labels <- c(
 g2 <- reinhart |>
   filter(source != "jhu-csse") |>
   ggplot(aes(x = time_value, y = value, color = source)) +
-  geom_vline(xintercept = sa_anomaly_date, color = "gray", linetype = "dashed",
+  geom_vline(xintercept = sa_anomaly_date, color = fifth_colour,
              alpha = 0.75) +
   scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
   geom_line() +
@@ -863,360 +779,152 @@ head(jhu_us_cases, n = 3) |>
 [There are some other columns in the usual output that I've hidden]{.small .grey}
 
 
+## Get everything for a `source + signal`
+
+```{r us-jhu-pub-covidcast-2}
+#| echo: true
+#| eval: false
+jhu_us_cases <- pub_covidcast(
+  source = "jhu-csse",                  # this endpoint contains many different sources
+  signals = "confirmed_incidence_num",  # raw cases during the entire pandemic reporting until ~ April 2024
+  geo_type = "county",                  # the geographic resolution (nation, state, hrr, msa, etc.)
+  time_type = "day",                    # lowest resolution
+  geo_values = "*",                     # (default) 
+  time_values = "*",                    # (default) 
+  ...                                   # additional arguments
+)
+```
+
+<br><br>
+
+* This query takes a few minutes to run, so I don't recommend it. 
+
+* But there is support for automatic caching,
+
+* and using `"*"` speeds things up relative to specifying many specific ranges.
+
+::: {.fragment .box-text .absolute top=30% left=10%}
+The result has about 3.75M rows and occupies 400Mb.
+:::
+
 
 # Versioning in [{epidatr}]{.monotype} {.inverse}
 
 ## Versioned data in `{epidatr}`
 
-Epidata API contains each signal's estimate, location, date, and update timeline
+<br>
 
-Requesting Specific Data Versions:
-
-* Use `as_of` or `issues` to specify data availability
-* `as_of` always fetches one version
-* `issues` can fetch multiple
-* Only one may be used at a time
-* Not all endpoints support both
-
-
-## Obtaining data "as of" a specific date
-
-[Doctor Visits](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html) (from the `covidcast` endpoint)
-
-* The percentage of outpatient visits w/ Covid-like illness
-* Pennsylvania on May 1, 2020:
-
-```{r pa-may-1st-as-of}
-#| echo: true
-#| eval: false
-dv_pa_as_of <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = "2020-05-01",
-  geo_type = "state",
-  geo_values = "pa",
-  as_of = "2020-05-07"
-)
-```
-
-```{r head-pa-may-1st-as-of}
-#| echo: false
-head(dv_pa_as_of) |> 
-  select(geo_value, signal, source, time_value, issue, lag, value)
-```
-
-* Initial estimate *issued* on May 7, 2020 
-* Due to delay from reporting and ingestion by the API
-
-## Obtaining data "as of" a specific date
-
-[Default behaviour:]{.primary} unspecified `as_of`, get the most recent data
-
-```{r pa-may-1st-most-recent}
-#| echo: true
-#| eval: false
-dv_pa_final <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = "2020-05-01",
-  geo_type = "state",
-  geo_values = "pa"
-)
-```
-
-```{r head-pa-may-1st-most-recent}
-#| echo: false
-head(dv_pa_final) |> 
-  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
-```
-
-[**Estimate changed substantially**]{.primary}:
-
-* Increased to ~6% from <3%
-    
-## Versioning is important for forecasting
+Two important, mutually exclusive parameters
 
 <br>
 
-* Backtesting requires using data that would have been available at the time
-
-<br>
-
-* Not later updates
-
-<br>
-
-* Overly optimistic
+### `issues = c(mdy1, mdy2, ..., )` 
+* fetches the data that the source made available on the requested dates
+* Database stores only the diffs, so that's typically what you get
+* Even if the source republishes the entire history every time they make an update
 
 
-## Obtaining multiple specific issues for one state
-Request all issues in a certain time period
+### `as_of = mdy`
+* fetches the all available data as it would have looked on `mdy`
+* Think of it as [winding back the clock]{.secondary} to the date `mdy`
+* API only accepts a single date here
 
-```{r pa-multiple-issues}
+## Example `issues` query
+
+* I wanted to display a major reporting error. 
+
+```{r version-query-wrong}
 #| echo: true
-#| eval: false
-#| code-line-numbers: "1,8,9"
-dv_pa_issues <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
+versions <- as.Date(c("2021-02-15", "2021-02-20", "2021-02-25", "2021-03-01", "2023-01-01")) 
+pub_covidcast(
+  "jhu-csse", "deaths_7dav_incidence_num", 
+  geo_type = "state", 
+  geo_values = "oh",
   time_type = "day",
-  time_values = "2020-05-01",
-  geo_type = "state",
-  geo_values = "pa",
-  issues = epirange("2020-05-01", "2020-05-15")
-)
+  time_values = epirange(20210101,20210301),
+  issues = versions
+) |>
+  select(geo_value, time_value, version = issue, deaths = value)
 ```
 
-```{r head-pa-multiple-issues}
-#| echo: false 
-head(dv_pa_issues) |> 
-  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
-```
+::: {.fragment .box-text .absolute top=20% left=10%}
+* Not what I wanted.
 
-## Obtaining multiple issues for one state
+* Got only the diff on each issue.
 
-To get all issues up to a specific date, set an extreme lower bound
+* I wanted to view the whole history on each of those dates.
+:::
 
-```{r extreme-lb-multiple-issues}
+## Correct `as_of` query
+
+```{r version-query-asof}
 #| echo: true
-#| eval: false
-#| code-line-numbers: "1,8,9"
-dv_pa_issues_sub <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = "2020-05-01",
-  geo_type = "state",
-  geo_values = "pa",
-  issues = epirange("1900-01-01", "2020-05-15")
-)
+#| code-line-numbers: "|1,2,9"
+res <- map(versions, # same set as before
+           .f = \(v) { 
+             pub_covidcast(
+               "jhu-csse", "deaths_7dav_incidence_num", 
+               geo_type = "state", 
+               geo_values = "oh",
+               time_type = "day",
+               time_values = epirange(20210101,20210301),
+               as_of = v 
+             ) |>
+               select(geo_value, time_value, deaths = value) |>
+               mutate(version = v)
+           }) |>
+  list_rbind()
+res |> head(7)
 ```
 
-```{r head-extreme-lb-multiple-issues}
-#| echo: false
-head(dv_pa_issues_sub) |> 
-  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
-```
+::: {.fragment .box-text .absolute top=20% left=5%}
+* Got the data [as it would have appeared]{.tertiary} for each of the 4 dates.
+* But `as_of` can only accept a scalar, not vector of dates.
+* Had to "loop" over them.
+* We'll see a more efficient way to do this later this morning.
+:::
 
-No change here • Can matter if the latency or reporting lag is unknown
+## Now I can show you why I wanted that query
 
-[API docs](https://cmu-delphi.github.io/delphi-epidata/api/covidcast-signals/doctor-visits.html)
-show the earliest date available.
-
-## Obtaining multiple issues for one state
-
-At some point, nothing changes • It is [finalized]{.primary} • That will be the "last" issue
-
-```{r extreme-lb-ub-multiple-issues}
-#| echo: true
-#| eval: false
-#| code-line-numbers: "1,8,9"
-dv_pa_issues_all <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = "2020-05-01",
-  geo_type = "state",
-  geo_values = "pa",
-  issues = epirange("1900-01-01", "2024-12-11") # From the 1900s to today
-)
-```
-
-```{r head-extreme-lb-ub-multiple-issues}
-#| echo: false
-tail(dv_pa_issues_all) |> 
-  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
-```
-
-* Avoid queries with too-late minimum too-early maximum issue
-* Could be misleading results
-
-<!-- * We caution against starting queries with too late a minimum issue or too early maximum issue, as it could lead to incorrect or misleading results. You're safest bet to capture all issues is on the next slide... -->
-
-## Obtaining all issues for one state
-
-
-```{r pa-all-issues}
-#| echo: true
-#| eval: false
-#| code-line-numbers: "1,5,8,9"
-dv_pa_issues_star <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = epirange("2020-05-01", "2020-05-07"),
-  geo_type = "state",
-  geo_values = "pa",
-  issues = "*"
-)
-```
-
-```{r head-pa-all-issues}
-#| echo: false
-head(dv_pa_issues_star, n = 8) |> 
-  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
-```
-
-## Obtaining all issues for all states
-
-Using `*` gives all available
-
-```{r all-the-states-and-issues}
-#| echo: true
-#| eval: false
-#| code-line-numbers: "1,7-9"
-dv_state_issues_star <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = epirange("2020-05-01", "2020-05-07"),
-  geo_type = "state",
-  geo_values = "*",
-  issues = "*"
-)
-```
-
-```{r head-all-the-states-and-issues}
-#| echo: false
-head(dv_state_issues_star) |> 
-  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
+```{r oh-death-spike}
+res |>
+  ggplot(aes(time_value, deaths, color = factor(version))) +
+  geom_vline(
+    aes(xintercept = version, color = factor(version)), 
+    show.legend = FALSE, alpha = .3) +
+  geom_line() +
+  scale_color_delphi() +
+  xlab("Date") + ylab("Reported COVID-19 deaths in\nOhio 2021") +
+  theme(legend.position = "right")
 ```
 
 
-<!--
 
-## Last but not least... The do nothing approach 
+## Versioning in nowcasting and forecasting
 
-![](gfx/do-nothing.jpg){height="550px"}
+* Revision patterns can be used to inform understanding of current situation
 
+* Often, predicting "today" is more about predicting the revisions than the process
 
+* Forecasting often requires adjustments for revision/reporting patterns
 
-## The do nothing approach 
+* Backtesting requires using data that would have been available at the time, not current data
 
-* `geo_values = *` is the default
-* `issues` defaults to "most recent"
-
-
-```{r do-nothing}
-#| echo: true
-#| eval: false
-dv_state_default <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = epirange("2020-05-01", "2020-05-07"),
-  geo_type = "state"
-)
-```
-
--->
-
-## Obtaining one issue for all states
-
-<!--
-[**Final question:**]{.primary}  What do you think happens when we adopt a "do nothing" approach to `geo_values` and `issues` (take both of them out)?
-
-<small> [**Hint**]{.primary}: remember a couple slides ago, when we removed `as_of`, we got the most recent estimate for PA. </small>
--->
-
-Defaults are intended to be "what you would expect"
-
-```{r one-issue-all-states}
-#| echo: true
-#| eval: false
-dv_state_default <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = epirange("2020-05-01", "2020-05-07"),
-  geo_type = "state"
-)
-```
-
-```{r head-one-issue-all-states}
-#| echo: false
-head(dv_state_default) |> 
-  select(geo_value, signal, source, time_value, issue, lag, value, stderr)
-```
-
-<hr>
-
-* most recent issue
-* all states
+* Only looking at the most recent data is a huge blunder
 
 
-<!-- ## Observations issued with a specific lag
-<div style="font-size: 0.8em;">
-* We can use the `lag` argument to request only data reported with a certain lag. 
-
-* **Example**: Request  a lag of 7 days fetches only data issued exactly 7 days after the corresponding `time_value`:
-
-```{r specific lag}
-#| echo: false
-#| eval: false
-epidata <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = epirange("2020-05-01", "2020-05-07"),
-  geo_type = "state",
-  geo_values = "pa",
-  lag = 7
-)
-```
-
-```{r}
-#| echo: false
-#| eval: false
-head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
-```
-</div>
-
-## Query results exclusion
-<div style="font-size: 0.8em;">
-* Although the query we ran on the previous slide requested values from May 1 to May 7, May 3 and May 4 were not included due to a 7-day lag.
-
-* Results for those dates appear only if updates are issued on the corresponding lag day (e.g., May 10).
-
-```{r query results exclusion}
-#| echo: false
-#| eval: false
-epidata <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  time_values = epirange("2020-05-03", "2020-05-03"),
-  geo_type = "state",
-  geo_values = "pa",
-  issues = epirange("2020-05-09", "2020-05-15")
-)
-```
-
-```{r}
-#| echo: false
-#| eval: false
-head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value, stderr)
-```
-</div>
--->
-
-## Main takeaways
+## Wrapup and worksheet discussion
 
 * [**Delphi Epidata:**]{.primary} platform for real-time epidemic data
     * provides (aggregated) signals for tracking and forecasting
     * sources like [**health records**]{.secondary}, [**mobility patterns**]{.tertiary}, and [**more**]{.fourth-colour}.
 
-<!-- * [**Delphi Epidata:**]{.primary} A one-stop platform for real-time epidemic data, providing aggregated signals for disease tracking and forecasting from diverse sources like health records, mobility patterns, and more. -->
 
 * [**Epidata API:**]{.primary} delivers up-to-date, granular epidemiological data + historical versions.
 
-<!-- Open-access API delivering up-to-date, granular epidemiological data + makes all historical versions available. -->
 
 * `{epidatr}`: Client package for R
 
-<!-- and interactive tools for discovering and analyzing health signals. -->
 
 * [**Versioned Data and Latency:**]{.primary}
     1. `as_of`:  One version; the specific date when the data was last updated 
@@ -1224,8 +932,3 @@ head(epidata) |> select(geo_value, signal, source, time_value, issue, lag, value
     
 Manages the record of revisions for transparency and accuracy in data analysis.
 
-<!-- Panel data captures time-series trends, which are often subject to revision.  A standout feature of this API is its inclusion of two critical fields... -->
-
-<!-- 1. as_of:  One version of the data, and referring to the specific date when the data was last updated (i.e. the data was updated `as_of` this date) -->
-
-<!-- 2. `issues`: Multiple versions of the data, each corresponding to different `as_of` dates, capturing revisions over time. --> 

@@ -79,6 +79,7 @@ $code-block-font-size: .65em;
 
 .reveal .slide figure>figcaption {
   color: theme-color("grey");
+  text-align: "center";
 }
 
 @each $name, $color in $dark-colors {
@@ -89,7 +90,7 @@ $code-block-font-size: .65em;
 }
 
 
-.primary {color: $primary;}
+.primary {color: theme-color("ubclblue");}
 .secondary {color: $secondary;}
 .tertiary {color: $tertiary;}
 .grey {color: theme-color("grey");}
@@ -178,6 +179,7 @@ dt {color: lighten($primary, 10%);}
 .reveal div.sourceCode {
   border: none;
   margin-bottom: 10px !important;
+  margin-top: 10px !important;
 }
 
 

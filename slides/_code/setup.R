@@ -1,5 +1,6 @@
 options(htmltools.dir.version = FALSE)
-primary <- "#002145"
+primary_orig <- "#002145"
+primary <- "#003671" # 10% lighter
 secondary <- "#a41623"
 tertiary <- "#f9c80e"
 fourth_colour <- "#177245"
@@ -7,9 +8,11 @@ fifth_colour <- "#A393BF"
 ubclblue <- "#6495ed"
 theme_white <- "#fbfcff"
 theme_black <- "#00162e"
-colvec <- c(primary = primary, secondary = secondary,
-            tertiary = tertiary, fourth_colour = fourth_colour,
-            fifth_colour = fifth_colour, ubclblue = ubclblue)
+colvec <- c(
+  primary = primary, secondary = secondary,
+  tertiary = tertiary, fourth_colour = fourth_colour,
+  fifth_colour = fifth_colour, ubclblue = ubclblue
+)
 library(epiprocess)
 suppressMessages(library(tidyverse))
 ggplot2::theme_set(ggplot2::theme_bw())
