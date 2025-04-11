@@ -12,6 +12,13 @@ source(here::here("slides", "_code", "setup.R"))
 library(epidatr)
 library(epipredict)
 library(epidatasets)
+asciicast::init_knitr_engine(
+  startup = quote({
+    suppressPackageStartupMessages(library(epiprocess))
+  }),
+  echo = TRUE,
+  echo_input = FALSE
+)
 ```
 
 
@@ -88,7 +95,7 @@ write_rds(hr_crosswalk, here::here("_data", "can_hr_crosswalk.rds"))
 
 ```{r load-data}
 #| echo: false
-bc_linelist <- read_rds(here::here("_data", "bc_linelist.rds"))
+# bc_linelist <- read_rds(here::here("_data", "bc_linelist.rds"))
 cases_df_api <- read_rds(here::here("_data", "cases_df_api.rds"))
 can_cases_deaths <- read_rds(here::here("_data", "can_cases_deaths.rds"))
 hr_crosswalk <- read_rds(here::here("_data", "can_hr_crosswalk.rds"))
@@ -129,11 +136,13 @@ contains the most [up-to-date values]{.secondary} of the signal variables,
 ## Example, linelist to `epi_df`
 
 ```{r bc-linelist}
+#| eval: false
 bc_linelist |> head(3)
 ```
 
 ```{r bc-linelist-edf}
 #| echo: true
+#| eval: false
 bc_linelist |>
   rename(time_value = `Reported Date`, geo_value = `Health Authority`) |>
   count(time_value, geo_value, name = "cases") |>
@@ -643,18 +652,12 @@ This functionality is very helpful in version aware forecasting. We will return 
 
 ```{r epiprocess-revision-summary-demo}
 #| echo: true
-#| eval: true
-
 revision_data <- revision_summary(
   archive_cases_dv_subset,
   case_rate_7d_av,
   drop_nas = TRUE,
   min_waiting_period = as.difftime(60, units = "days"),
   within_latest = 0.2,
-  quick_revision = as.difftime(3, units = "days"),
-  few_revisions = 3,
-  abs_spread_threshold = NULL,
-  rel_spread_threshold = 0.1,
   compactify = TRUE,
   compactify_abs_tol = sqrt(.Machine$double.eps)
 )
@@ -662,10 +665,10 @@ revision_data <- revision_summary(
 
 ## Features -- summarize revision behavior
 
-```{r epiprocess-revision-summary-results}
-#| echo: true
 
-head(revision_data)
+```{asciicast epiprocess-revision-summary-results}
+revision_summary(archive_cases_dv_subset, case_rate_7d_av)
+
 ```
 
 
@@ -813,7 +816,7 @@ Recall, we need to watch out for:
 
 ```{r inspect-revision_summary}
 #| echo: true
-revision_data = revision_summary(nchs_archive, mortality, print_inform = FALSE)
+revision_data <- revision_summary(nchs_archive, mortality)
 ```
 
 
@@ -823,8 +826,7 @@ revision_data = revision_summary(nchs_archive, mortality, print_inform = FALSE)
 
 ```{r nchs-latency-via-revision-summary}
 #| echo: true
-
-revision_data |> select(geo_value, time_value, min_lag) |> slice_sample(n = 10)
+revision_data |> pluck("revision_behavior") |> select(geo_value, time_value, min_lag) |> slice_sample(n = 10)
 ```
 
 * We randomly sampled some dates to check if there is a consistent latency pattern. 
@@ -836,7 +838,7 @@ revision_data |> select(geo_value, time_value, min_lag) |> slice_sample(n = 10)
 
 ```{r revision-summary-time-near-latest-demo}
 #| echo: true
-revision_data |> select(geo_value, time_value, lag_near_latest) |> slice_sample(n = 10)
+revision_data |> pluck("revision_behavior") |> select(geo_value, time_value, lag_near_latest) |> slice_sample(n = 10)
 ```
 * It generally takes at least 4 weeks for reported value to be within 20\% (default in `revision_summary()`) of the finalized value. 
 * We can change the threshold of percentage difference by specifying the `within_latest` argument of `revision_summary()`. 
@@ -945,8 +947,8 @@ ggplot(value_at_lags, aes(x = time_value, y = mortality)) +
 #| echo: false
 #| eval: true
   
-versions = seq.Date(as.Date("2021-01-01"), nchs_archive$versions_end, by = "1 month")
-nchs_snapshots = map(versions, function(v) {
+versions <- seq.Date(as.Date("2021-01-01"), nchs_archive$versions_end, by = "1 month")
+nchs_snapshots <- map(versions, function(v) {
   epix_as_of(nchs_archive, v) |>
     mutate(version = v)}) |>
   bind_rows() |>
@@ -1034,9 +1036,7 @@ Recall, `revision_summary()` reports the number of days to be within 20\% (defau
 
 ```{r revision-summary-time-near-latest-show-again}
 #| echo: false
-#| eval: true
-
-revision_data |> select(geo_value, time_value, lag_near_latest) |> slice_sample(n = 5)
+revision_data |> pluck("revision_behavior") |> select(geo_value, time_value, lag_near_latest) |> slice_sample(n = 5)
 (lag_quantiles = quantile(revision_data$lag_near_latest))
 approx_final_lag = lag_quantiles["75%"]
 ```
@@ -1309,7 +1309,7 @@ epix_slide(
 
 ## Details of `epix_slide()`
 
-```{r nowcasts-slide-demo-only, eval=FALSE}
+```{r nowcasts-slide-demo-only}
 #| echo: true
 #| eval: false
 #| code-line-numbers: "|7"
@@ -2018,7 +2018,6 @@ carefully tomorrow.
 #| fig-width: 9
 #| fig-height: 3
 #| out-height: "400px"
-#| label: nowcasting
 library(rtestim)
 source(here::here("_code/bccovid.R"))
 
