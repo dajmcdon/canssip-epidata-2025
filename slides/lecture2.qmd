@@ -612,7 +612,8 @@ Subset of daily COVID-19 doctor visits (Optum) and cases (JHU CSSE) from all U.S
 
 ```{r archive-ex}
 #| echo: true
-archive_cases_dv_subset_all_states |> head()
+#| message: true
+archive_cases_dv_subset_all_states
 ```
 
 ## Features -- sliding computation over `epi_df`s
@@ -638,7 +639,7 @@ epix_slide(
 This functionality is very helpful in version aware forecasting. We will return with a concrete example. 
   
 
-## Features -- summarize revision behaviour
+## Summarize revision behaviour
 
 
 ```{r epiprocess-revision-summary-demo}
@@ -672,39 +673,17 @@ head(revision_data)
 
 ## Visualize revision patterns
 
-```{r create-snapshots-of-data}
-#| echo: false
-#| eval: true
-
-versions <- seq(as.Date("2020-07-01"), as.Date("2021-11-30"), by = "1 month")
-max_version <- max(versions)
-
-snapshots <- map(versions, \(v) {
-  epix_as_of(archive_cases_dv_subset_all_states, v) |>
-    mutate(version = v) |>
-    filter(geo_value %in% c("ca", "ut"))
-  }) |>
-  bind_rows() |>
-  mutate(latest = version == max_version) 
-
-```
-
-
-
 ```{r plot-revision-patterns}
 #| fig-width: 7
- ggplot(snapshots |> filter(!latest),
-        aes(x = time_value, y = percent_cli)) +  
-   geom_line(aes(color = factor(version))) + 
-   geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
-   facet_wrap(~ geo_value, scales = "free_y", nrow = 1) +
-   scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
-   labs(x = "", y = "% of doctor's visits with\n Covid-like illness") + 
-   scale_color_viridis_d(option = "B", end = .8) +
-   theme(legend.position = "none") +
-   geom_line(data = snapshots |> filter(latest),
-             aes(x = time_value, y = percent_cli), 
-             inherit.aes = FALSE, color = "black")
+autoplot(
+  archive_cases_dv_subset, percent_cli, 
+  .versions = seq(ymd("2020-07-01"), ymd("2021-11-30"), by = "1 month"), 
+  .mark_versions = TRUE
+) +
+  scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
+  labs(x = "", y = "% of doctor's visits with\n Covid-like illness") + 
+  scale_color_viridis_c(option = "B", end = .8) +
+  theme(legend.position = "none")
 ```
 
 ## Finalized data
@@ -728,19 +707,20 @@ snapshots <- map(versions, \(v) {
 
 
 
-# Basic Nowcasting in the Epiverse
+# Basic Nowcasting using [{epiprocess}]{.monotype} {.inverse}
 
 <!-- predicting a finalized value from a provisional value and making predictions. -->
 ## Backfill Canadian edition
   
-* Every week the [BC CDC releases COVID-19 hospitalization data](http://www.bccdc.ca/health-info/diseases-conditions/covid-19/archived-b-c-covid-19-data).
+* Every week [BC CDC released COVID-19 hospitalization data](http://www.bccdc.ca/health-info/diseases-conditions/covid-19/archived-b-c-covid-19-data).
 
-* Following week they revise the number upward (by ~25%) due to lagged reports.
+* The following week, they revised the number upward (by ~25%) due to lagged reports.
 
-![](gfx/bc_hosp_admissions_ex.jpg){style="width: 45%; display: block; margin-left: auto; margin-right: auto;"}
-<!-- Newest iteration of "backfill”, Canada edition. Every week the BC CDC releases hospitalization data. The following week they revise the number upward (by about 25%) due to lagging reports. Every single week, the newspaper says “hospitalizations have declined”. This week the BC CDC’s own report said “hospitalizations have declined”. The takeaway in the news is that hospitalizations ALWAYS fall from the previous week, but once backfilled, they’re rarely down -->
+![](gfx/bc_hosp_admissions_ex.jpg){fig-align="center"}
 
-* [**Takeaway**]{.primary}: Once the data is backfilled, hospitalizations rarely show a decline, challenging the common media narrative.
+::: {.fragment .box-text .absolute top=30% left=10%}
+Comparing preliminary to revised data [always]{.secondary} shows a decline.
+:::
 
 ## Backfill American edition
 

@@ -189,7 +189,7 @@ k <- 28 # selected lag
 
 cor_deaths_cases |>
   ggplot(aes(Lag, cor)) +
-  geom_vline(xintercept = k, color = base) +
+  geom_vline(xintercept = k, color = primary) +
   geom_point(color = primary) +
   geom_line(color = primary) +
   labs(x = "Lag", y = "Correlation") +
@@ -232,7 +232,7 @@ coef(reg_lagged)
 ```{r plot-linear-fit}
 ggplot(train, aes(lagged_cases, deaths)) + 
   geom_point(alpha = .5, color = primary, shape = 16) +
-  geom_smooth(method = "lm", se = FALSE, color = base) +
+  geom_smooth(method = "lm", se = FALSE, color = primary) +
   labs(x = "Cases", y = "Deaths 28 days later")
 ```
 
@@ -992,7 +992,7 @@ for (t in forecast_time) {
 pred_m1 |>
   ggplot(aes(target_date, prediction, group = forecast_date)) +
   geom_line(data = ca_lags, aes(x = time_value, y = deaths), 
-            inherit.aes = FALSE, col = base) + 
+            inherit.aes = FALSE, col = primary) + 
   geom_line(col = primary) +
   geom_point(col = primary) +
   geom_vline(xintercept = ca_lags$time_value[forecast_time], 
@@ -1015,7 +1015,7 @@ getErrors((ca |> filter(time_value %in% pred_m1$target_date))$deaths,
 pred_m2 |>
   ggplot(aes(target_date, prediction, group = forecast_date)) +
   geom_line(data = ca_lags, aes(x = time_value, y = deaths), 
-            inherit.aes = FALSE, col = base) + 
+            inherit.aes = FALSE, col = primary) + 
   geom_line(col = secondary) +
   geom_point(col = secondary) +
   geom_vline(xintercept = ca_lags$time_value[forecast_time], 
@@ -1869,7 +1869,7 @@ pred_aware <- pred_aware |>
 pred_aware |>
   drop_na(median) |>
   ggplot(aes(x = target_date, median)) +
-  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .3, fill = primary) +
   geom_line(col = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -1907,7 +1907,7 @@ for (fc_date in fc_time_values) {
 pred_unaware |>
   drop_na(X1) |>
   ggplot(aes(x = target_date, X1)) +
-  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
   geom_ribbon(aes(ymin = X2, ymax = X3), alpha = .3, fill = primary) +
   geom_line(col = primary) +
   geom_vline(xintercept = t0_date) +    

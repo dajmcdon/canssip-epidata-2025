@@ -1,5 +1,5 @@
 ---
-title: "Forecasting With `{epipredict}` and Other Advanced Topics"
+title: "Forecasting With [{epipredict}]{.monotype} and Other Advanced Topics"
 short-title: "Forecasting"
 subtitle: "Lecture 4"
 org: "CANSSI Prairies &mdash; Epi Forecasting Workshop 2025"
@@ -153,7 +153,7 @@ Handle lots of cases we've already seen
 
 <br>
 
-[We'll start here]{.base}
+[We'll start here]{.secondary}
 
 
 
@@ -392,8 +392,11 @@ for 28 days after the last available time value in the data (`$predictions`).
 
 ## `arx_forecaster` output
 
-```{r output-arx, message=TRUE}
+```{r output-arx}
 #| echo: true
+#| message: true
+#| code-line-numbers: false
+#| collapse: true
 epi_arx 
 ```
 
@@ -402,8 +405,10 @@ epi_arx
 
 <div class="scrollable-output">
 
-```{r epi-workflow-arx, message=TRUE}
-#| echo: true
+```{r epi-workflow-arx}
+#| message: true
+#| code-line-numbers: false
+#| collapse: true
 epi_arx$epi_workflow
 ```
 
@@ -566,7 +571,7 @@ pred_arx
 #| fig-align: left
 pred_arx |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -737,7 +742,7 @@ pred_arx_hosp <- ca_archive_dv |> epix_slide(
 #| fig-align: left
 pred_arx_hosp |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -781,7 +786,7 @@ pred_arx_more_lags <- ca_archive_dv |> epix_slide(
 #| fig-align: left
 pred_arx_more_lags |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -901,7 +906,7 @@ pred_arx_rf <- ca_archive_dv |>
 #| fig-align: left
 pred_arx_rf |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -946,7 +951,7 @@ pred_arx_grf <- ca_archive_dv |>
 )
 pred_arx_grf |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -1008,7 +1013,7 @@ pred_arx_geo_pool |>
   filter(geo_value == "ca") |>
   ggplot(aes(target_date, .pred)) +
   geom_line(data = ca,
-            aes(x = time_value, y = deaths), inherit.aes = FALSE, col = base) + 
+            aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
   geom_line(col = primary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
   geom_vline(xintercept = t0_date) +    
@@ -1547,47 +1552,19 @@ td <- climate_data |> filter(geo_value %in% geos, time_value >= ymd("2024-09-01"
 ggplot() +
   geom_ribbon(data = climate_preds, aes(x = target_end_date, ymin = `0.1`, ymax = `0.9`), fill = primary, alpha = 0.3) +
   geom_line(data = climate_preds, aes(x = target_end_date, y = `0.5`), color = primary) +
-  geom_line(data = td, aes(x = time_value, y = nhsn), color = base) +
+  geom_line(data = td, aes(x = time_value, y = nhsn), color = primary) +
   geom_vline(xintercept = ymd("2024-12-14")) +
   facet_wrap(~ geo_value, scales = "free_y") +
   scale_y_continuous(name = "Weekly incident flu hospitalizations", expand = expansion(c(0, .05))) +
   xlab("Reference date")
 ```
 
-## Almost our production forecaster (helper functions)
-
-```{r prod-funs}
-#| echo: true
-roll_modular_multivec <- function(col, index, window_size, modulus = 53) {
-  tib <- tibble(col = col, index = index) |>
-    arrange(index) |>
-    tidyr::nest(data = col, .by = index)
-  out <- double(nrow(tib))
-  for (iter in seq_along(out)) {
-    entries <- (iter - window_size):(iter + window_size) %% modulus
-    entries[entries == 0] <- modulus
-    out[iter] <- with(
-      purrr::list_rbind(tib$data[entries]),
-      median(col, na.rm = TRUE)
-    )
-  }
-  tibble(index = unique(tib$index), climate_pred = out)
-}
-
-climatological_feature <- function(epi_data, window_size = 3) {
-  epi_data |>
-    filter(season != "2020/21", season != "2021/22") |> # drop weird years)
-    select(nhsn, epiweek, geo_value) |>
-    reframe(roll_modular_multivec(nhsn, epiweek, window_size, 53), .by = geo_value) |>
-    mutate(climate_pred = pmax(0, climate_pred)) |>
-    rename(epiweek = index)
-}
-```
 
 ## Almost our production forecaster (data munging)
 
 ```{r prod-munging}
 #| echo: true
+#| eval: false
 climate <- climatological_feature(climate_data |> select(nhsn, epiweek, season, geo_value))
 nssp <- pub_covidcast( # time_value is first day of the epiweek
   source = "nssp",
@@ -1625,6 +1602,7 @@ flu_data <- flu_data |>
 
 ```{r prod-fcaster}
 #| echo: true
+#| eval: false
 r <- epi_recipe(flu_data) |>
   step_population_scaling(
     hhs, nssp,
@@ -1663,6 +1641,7 @@ preds <- forecast(trained_ewf) |>
 
 ```{r plot-prod}
 #| fig-width: 7
+#| eval: false
 preds_wide <- preds |> pivot_quantiles_wider(.pred) |>
   filter(geo_value %in% geos)
 ggplot() +
@@ -1672,7 +1651,7 @@ ggplot() +
                  color = primary, alpha = .4, linewidth = 2) +
   geom_line(data = flu_data |> filter(time_value > "2024-09-01", geo_value %in% geos),
             aes(time_value, hhs)) +
-  geom_point(data = preds_wide, aes(x = target_date, y = `0.5`), color = base) +
+  geom_point(data = preds_wide, aes(x = target_date, y = `0.5`), color = primary) +
   facet_wrap(~geo_value, scales = "free_y") +
   geom_vline(xintercept = max_time_value + days(7), color = "grey40") +
   scale_y_continuous(expand = expansion(c(0, .05)))
