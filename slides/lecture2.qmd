@@ -24,19 +24,11 @@ asciicast::init_knitr_engine(
 
 ## Outline
 
-
-1. Signal processing with `{epiprocess}`
-
-1. Exploring signals
-
-1. Basic Nowcasting using `{epiprocess}`
-
-1. Nowcasting with One Variable
-
-1. Nowcasting with Two Variables
-
-1. Case Study - Nowcasting Cases Using %CLI
-
+1. Warmup: Examining Snapshots
+1. Signal processing with snapshots
+1. Tracking Revisions
+1. Nowcasting Using `{epiprocess}`
+1. Nowcasting with Regression
 
 
 
@@ -99,6 +91,9 @@ write_rds(hr_crosswalk, here::here("_data", "can_hr_crosswalk.rds"))
 cases_df_api <- read_rds(here::here("_data", "cases_df_api.rds"))
 can_cases_deaths <- read_rds(here::here("_data", "can_cases_deaths.rds"))
 hr_crosswalk <- read_rds(here::here("_data", "can_hr_crosswalk.rds"))
+nchs_archive <- read_rds(here::here("_data", "nchs_archive_dt.rds")) |> as_epi_archive()
+hhs_hosp_archive <- read_rds(here::here("_data", "hhs_hosp_archive_dt.rds")) |> as_epi_archive()
+corrections_df <- read_rds(here::here("_data", "corrections_df.rds"))
 prov_pop <- summarise(hr_crosswalk, pop = sum(pop), .by = region)
 cases_df <- cases_df_api |> 
   select(time_value, geo_value, raw_cases = value)
@@ -113,11 +108,10 @@ case_rates_df <- cases_df |>
 
 ![](gfx/epiverse_packages_flow.jpg)
 
-# Signal processing with [{epiprocess}]{.monotype} {.inverse}
+# Warmup: Examining Snapshots
   
-## `{epiprocess}` Data Structures
 
-### `epi_df`: snapshot of a data set
+## `epi_df`: snapshot of a data set
 
 * a tibble with a couple of required columns, `geo_value` and `time_value`.
 * arbitrary additional columns containing measured values, called [signals]{.secondary}
@@ -170,7 +164,7 @@ edf1 <- earch1 |> epix_as_of(version = max(positive_tests$issue))
 
 ```{r can-edf}
 #| echo: true
-#| code-line-numbers: 1-3|4
+#| code-line-numbers: 1-3
 can_edf <- can_cases_deaths |>
   rename(geo_value = region) |>
   as_epi_df(as_of = "2024-04-13", other_keys = "hr")
@@ -178,16 +172,6 @@ can_edf
 ```
 
 
-## Examples of signal processing
-
-<br><br>
-
-1. Making locations commensurate (per capita scaling)
-1. Correlating signals across location or time 
-1. Computing growth rates
-1. Detecting and removing outliers
-1. Calculating summaries with rolling windows
-1. Dealing with revisions 
 
 ## Warm up: plotting
 
@@ -230,7 +214,7 @@ can_edf
 #| echo: true
 #| code-line-numbers: 2
 can_prov <- can_edf |>
-  sum_groups_epi_df(c("cases", "deaths"), group_cols = "geo_value")
+  sum_groups_epi_df(c(cases, deaths), group_cols = "geo_value")
 can_prov
 ```
 
@@ -240,7 +224,7 @@ can_prov
 
 ```{r edf-rates}
 #| echo: true
-#| code-line-numbers: 1-2|3
+#| code-line-numbers: 2|3
 can_prov <- can_prov |>
   inner_join(prov_pop, by = join_by(geo_value == region)) |>
   mutate(case_rate = cases / pop * 1e5, death_rate = deaths / pop * 1e6) |>
@@ -267,23 +251,35 @@ can_prov |> select(geo_value:deaths) |> filter(deaths < 0)
 
 :::
 
-# Exploring signals {.inverse}
+# Signal Processing with Snapshots {.inverse}
+
+## Examples of signal processing
+
+<br><br>
+
+1. Correlating signals across location or time 
+1. Computing growth rates
+1. Detecting and removing outliers
+1. Calculating summaries with rolling windows
+
 
 ## Correlations at different lags (province-level)
 
 ```{r corr-lags-ex}
 #| echo: true
 cor0 <- epi_cor(can_prov, case_rate, death_rate, cor_by = geo_value)
-cor14 <- epi_cor(can_prov, case_rate, death_rate, cor_by = geo_value, dt1 = -14)
+cor21 <- epi_cor(can_prov, case_rate, death_rate, cor_by = geo_value, dt1 = -21)
 ```
 
 ```{r plot-corr-lags-ex}
 #| fig-width: 7
-bind_rows(`0` = cor0, `14` = cor14, .id = "lag") |>
+bind_rows(`0` = cor0, `21` = cor21, .id = "lag") |>
   mutate(lag = fct_relabel(factor(lag), ~ paste(.x, "days"))) |>
   ggplot(aes(lag, cor, fill = geo_value)) +
   coord_flip() +
-  geom_dotplot(binaxis = "y", stackdir = "center", binwidth = 1/20, stackgroups = TRUE, method = "histodot") +
+  geom_dotplot(
+    binaxis = "y", stackdir = "center", binwidth = 1 / 20, 
+    stackgroups = TRUE, method = "histodot") +
   labs(y = "Correlation", x = "Lag") +
   scale_fill_viridis_d(option = "B", guide = guide_legend(ncol = 2)) +
   theme(legend.position = "right")
@@ -321,7 +317,9 @@ can_lag_cors |>
 ```
 
 ::: {.fragment .absolute .box-text left=10% top=20%}
-* Really strong weekly pattern. But we can fix that. More in a moment
+* Really strong weekly pattern. 
+
+* But we can fix that. 
 :::
 
 ## Quickly compute rolling functions by group
@@ -382,12 +380,12 @@ Implicitly assuming that reporting / testing / disease behaviour is stable over
 # Only consider the 50 US states (no territories)
 us_edf <- covid_case_death_rates |> filter(geo_value %in% tolower(state.abb)) 
 cor0 <- epi_cor(us_edf, case_rate, death_rate, cor_by = geo_value)
-cor14 <- epi_cor(us_edf, case_rate, death_rate, cor_by = geo_value, dt1 = -14)
+cor21 <- epi_cor(us_edf, case_rate, death_rate, cor_by = geo_value, dt1 = -21)
 ```
 
 ```{r us-cor-plot}
 #| fig-width: 7
-bind_rows(`0` = cor0, `14` = cor14, .id = "lag") |>
+bind_rows(`0` = cor0, `21` = cor21, .id = "lag") |>
   mutate(lag = fct_relabel(factor(lag), ~ paste(.x, "days"))) |>
   ggplot(aes(cor)) +
   geom_density(aes(fill = lag, col = lag), alpha = 0.5) +
@@ -402,28 +400,49 @@ bind_rows(`0` = cor0, `14` = cor14, .id = "lag") |>
 
 ## Compare to the US
 
-<br><br>
-
 ```{r sys-lag-ex}
 #| fig-width: 7
+#| fig-height: 3.5
 map(lags, \(lag) epi_cor(us_edf, case_rate, death_rate, cor_by = geo_value, dt1 = -lag)) |>
   set_names(lags) |> 
   list_rbind(names_to = "lag") |>
   summarize(mean_cor = mean(cor, na.rm = TRUE), .by = lag) |>
   mutate(lag = as.numeric(lag)) |>
   ggplot(aes(x = lag, y = mean_cor)) +
-  geom_vline(xintercept = can_lag_cors$lag[which.max(can_lag_cors$mean_cor)], color = primary) + 
+  geom_vline(aes(xintercept = lag[which.max(mean_cor)]), color = primary) + 
   geom_line(color = secondary) +
   geom_point(color = secondary) +
   labs(x = "Lag", y = "Correlation over time\naveraged over space")
 ```
 
-::: {.fragment .box-text .absolute top=30% left=10%}
+::: {.fragment .box-text .absolute top=20% left=10%}
 Aggregate cases tend to lead deaths by &#8776;23 days (arg max $\rho$)
 
 <br>
 Same was true for Canada after smoothing, but lower correlation
 :::
+
+## Examining how correlations change over time
+
+```{r cor-by-time-value}
+#| echo: true
+cor0 <- epi_cor(us_edf, case_rate, death_rate, cor_by = time_value, method = "kendall")
+cor21 <- epi_cor(us_edf, case_rate, death_rate, cor_by = time_value, method = "kendall", dt1 = -21)
+```
+
+```{r plot-cor-by-time-value}
+#| fig-width: 7
+bind_rows(`0` = cor0, `21` = cor21, .id = "lag") |>
+  mutate(lag = paste(lag, "days")) |>
+  ggplot(aes(x = time_value, y = cor, color = lag)) +
+  geom_line(key_glyph = "timeseries") +
+  geom_hline(yintercept = 0) +
+  scale_color_delphi() +
+  scale_x_date(expand = expansion()) +
+  theme(legend.position = "right") +
+  labs(x = "Date", y = "Correlation over space")
+```
+
 
 ## Compute growth rates
 
@@ -486,7 +505,7 @@ outp1 <- outliers |>
   geom_line(aes(y = lower), color = primary, alpha = .6) +
   geom_line(aes(y = upper), color = primary, alpha = .6) +
   scale_color_manual(name = "", values = c(secondary, tertiary), guide = "none") +
-  geom_hline(yintercept = 0) + xlab("") + ylab("Confirmed cases") +
+  geom_hline(yintercept = 0) + xlab("") + ylab("Cases") +
   facet_wrap(~ geo_value, scales = "free_y", nrow = 1) +
   scale_x_date(date_breaks = "6 months", date_labels = "%b %Y", expand = expansion(0)) +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
@@ -495,7 +514,7 @@ outp2 <- outliers |>
   geom_line(aes(y = cases, color = geo_value)) +
   geom_line(aes(y = replacement), color = primary) +
   scale_color_manual(name = "", values = c(secondary, tertiary), guide = "none") +
-  xlab("") + ylab("Confirmed cases") +
+  xlab("") + ylab("Cases") +
   coord_cartesian(ylim = c(0, NA)) +
   facet_wrap(~ geo_value, scales = "free_y", nrow = 1) +
   scale_x_date(date_breaks = "6 months", date_labels = "%b %Y", expand = expansion(0)) +
@@ -507,11 +526,10 @@ cowplot::plot_grid(outp1, outp2, align = "v", ncol = 1, axis = "lr")
 
 ## Advanced sliding on an `epi_df`
 
-* It is often useful to compute rolling summaries of signals. 
+* Compute rolling summaries of signals. 
+* These depend on the reference time
+* Computed separately over geographies (and other groups). 
 
-* These depend on the reference time, and are computed separately over geographies (and other groups). 
-
-* In `epiprocess`, this is achieved by `epi_slide()`.
 
 ```{r epi-slide-example-call}
 #| echo: true
@@ -527,6 +545,14 @@ epi_slide(
   .all_rows = FALSE # do return all available time_values, or only the ones with a result
 )
 ```
+::: {.fragment}
+`.f` "sees" a data set with a time value and other columns
+
+That data is labeled with  
+
+1. A reference time (the time around which the window is taken)
+2. A grouping key
+:::
 
 ::: {.fragment .box-text .absolute top=10%}
 * `epi_slide()` is [very]{.secondary} general, often too much so.
@@ -536,15 +562,17 @@ epi_slide(
 
 ## Really ugly, but actually deployed slide functions
 
-Function to flag outliers for corrections during late-2020
+Function to flag outliers for corrections during late-2020 and early-2021
 
 ```{r covid-corrections}
 #| echo: true
-#| eval: false
-flag_covid_outliers <- function(signal, sig_cut = 3, size_cut = 20, sig_consec = 2.25, excess_cut = 0) {
+#| code-line-numbers: 1-3,22-25|4-8|9-10,23|11-17|18-22
+flag_covid_outliers <- function(signal, sig_cut = 2.75, size_cut = 20, sig_consec = 1.2) {
   signal <- rlang::enquo(signal)
   function(x, g, t) {
-    .fns <- list(m = mean, med = median, sd = sd, mad = ~ median(abs(.x - median(.x))))
+    .fns <- list(m = ~ mean(.x, na.rm = TRUE), med = ~ median(.x, na.rm = TRUE), 
+                 sd = ~ sd(.x, na.rm = TRUE), mad = ~ median(abs(.x - median(.x)))
+    )
     fs <- filter(x, time_value <= t) |> summarise(across(!!signal, .fns, .names = "{.fn}"))
     ss <- summarise(x, across(!!signal, .fns, .names = "{.fn}"))
     mutate(
@@ -561,8 +589,7 @@ flag_covid_outliers <- function(signal, sig_cut = 3, size_cut = 20, sig_consec =
         (lag(flag) & !is.na(ststat) & ststat > sig_consec) |
         (lead(flag) & is.na(ststat) & ftstat > sig_consec) |
         (lag(flag) & is.na(ststat) & ftstat > sig_consec)
-    ) |>
-      filter(time_value == t) |> pull(flag)
+    ) |> filter(time_value == t) |> pull(flag)
   }
 }
 ```
@@ -573,38 +600,69 @@ Function to back distribute data [randomly]{.secondary}
 
 ```{r covid-multinomial}
 #| echo: true
-#| eval: false
-exp_w <- function(x, std_decay = 30, b0 = 8, a = exp(1) / 2){
-  w = (1:std_decay) / std_decay
-  w = tail(w, length(x))
-  1 / (1 + exp(-w * b0 + a))
-}
-
-corrections_multinom_roll <- function(x, excess, flag, time_value, max_lag = Inf, reweight = exp_w) {
+#| code-line-numbers: 1-4,11-13|5-7|14-18|8-10
+corrections_multinom_roll <- function(x, excess, flag, time_value, max_lag = 30L, reweight = exp_w) {
   locs <- which(flag)
   if (length(locs) == 0) return(x)
-  
   for (ii in locs) {
     if (ii <= max_lag) ii_lag <- seq_len(ii)
     else ii_lag <- seq(ii - max_lag + 1, ii)
-    w <- rep(1 / length(ii_lag), times = length(ii_lag))
-    zz <- reweight(w)
-    w <- zz * w
-    
+    w <- reweight(length(ii_lag)) / length(ii_lag)
     x[ii] <- x[ii] - excess[ii]
     prop <- x[ii_lag] + sign(excess[ii]) * rmultinom(1, abs(excess[ii]), w)
     x[ii_lag] <- prop
   }
   x
 }
+exp_w <- function(n, std_decay = 30L, b0 = 8, a = exp(1) / 2){
+  w <- (1:std_decay) / std_decay
+  w <- tail(w, n)
+  1 / (1 + exp(-w * b0 + a))
+}
 ```
 
+## Roll our outlier detector, then calculate the corrections
+
+```{r api-corrections}
+#| eval: false
+corrections_df <- pub_covidcast(
+  "jhu-csse", "deaths_incidence_num", "state", "day", 
+  geo_values = "nj,oh", as_of = 20210214
+) |> select(geo_value, time_value, deaths = value) |>
+  as_epi_df(as_of = ymd("2021-02-14"))
+write_rds(corrections_df, here::here("_data", "corrections_df.rds"))
+```
+
+```{r replicate-corrections}
+#| echo: true
+#| code-line-numbers: 1-3|4
+corrections_df <- epi_slide(
+  corrections_df, .align = "center", .window_size = 14L, .new_col_name = "flag",
+  .f = flag_covid_outliers(deaths)
+) |> mutate(corrected_deaths = corrections_multinom_roll(deaths, deaths, flag, time_value), .by = geo_value)
+```
+
+```{r plot-corrections}
+#| fig-width: 7
+corrections_df |>
+  pivot_longer(contains("deaths")) |>
+  ggplot(aes(time_value)) +
+  geom_line(aes(y = value, color = name), key_glyph = "timeseries") +
+  geom_point(data = filter(corrections_df, flag), aes(y = deaths), color = tertiary) +
+  facet_wrap(~ geo_value, scales = "free_y") + ylab("Deaths") + xlab("Date") +
+  coord_cartesian(xlim = ymd(c("2020-03-01", NA))) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "4 months", expand = expansion(c(0, 0.03))) +
+  geom_hline(yintercept = 0, color = theme_black) +
+  scale_color_delphi()
+```
+
+# Tracking Revisions
 
 ## `epi_archive`: Collection of `epi_df`s
 
-* full version history of a data set
-* acts like a bunch of `epi_df`s --- but stored [compactly]{.secondary}
-* allows similar functionality as `epi_df` but using only [data that would have been available at the time]{.secondary}
+* Full version history of a data set
+* Acts like a bunch of `epi_df`'s --- but stored [compactly]{.secondary}
+* Similar functionality as we saw but using only [data that would have been available at the time]{.secondary}
 
 ::: {.callout-note}
 ## Revisions
@@ -619,58 +677,19 @@ Epidemiology data gets revised frequently.
 
 Subset of daily COVID-19 doctor visits (Optum) and cases (JHU CSSE) from all U.S. states in `archive` format:
 
-```{r archive-ex}
-#| echo: true
-#| message: true
+```{asciicast archive-ex-ascii}
 archive_cases_dv_subset_all_states
 ```
-
-## Features -- sliding computation over `epi_df`s
-
-* We can apply a computation over different snapshots in an `epi_archive`.
-
-```{r}
-#| echo: true
-#| eval: false
-
-epix_slide(
-  .x,
-  .f,
-  ...,
-  .before = Inf,
-  .versions = NULL,
-  .new_col_name = NULL,
-  .all_versions = FALSE
-)
-
-```
-
-This functionality is very helpful in version aware forecasting. We will return with a concrete example. 
-  
 
 ## Summarize revision behaviour
 
 
-```{r epiprocess-revision-summary-demo}
-#| echo: true
-revision_data <- revision_summary(
-  archive_cases_dv_subset,
-  case_rate_7d_av,
-  drop_nas = TRUE,
-  min_waiting_period = as.difftime(60, units = "days"),
-  within_latest = 0.2,
-  compactify = TRUE,
-  compactify_abs_tol = sqrt(.Machine$double.eps)
-)
+
+```{asciicast epiprocess-revision-summary-demo}
+revision_data <- revision_summary(archive_cases_dv_subset, case_rate_7d_av)
+revision_data
 ```
 
-## Features -- summarize revision behavior
-
-
-```{asciicast epiprocess-revision-summary-results}
-revision_summary(archive_cases_dv_subset, case_rate_7d_av)
-
-```
 
 
 
@@ -678,6 +697,7 @@ revision_summary(archive_cases_dv_subset, case_rate_7d_av)
 
 ```{r plot-revision-patterns}
 #| fig-width: 7
+#| fig-height: 3.5
 autoplot(
   archive_cases_dv_subset, percent_cli, 
   .versions = seq(ymd("2020-07-01"), ymd("2021-11-30"), by = "1 month"), 
@@ -686,519 +706,36 @@ autoplot(
   scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
   labs(x = "", y = "% of doctor's visits with\n Covid-like illness") + 
   scale_color_viridis_c(option = "B", end = .8) +
+  scale_y_continuous(limits = c(0, NA), expand = expansion(c(0, 0.05))) +
   theme(legend.position = "none")
 ```
 
 ## Finalized data
 
 * Counts are revised as time proceeds
-* Want to know the [final]{.primary} value 
+* Want to know the [final]{.secondary} value 
 * Often not available until weeks/months later
 
-  Forecasting
-: At time $t$, predict the final value for time $t+h$, $h > 0$
   
-  <br>
-  
-  Backcasting
+Backcasting
 : At time $t$, predict the final value for time $t-h$, $h < 0$
 
   <br>
   
-  Nowcasting
+Nowcasting
 : At time $t$, predict the final value for time $t$
 
+<br>
 
+Forecasting
+: At time $t$, predict the final value for time $t+h$, $h > 0$
 
-# Basic Nowcasting using [{epiprocess}]{.monotype} {.inverse}
 
-<!-- predicting a finalized value from a provisional value and making predictions. -->
-## Backfill Canadian edition
-  
-* Every week [BC CDC released COVID-19 hospitalization data](http://www.bccdc.ca/health-info/diseases-conditions/covid-19/archived-b-c-covid-19-data).
+## Sliding computations over archives
 
-* The following week, they revised the number upward (by ~25%) due to lagged reports.
-
-![](gfx/bc_hosp_admissions_ex.jpg){fig-align="center"}
-
-::: {.fragment .box-text .absolute top=30% left=10%}
-Comparing preliminary to revised data [always]{.secondary} shows a decline.
-:::
-
-## Backfill American edition
-
-* Again, we can see a similar systematic underestimation problem for COVID-19 mortality rates in CA. <!-- 2023-2024 -->
-
-* This plot also illustrates the [**revision process**]{.primary} - how the reported mortality changes & increases across multiple updates until it stabilizes at the final value (black line).
-
-![](gfx/am_mortality_revisions_ex.jpg){style="width: 45%; display: block; margin-left: auto; margin-right: auto;"}
-
-* These two examples show the problem and now we need a solution...
-
-## Nowcasting and its mathematical setup
-
-* **Nowcasting**: Predict a finalized value from a provisional value.
-
-* Suppose today is time $t$
-
-* Let $y_i$ denote a series of interest observed at times $i=1,\ldots, t$.
-
-::: {.callout-important icon="false"}
-## Our goal
-
-* Produce a [**point nowcast**]{.primary} for the finalized values of $y_t$.
-* Accompany with time-varying prediction intervals
-
-:::
-
-* We may also have access to $p$ other time series 
-$x_{ij},\; i=1,\ldots,t, \; j = 1,\ldots, p$ which may be subject to revisions.
-
-
-
-## Case study: NCHS mortality
-
-* In this example, we'll demonstrate the concept of nowcasting using [**NHCS mortality data**]{.primary}.
-(the number of weekly new deaths with confirmed or presumed COVID-19, per 100,000 population).
-* We will work with [**provisional**]{.primary} data (real-time reports) and compare them to **finalized** data (final reports).
-* The goal is to estimate or [**nowcast the mortality rate**]{.primary} for weeks when only provisional data is available.
-  
-## Fetch versioned data
-
-Let's fetch versioned mortality data from the API (`pub_covidcast`) for CA (`geo_values = "ca"`) and the signal of interest (`deaths_covid_incidence_num`) over early 2024.
-
-```{r mortality-archive-construct}
-#| echo: true
-
-# Fetch the versioned NCHS mortality data (weekly)
-nchs_archive <- pub_covidcast(
-  source = "nchs-mortality",
-  signals = "deaths_covid_incidence_num",
-  geo_type = "state",
-  time_type = "week",
-  geo_values = c("ca", "ut"),  
-  time_values = epirange(202001, 202440),  
-  issues = "*"
-) |> 
-  select(geo_value, time_value, version = issue, mortality = value) |> 
-  as_epi_archive(compactify = TRUE)
-```
-
-
-## Analysis of versioning behavior 
-
-Recall, we need to watch out for:
-
-* [**Latency**]{.primary} the time difference between date of reference and date of the initial report
-* [**Backfill**]{.primary} how data for a given date is updated after initial report. 
-
-`revision_summary()` provides a summary of both aspects.  
-
-```{r inspect-revision_summary}
-#| echo: true
-revision_data <- revision_summary(nchs_archive, mortality)
-```
-
-
-## Versioning analysis -- latency
-
-* [**Question:**]{.primary} What is the latency of NCHS data? 
-
-```{r nchs-latency-via-revision-summary}
-#| echo: true
-revision_data |> pluck("revision_behavior") |> select(geo_value, time_value, min_lag) |> slice_sample(n = 10)
-```
-
-* We randomly sampled some dates to check if there is a consistent latency pattern. 
-* Understanding latency prevents us from using data that we shouldn't have access to. 
-
-## Versioning analysis -- backfill
-
-* [**Question:**]{.primary} How long does it take for the reported value to be close to the finalized value? 
-
-```{r revision-summary-time-near-latest-demo}
-#| echo: true
-revision_data |> pluck("revision_behavior") |> select(geo_value, time_value, lag_near_latest) |> slice_sample(n = 10)
-```
-* It generally takes at least 4 weeks for reported value to be within 20\% (default in `revision_summary()`) of the finalized value. 
-* We can change the threshold of percentage difference by specifying the `within_latest` argument of `revision_summary()`. 
-
-## Versioning analysis - backfill 
-
-* [**Question:**]{.primary} When is the [**finalized value**]{.primary} first attained for each date? Would we have access to any in real-time?
-* How fast are the final values attained & what's the pattern for these times, if any?
-
-
-```{r finalized-value-first-attained-fun}
-#| echo: false
-check_when_finalized <- function(epi_archive, start_date = NULL, end_date = NULL) {
-  # Extract the mortality archive data
-  dt <- epi_archive$DT
-  
-  # Extract the latest (finalized) version
-  mortality_latest <- epix_as_of(epi_archive, max(dt$version))
-  
-  # Merge the finalized mortality data with all versions
-  merged_data <- dt |>
-    filter(geo_value %in% mortality_latest$geo_value &
-             time_value %in% mortality_latest$time_value) |>
-    inner_join(mortality_latest, by = join_by(geo_value, time_value), suffix = c("", "_finalized"))
-  
-  # Find the minimal version where the finalized mortality first occurred
-  finalized_version_data <- merged_data |>
-    filter(mortality == mortality_finalized) |>
-    group_by(geo_value, time_value) |>
-    summarize(min_version = min(version), .groups = 'drop') |>
-    mutate(time_to_final = min_version - time_value)
-  
-  return(finalized_version_data)
-}
-```
-
-```{r check-when-finalized-run}
-#| echo: false
-res <- check_when_finalized(nchs_archive, 
-  start_date = min(nchs_archive$DT$time_value), 
-  end_date = max(nchs_archive$DT$time_value))
-
-head(res)
-```
-
-
-* [**Conclusion**]{.primary}: The revision behavior is pretty long-tailed. Value reported 4 weeks later is reasonably close to the finalized value. 
-
-
-## Revision pattern visualization  
-This shows the finalized rates in comparison to [**multiple revisions**]{.primary} to see how the data changes over time:
-
-```{r mortality-by-accessed-weeks-later}
-#| echo: false
-
-ref_dates <- unique(nchs_archive$DT$time_value)
-offsets = seq(1, 7) * 7
-max_version <- nchs_archive$versions_end
-
-get_val_asof <- function(time_val, archive, offsets) {
-  
-  as_of_dates <- pmin(time_val + offsets, max_version)
-  
-  result <- map(as_of_dates, function(x) {
-    
-    qd <- archive |>
-      epix_as_of(x) |>
-      filter(time_value == time_val) |>
-      select(geo_value, time_value, mortality) |>
-      mutate(lag = x - time_val)
-  }) |>
-    list_rbind()
-  
-  return(result)
-
-  
-}
-
-value_at_lags <- map(ref_dates, get_val_asof, 
-  archive <- nchs_archive, offsets <- offsets) |>
-  list_rbind()
-  
-values_final <- epix_as_of(nchs_archive, max(nchs_archive$versions_end))
-
-```
-
-```{r final-vs-revisions-plot}
-#| echo: false
-#| fig-width: 7
-ggplot(value_at_lags, aes(x = time_value, y = mortality)) +  
-  geom_line(aes(color = factor(lag))) + 
-  facet_wrap(~ geo_value, scales = "free_y", ncol = 1) +
-  scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
-  labs(x = "", y = "Weekly new COVID deaths") + 
-  # scale_color_viridis_d(option="D", end=0.8) +
-  theme(legend.position = "none") +
-  geom_line(data = values_final, aes(x = time_value, y = mortality), 
-            inherit.aes = FALSE, color = "black")
-
-
-```
-
-## Revision pattern visualization 
-
-```{r nchs-plot-different-ver}
-#| echo: false
-#| eval: true
-  
-versions <- seq.Date(as.Date("2021-01-01"), nchs_archive$versions_end, by = "1 month")
-nchs_snapshots <- map(versions, function(v) {
-  epix_as_of(nchs_archive, v) |>
-    mutate(version = v)}) |>
-  bind_rows() |>
-  mutate(latest = version == nchs_archive$versions_end)
-```
-
-```{r nchs-plot-val-different-ver}
-#| echo: false
-#| fig-width: 7
-
-ggplot(nchs_snapshots |> filter(!latest),
-       aes(x = time_value, y = mortality)) +
-  geom_line(aes(color = factor(version))) +
-  geom_vline(aes(color = factor(version), xintercept = version), lty = 3) +
-  facet_wrap(~ geo_value, scales = "free_y", ncol = 1) +
-  scale_x_date(minor_breaks = "month", date_labels = "%b %Y") +
-  labs(x = "", y = "Weekly covid deaths") +
-  scale_color_viridis_d(option = "B", end = .8) +
-  theme(legend.position = "none") +
-  geom_line(data = nchs_snapshots |> filter(latest),
-            aes(x = time_value, y = mortality),
-            inherit.aes = FALSE, color = "black")
-```
-
-<!--
-## Aside: Do we need a burn-in/training set? 
-
-* Typical stat-ML practise suggests a train, validation, test split.
-* But our exploratory analysis covered all available data, is that fine?
-
-
-* Generally, for exploratory analysis, it is fine to not do train/test split. 
-  + These analyses do not involve model fitting, we have little risk of an overly optimistic performance evaluation (no overfitting on test data).
-* However, for a [**psuedo-prospective analysis**]{.primary}, the best practise is to do a train/test split.
-  + In such analysis, one would be fitting and validating many models, a train/test split provides a more rigorous control on overfitting to test set. 
--->
-
-## Ratio nowcaster: jumping from provisional to finalized value
-
-* Recall, the goal of nowcast at date $t$ is to use project the [*finalized value*]{.primary} of $y_t,$ given the information available on date $t$. 
-* A very simple nowcaster is the ratio between finalized and provisional value. 
-
-How can we sensibly estimate this quantity? 
-
-```{r nchs-ca-only}
-#| echo: false
-#| eval: true
-nchs_archive <- pub_covidcast(
-  source = "nchs-mortality",
-  signals = "deaths_covid_incidence_num",
-  geo_type = "state",
-  time_type = "week",
-  geo_values = "ca",  
-  time_values = epirange(202001, 202440),  
-  issues = "*"
-) |> 
-  select(geo_value, time_value, version = issue, mortality = value) |> 
-  as_epi_archive(compactify = TRUE)
-```
-
-## Ratio nowcaster: building training samples
-
-* At nowcast date $t,$ would have received reports with versions up to and including $t.$
-* We need to build training samples, which
-  + correctly aligns finalized value against provisional value 
-  + uses features that would have been available at test time 
-  + have enough samples to ensure sensible estimation results
-
-::: {.fragment .fade-in}
-* Build training samples by treating dates prior to date $t$ as actual nowcast dates.
-  + What is the provisional data on that date?
-  + Have we received finalized value for that date? 
-:::
-
-## Ratio nowcaster: building training samples
-
-* At an earlier nowcast date $t_0,$ we define 
-  + [**Provisional value**]{.primary} as the reported value of $Y_{s_0}$ with version $t_0.$ Here $s_0$ is the largest occurence date among all values reported up until $t_0.$
-  + [**Finalized value**]{.primary} as the (potentially unobserved) finalized value of $Y_{s_0}.$
-    - We only know in *hindsight* when reported value of $Y_{s_0}$ is finalized -- need an approximation. 
-
-## Revisiting `revision_summary()`
-
-Recall, `revision_summary()` reports the number of days to be within 20\% (default value) of finalized value
-
-```{r revision-summary-time-near-latest-show-again}
-#| echo: false
-revision_data |> pluck("revision_behavior") |> select(geo_value, time_value, lag_near_latest) |> slice_sample(n = 5)
-(lag_quantiles = quantile(revision_data$lag_near_latest))
-approx_final_lag = lag_quantiles["75%"]
-```
-
-::: {.fragment .fade-in}
-Let's say data reported `r approx_final_lag` days after reference date is good enough to be considered finalized. 
-:::
-
-## Ratio nowcaster: test time feature
-
-* Due to latency, provisional values may not be available at lag 0
-* We use last-observation-carried-forward (LOCF) to impute missing values at test time
-* Precisely, at test time $t,$ we use last observed data point (among all those reported up through time $t$)
-
-## Nowcasting at a single date: building training samples 
-
-::: {.fragment .fade-in}
-* Searching for provisional values, at previous hypothetical nowcast dates.
-
-```{r one-date-look-for-provisional}
-#| echo: true
-
-nowcast_date <- as.Date("2022-01-02"); window_length = 180
-
-initial_data <- nchs_archive$DT |>
-  group_by(geo_value, time_value) |>
-  filter(version == min(version)) |>
-  rename(initial_val = mortality) |>
-  select(geo_value, time_value, initial_val)
-
-```
-:::
-
-
-::: {.fragment .fade-in}
-* Searching for finalized values, at previous hypothetical nowcast dates.
-
-```{r one-date-look-for-final}
-#| echo: true
-#| 
-finalized_data <- epix_as_of(nchs_archive, nowcast_date) |>
-  filter(time_value >= nowcast_date - approx_final_lag - window_length & time_value <= nowcast_date - approx_final_lag) |>
-  rename(finalized_val = mortality) |>
-  select(geo_value, time_value, finalized_val)
-```
-:::
-
-## Nowcasting at a single date: estimating ratio model
-
-* After searching for both provisional and finalized values, we merge them together and estimate the ratio. 
-```{r one-date-combine-provsional-and-final}
-#| echo: true
-  
-ratio <- finalized_data |>
-  inner_join(initial_data, by = c("geo_value", "time_value")) |>
-  mutate(ratio = finalized_val / initial_val) |>
-  pull(ratio) |>
-  median(na.rm = TRUE)
-```
-
-## Nowcasting at a single date: test feature construction
-
-```{r one-date-test-feat}
-#| echo: true
-
-last_avail <- epix_as_of(nchs_archive, nowcast_date) |>
-  slice_max(time_value) |>
-  pull(mortality) 
-```
-
-## Nowcasting at a single date: producing the nowcast
-
-```{r one-date-nowcast}
-#| echo: true
-
-nowcast <- last_avail * ratio
-finalized_val <- epix_as_of(nchs_archive, nchs_archive$versions_end) |>
-  filter(time_value == nowcast_date) |>
-pull(mortality)
-
-nowcast_final = data.frame(Nowcast = nowcast, `Finalized value` = finalized_val, check.names=FALSE)
-knitr::kable(nowcast_final)
-
-```
-
-
-## Nowcasting for multiple dates
-
-* All previous manipulations should really be seen as a template for all nowcast dates. 
-* The template computation sould be applied over all nowcast dates, [**but we must respect data versioning**]{.primary}! 
-* `epix_slide()` is designed just for this! It behaves similarly to `epi_slide`.
-* Key exception: `epix_slide()` is version aware: the sliding computation at any reference time $t$ is performed on [**data that would have been available as of t**]{.primary}.
-
-
-## Nowcasting for multiple dates via `epix_slide()`
-
-We begin by templatizing our previous operations. 
-
-```{r nowcaster-to-slide}
-#| echo: true
-nowcaster <- function(x, g, t, wl=180, appx=approx_final_lag) {
-  initial_data <- x$DT |>
-    group_by(geo_value, time_value) |>
-    filter(version ==  min(version)) |>
-    filter(time_value >= t - wl - appx & time_value <= t - appx) |>
-    rename(initial_val = mortality) |>
-    select(geo_value, time_value, initial_val)
-  finalized_data <- x$DT |>
-    group_by(geo_value, time_value) |>
-    filter(version ==  max(version)) |>
-    filter(time_value >= t - wl - appx & time_value <= t - appx) |>
-    rename(finalized_val = mortality) |>
-    select(geo_value, time_value, finalized_val)
-  ratio <- finalized_data |>
-    inner_join(initial_data, by = c("geo_value", "time_value")) |>
-    mutate(ratio = finalized_val / initial_val) |>
-    pull(ratio) |>
-    median(na.rm = TRUE)
-  last_avail <-  epix_as_of(x, t) |>
-    slice_max(time_value) |>
-    pull(mortality) 
-  tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
-}
-```
-
-## Sanity check of `epix_slide()`
-
-```{r nowcast-san-check}
-#| echo: true
-#| eval: true
-
-slided_nowcast_1d = epix_slide(
-  .x = nchs_archive,
-  .f = nowcaster,
-  .before = Inf,
-  .versions = nowcast_date,
-  .all_versions = TRUE
-)
-
-nowcast_check = data.frame(`Manual nowcast` = nowcast, `Slided nowcast` = slided_nowcast_1d$nowcast, check.names = FALSE)
-knitr::kable(nowcast_check)
-
-
-```
-
-
-## Nowcasting for multiple dates via `epix_slide()`
-
-```{r epix-slide-extract-nowcast-date}
-#| echo: false
-#| eval: true
-
-all_nowcast_dates = nchs_archive$DT |>
-  filter(time_value >= as.Date("2022-01-01")) |>
-  distinct(time_value) |>
-  pull(time_value)
-```
-
-
-```{r nowcasts-slided}
-#| echo: true
-#| eval: true
-
-nowcasts = nchs_archive |>
-  group_by(geo_value) |>
-  epix_slide(
-    nowcaster,
-    .before=Inf,
-    .versions = all_nowcast_dates,
-    .all_versions = TRUE
-)
-```
-
-
-
-## Details of `epix_slide()`
-
-
-```{r epix-slide-demo-call-allversions-FALSE}
+```{r}
 #| echo: true
 #| eval: false
-
 epix_slide(
   .x,
   .f,
@@ -1210,556 +747,240 @@ epix_slide(
 )
 ```
 
+::: {.fragment .box-text .absolute top=10%}
 
-* `.f` in `epix_slide()` can be specified with the same form of custom function as `epi_slide()`. 
+* To perform nowcasts we need to track how values get revised
+* To evaluate forecasting [models]{.secondary}, we need to test them on the data we
+[would have seen]{.secondary}
 
-```{r epix-slide-form-of-custom-function}
-#| echo: true
-#| eval: false
-
-function(x, g, t) {
-  # function body
-}
-```
-
-* Mandatory variables of `.f` would have different forms depending on the value of `.all_versions`. 
-
-
-## Details of `epix_slide()`
-
-```{r epix-slide-demo-call-allversions-FALSE-again}
-#| echo: true
-#| eval: false
-#| code-line-numbers: "|8"
-
-epix_slide(
-  .x,                          
-  .f,                         
-  ...,                        
-  .before = Inf,             
-  .versions = NULL,           
-  .new_col_name = NULL,      
-  .all_versions = FALSE
-)
-```
-
-::: {.fragment .fade-in}
-* When `.all_versions = FALSE`, `epix_slide()` essentially iterates the templatized computation over snapshots. 
-* Said differently, when `.all_versions = FALSE`, data accessed at any sliding iteration [**only involves a single version**]{.primary}. 
-:::
-
-::: {.fragment .fade-in}
-* Hence: 
-  + `x`: an `epi_df` with same column names as archive's `DT`, minus the `version` column.
-  +  `g`: a one-row tibble containing the values of groupping variables of the associated group.
-  + `t`: the `ref_time_value` of the current window.
-  + `...`: additional arguments. 
-:::
-
-## Details of `epix_slide()`
-
-```{r epix-slide-demo-call-allversions-TRUE}
-#| echo: true
-#| eval: false
-#| code-line-numbers: "|8"
-
-epix_slide(
-  .x,                          
-  .f,                         
-  ...,                        
-  .before = Inf,             
-  .versions = NULL,           
-  .new_col_name = NULL,      
-  .all_versions = TRUE
-)
-```
-
-::: {.fragment .fade-in}
-* When `.all_versions = FALSE`, data accessed at any sliding iteration involves versions [**up to and including .version**]{.primary}. 
-:::
-
-::: {.fragment .fade-in}
-* Hence: 
-  + `x`: an `epi_archive`, with version up to and including `.version`. 
-  +  `g`: a one-row tibble containing the values of groupping variables of the associated group.
-  + `t`: the `.version` of the current window.
-  + `...`: additional arguments. 
 :::
 
 
-## Details of `epix_slide()`
 
-```{r nowcasts-slide-demo-only}
-#| echo: true
-#| eval: false
-#| code-line-numbers: "|7"
+# Nowcasting Using [{epiprocess}]{.monotype} {.inverse}
 
-nowcasts <- nchs_archive |>
-  group_by(geo_value) |>
-  epix_slide(
-    nowcaster,
-    .before=Inf,
-    .versions = all_nowcast_dates,
-    .all_versions = TRUE
-)
+<!-- predicting a finalized value from a provisional value and making predictions. -->
+## Why this matters
+  
+* Every week [BC CDC released COVID-19 hospitalization data](http://www.bccdc.ca/health-info/diseases-conditions/covid-19/archived-b-c-covid-19-data).
+
+* The following week, they revised the number upward (by ~25%) due to lagged reports.
+
+![](gfx/bc_hosp_admissions_ex.jpg){fig-align="center"}
+
+::: {.fragment .box-text .absolute top=30%}
+Comparing preliminary to revised data [often]{.secondary} shows a decline.
+
+Due to [backfill]{.secondary}
+:::
+
+## Backfill American edition - NCHS COVID-19 mortality
+
+
+```{r}
+#| fig-width: 7
+#| fig-height: 3.5
+nchs_versions <- seq(ymd("2024-01-07"), ymd("2024-03-24"), by = "1 week")
+autoplot(nchs_archive, mortality, .versions = nchs_versions) +
+  scale_y_continuous(limits = c(0, 250), expand = expansion()) +
+  scale_x_date(limits = ymd(c("2023-12-31", "2024-04-01")), expand = expansion())
 ```
 
-## Details of `epix_slide()`
+## The revision triangle
 
-```{r nowcaster-to-slide-again}
+```{r revision-triangle}
+#| fig-height: 4
+#| dev: png
+ca_nchs_finalized <- epix_as_of(nchs_archive, nchs_archive$versions_end) |>
+  filter(geo_value == "ca", time_value %in% nchs_versions)
+ca_nchs_complete <- map(
+  nchs_versions, 
+  ~ epix_as_of(nchs_archive, .x) |> 
+    filter(geo_value == "ca", time_value >= min(nchs_versions)) |>
+    mutate(version = .x)
+) |> list_rbind()
+    
+ca_revision_triangle <- ca_nchs_complete |>
+  left_join(ca_nchs_finalized |> rename(final_mortality = mortality)) |>
+  mutate(mortality = mortality / final_mortality, final_mortality = NULL)
+
+alt_versions <- nchs_versions[seq_along(nchs_versions) %% 2 == 1]
+
+ca_revision_triangle |>
+  ggplot(aes(version, time_value, fill = mortality)) +
+  geom_raster() +
+  scale_y_date(
+    name = "Reference date", breaks = alt_versions - weeks(1), 
+    date_labels = "%b %d", expand = expansion()) +
+  scale_x_date(
+    name = "Report date", breaks = alt_versions, 
+    date_labels = "%b %d", expand = expansion()) +
+  coord_equal() +
+  theme(legend.position = "right", legend.title = element_text()) +
+  scale_fill_viridis_c(
+    transform = "logit", direction = -1, breaks = c(.2, .5, .75, .9, .95),
+    option = "B", name = "Ratio to final"
+  )
+```
+
+
+::: {.fragment .box-text .absolute top=10%}
+* On day $t$, predict the finalized value of signal $y_t$
+
+* We may have a provisional value for $y_t$ (subject to revision)
+
+* Most likely, we only have provisional values for earlier dates
+
+* We may only have "finalized" values for $y_{t-s}$, $s\gg0$
+
+:::
+
+
+
+
+## Formal analysis of versioning behavior 
+
+Latency
+: the time difference between Reference Date and Initial Report Date
+
+Backfill
+: the characteristics of updates after initial report (typical positive)
+
+
+```{r inspect-revision_summary}
 #| echo: true
-#| code-line-numbers: "|3,9"
-nowcaster <- function(x, g, t, wl=180, appx=approx_final_lag) {
-  initial_data <- x$DT |>
-    group_by(geo_value, time_value) |>
-    filter(version ==  min(version)) |>
-    filter(time_value >= t - wl - appx & time_value <= t - appx) |>
-    rename(initial_val = mortality) |>
-    select(geo_value, time_value, initial_val)
-  finalized_data <- x$DT |>
-    group_by(geo_value, time_value) |>
-    filter(version ==  max(version)) |>
-    filter(time_value >= t - wl - appx & time_value <= t - appx) |>
-    rename(finalized_val = mortality) |>
-    select(geo_value, time_value, finalized_val)
-  ratio <- finalized_data |>
-    inner_join(initial_data, by = c("geo_value", "time_value")) |>
-    mutate(ratio = finalized_val / initial_val) |>
-    pull(ratio) |>
-    median(na.rm=TRUE)
-  last_avail <- epix_as_of(x, t) |>
-    slice_max(time_value) |>
-    pull(mortality) 
-  tibble(geo_value = x$geo_value, target_date = t, nowcast = last_avail * ratio)
-}
+#| code-line-numbers: 1-2
+# same as before, but the NCHS data
+revision_data <- revision_summary(nchs_archive, mortality, within_latest = .05, return_only_tibble = TRUE)
+revision_data |> filter(geo_value == "ca", time_value %in% nchs_versions) |> print(width = 120)
 ```
 
 
 
-## Visualize nowcasts
+## Revision pattern visualization  
 
-
-We are now finally able to compare nowcasts against first available reports:
-
-```{r nowcast-subsetting}
+```{r mortality-by-accessed-weeks-later}
 #| echo: false
+ref_dates <- unique(nchs_archive$DT$time_value)
+offsets = seq(1, 7) * 7
+max_version <- nchs_archive$versions_end
 
-intial_val_extracter <- function(x, g, t, wl=180, appx=approx_final_lag) {
-  
-  last_avail = epix_as_of(x, t) |>
-    slice_max(time_value) |>
-    pull(mortality)
-  
-  res = tibble(geo_value = x$geo_value, target_date = t, value = last_avail)
-  
-  return(res)
-  
+get_val_asof <- function(time_val, archive, offsets) {
+  as_of_dates <- pmin(time_val + offsets, max_version)
+  map(as_of_dates, \(.x) {
+    archive |>
+      epix_as_of(.x) |>
+      filter(time_value == time_val) |>
+      select(geo_value, time_value, mortality) |>
+      mutate(lag = .x - time_val)
+  }) |> list_rbind()
 }
 
-
-provisional_val = epix_slide(nchs_archive, intial_val_extracter,  .versions = all_nowcast_dates, .all_versions = TRUE)
-
-finalized_val = nchs_archive$DT |>
-  filter(time_value >= as.Date("2021-01-10")) |>
-  group_by(geo_value, time_value) |>
-  filter(version == max(version))
-
+value_at_lags <- map(ref_dates, get_val_asof, 
+  archive <- nchs_archive, offsets <- offsets) |>
+  list_rbind()
+  
+values_final <- epix_as_of(nchs_archive, max(nchs_archive$versions_end))
 ```
 
-
-```{r nowcast-fun-plot-results}
+```{r final-vs-revisions-plot}
 #| echo: false
 #| fig-width: 7
-ggplot() + 
-  geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
-  geom_line(data = provisional_val, aes(x = target_date, y = value, color = "Provisional")) +
-  geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
-  ylab("Mortality") +
-  xlab("Reference date") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  scale_color_delphi(name = "")
+#| fig-height: 3.5
+value_at_lags |> filter(time_value >= ymd("2021-03-01")) |>
+  ggplot(aes(x = time_value, y = mortality)) +  
+  geom_line(aes(y = mortality, color = factor(lag / 7))) + 
+  geom_line(data = values_final |> filter(time_value >= ymd("2021-03-01")), 
+            color = "black") +
+  facet_wrap(~ geo_value, scales = "free_y", ncol = 1) +
+  scale_color_viridis_d(option = "B", end = 0.8, direction = -1, name = "Lag (weeks)") +
+  scale_x_date(minor_breaks = "month", date_labels = "%b %Y", expand = expansion()) +
+  labs(x = "", y = "Weekly new COVID deaths") + 
+  scale_y_continuous(expand = expansion(c(0, 0.05))) +
+  theme(legend.position = "right", legend.title = element_text())
 ```
 
-* The real-time counts tend to be biased below the finalized counts. Nowcasted values tend to provide a much better approximation of the truth (at least for these dates).
 
+## Building training data for nowcasting
 
-## Smoothing nowcasts
+* Can't estimate [any]{.secondary} statistical model, unless I "see" the response
+* The finalized value, is often [very]{.secondary} slow (~ 1 year for this signal)
+* So a compromise is to use something close, here I'm using 95% of the finalized value
 
-* Nowcasts are quite volatile, reflecting the provisional counts are far from complete. 
-* We can use a trailing average to smooth them.
-
-```{r smooth-nowcasts-epi-slide}
+```{r revision-summary-time-near-latest-show-again}
 #| echo: true
-#| fig-width: 7
-
-smoothed_nowcasts <- epi_slide(
-  nowcasts |> as_epi_df(),
-  smoothed_nowcasts = mean(nowcast, na.rm = TRUE),
-  .window_size = as.difftime(3, units = "weeks")
-)
-
+revision_ca <- filter(revision_data, geo_value == "ca")
+revision_ca |> select(geo_value, time_value, lag_near_latest) |> slice_sample(n = 5)
+(lag_quantiles <- quantile(revision_data$lag_near_latest))
+approx_final_lag <- lag_quantiles["75%"]
 ```
 
-```{r nowcast-smoothed-vis}
-#| echo: false
-#| fig-width: 7.5
-#| fig-height: 2.5
-cbPalette = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
-              "#0072B2", "#D55E00", "#CC79A7")
+::: {.fragment .box-text .absolute top=20%}
+* Pretend that for time $s$, the $Y_s$ with version $s +$  `r approx_final_lag` weeks is "final".
+* At time $t$, the most recent data in our training set will be `r approx_final_lag` weeks old.
+:::
 
-ggplot() + 
-  geom_line(data = finalized_val, aes(x = time_value, y = mortality, color = "Finalized")) +
-  geom_line(data = provisional_val, aes(x = target_date, y = value, color = "Provisional")) +
-  geom_line(data = nowcasts, aes(x = target_date, y = nowcast, color = "Nowcast")) +
-  geom_line(data = smoothed_nowcasts, aes(x = time_value, y = smoothed_nowcasts, color = "Smoothed")) +
-  scale_color_delphi(name = "") +
-  ylab("Mortality") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  xlab("Reference date")
-```
+## What about features?
 
+Must use features that would have been available at test time.
 
+Must have enough samples to ensure sensible estimation results.
 
-## Evaluation using MAE
+1. [provisional value(s) for time $t$]{.fragment .strike}
+2. provisional value(s) for time $t-\ell$
+3. exogenous signals that may be available
 
-* Assume we have prediction $\hat y_{t}$ for the provisional value at time $t$.
+::: {.fragment}
+### Potential model
 
-* Then for $y_{t}$ over times $t = 1, \dots, N$, then we may compute error metrics like mean absolute error (MAE).
+Predictors are 
 
+* Provisional values for time $t-\ell$, $\ell =$ 1 week, 2 weeks when available
+* Provisional $Z_{t-k}$ for HHS/NHSN COVID-19 hospitalizations (these are daily, so different lags)
 
-* MAE measures the average absolute difference between the nowcast and finalized values. 
+Exclude a potential predictor if it doesn't have much training data available.
 
-$$MAE = \frac{1}{N} \sum_{t=1}^N |y_{t}- \hat y_{t}|$$
-
-* Note that it's scale-dependent, meaning it can vary depending on the units of the data (e.g., cases, deaths, etc.).
-
-## Evaluation using MAE
-
-Let's numerically evaluate our point nowcasts for the provisional values of a time series (e.g., COVID-19 mortality) using MAE.
-
-<!-- Accuracy of nowcast is assessed by how close provisional estimates are to the finalized values to gauge the model's performance. -->
+:::
 
 
-```{r mae-code}
-#| echo: false
-# Step 1: Join the mortality data with nowcast data
-mae_data <- finalized_val |> 
-  select(-version) |>
-  inner_join(nowcasts |> select(-version), by = join_by("geo_value", "time_value" == "target_date")) |>
-  inner_join(initial_data, by = c("geo_value", "time_value")) |>
-  inner_join(smoothed_nowcasts |> select(-version, -nowcast), by = c("geo_value", "time_value"))
 
-# Step 2: Calculate the absolute error between actual and nowcasted values
-mae_data <- mae_data |> 
-  mutate(raw_nc_res = abs(mortality - nowcast),
-         prov_res = abs(mortality - initial_val),
-         smoothed_res = abs(mortality - smoothed_nowcasts))  
-
-# Step 3: Compute the MAE (mean of absolute errors)
-mae_value <- mae_data |> 
-  group_by(geo_value) |>
-  summarise(`Smoothed MAE` = mean(smoothed_res, na.rm = TRUE),
-            `Unsmoothed nowcast MAE` = mean(raw_nc_res, na.rm = TRUE),
-            `Provisional value MAE` = mean(prov_res, na.rm = TRUE)) |>
-  select(-geo_value) 
-  
-knitr::kable(mae_value)
-```
 
 
 # Nowcasting with Regression
 
-## Nowcasting: Moving from one predictor to multiple
 
-* The ratio model predicts the finalized value of $Y_t$ from $Y_{s}$, the last value included in the version $t$ report.
-* $Y_s$ is the closest in time we can get to $Y_t$, but we also expect it to be the least reliable value in version $t$.
-* Can we add $Y_{s - 1}$, $Y_{s - 2}$, and even other data sources to the model to try to find a good mix of relevant and reliable signals?
-* Regressions models will let us do that.
-* Let's start "simple": predicting $Y_t$ with whichever of $Y_{t - 1}$ and $Y_{t -
-  2}$ are available in version $t$.
+## Operationalizing
 
-## Start with a single nowcast date
+* Function needs to work on multiple nowcast dates
+* Sometimes reporting changes, so we should adjust, not error
+* If a predictor isn't available, we remove it from the model and proceed
+* Make sure we have "enough" training data to fit a model
+* The nowcaster needs access to all versions prior to the nowcast date
+* We want to retrain at every date: `epix_slide(..., .all_versions = TRUE)`
+* Allow for linear regression or median regression
 
-We're only looking at California in this example:
-```{r nchs-ca-archive}
-#| echo: true
+## Big ugly function 
 
-nchs_ca_archive <- nchs_archive$DT[geo_value == "ca",] |>
-  as_epi_archive()
-```
+* Goal: eventually refactor and put in `{epipredict}`
 
-We'll start experimenting with just a single nowcast date:
-
-::: {.notes}
-Earlier nowcast dates often encounter extra difficulties regarding data
-availability, so let's make sure we work on the first one.
-:::
-
-```{r regression-trial-nowcast-data}
-#| echo: true
-
-trial_nowcast_date <- all_nowcast_dates[[1]]
-```
-
-What data would we have had available then?
-```{r regression-trial-nowcast-date-as-of}
-#| echo: true
-
-# This is the version history we'd have seen at that point:
-nchs_ca_past_archive <- nchs_ca_archive |>
-  epix_as_of(trial_nowcast_date, all_versions = TRUE)
-
-# And this is what the latest version was at that point:
-nchs_ca_past_latest <- nchs_ca_past_archive |>
-  epix_as_of(trial_nowcast_date)
-```
-
-
-
-## What predictors were available at test time?
-
-```{r predictor-descriptions}
-#| echo: true
-
-# At version t, our target is finalized Y_t:
-target_time_value <- trial_nowcast_date
-
-# Check which of Y_{t-1} and Y_{t-2} are available, assign distinct names:
-predictor_descriptions <- nchs_ca_past_latest |>
-  filter(as.integer(target_time_value - time_value) <= 2 * 7) |>
-  drop_na(mortality) |>
-  transmute(
-    varname = "mortality",
-    lag_days = as.integer(trial_nowcast_date - time_value),
-    predictor_name = paste0(varname, "_lag", lag_days, "_realtime")
-  )
-predictor_descriptions
-```
-
-## Line up with training data
-
-We need to make sure to line up our predictors in `nchs_ca_past_latest` with
-training data that is analogous (e.g., "equally unreliable").
-
-```{r regression-trial-nowcast-analogues-fn-prototype}
-#| echo: true
-#| eval: false
-
-library(data.table)
-get_predictor_training_data <- function(archive, varname, lag_days, predictor_name) {
-  ...
-  ...
-  ...
-  return (training_data_edf_for_this_predictor)
-}
-```
-
-Actual implementation:
-```{r regression-trial-nowcast-analogues}
-#| echo: true
-#| code-fold: true
+```{r regression-nowcaster-helpers}
+nchs_ca_archive <- nchs_archive$DT |> filter(geo_value == "ca") |> as_epi_archive()
 
 library(data.table)
 get_predictor_training_data <- function(archive, varname, lag_days, predictor_name) {
   epikeytime_names <- setdiff(key(archive$DT), "version")
-  requests <- unique(archive$DT, by = epikeytime_names, cols = character())[
-  , version := time_value + ..lag_days
-  ]
+  requests <- unique(archive$DT, by = epikeytime_names, 
+                     cols = character())[, version := time_value + ..lag_days]
   setkeyv(requests, c(epikeytime_names, "version"))
   result <- archive$DT[
-    requests, c(key(archive$DT), varname), roll = TRUE, nomatch = NULL, allow.cartesian = TRUE, with = FALSE
-  ][
-  , time_value := version
-  ][
-  , version := NULL
-  ]
+    requests, c(key(archive$DT), varname), roll = TRUE, nomatch = NULL, 
+    allow.cartesian = TRUE, with = FALSE
+  ][, time_value := version][, version := NULL]
   nms <- names(result)
   nms[[match(varname, nms)]] <- predictor_name
   setnames(result, nms)
   setDF(result)
   as_tibble(result)
-}
-```
-
-```{r regression-trial-nowcast-analogues-example}
-#| echo: true
-get_predictor_training_data(nchs_ca_past_archive, "mortality", 7, "mortality_lag7_realtime")
-```
-The first value here is a version of $Y_{\text{2020-11-30}}$ as it was reported in version 2020-12-06.  We expect it to have similar characteristics as $Y_{t - 7\text{ days}}$ as reported in version $t$ for other values of $t$.
-
-## Get multiple predictors
-
-```{r regression-trial-nowcast-predictors-data}
-#| echo: true
-predictors <- predictor_descriptions |>
-  pmap(function(varname, lag_days, predictor_name) {
-    get_predictor_training_data(nchs_ca_past_archive, varname, lag_days, predictor_name)
-  }) |>
-  reduce(full_join, by = c("geo_value", "time_value"))
-predictors
-```
-
-- A full join is nice to show differences in missingness
-- But before training we're going to `drop_na()` and end up with something more
-  like an inner join
-
-## Combine with target data
-
-```{r regression-trial-nowcast-predictors-target-data}
-#| echo: true
-
-target <- nchs_ca_past_latest |>
-  filter(time_value <= max(time_value) - 49) |>
-  rename(mortality_semistable = mortality)
-```
-
-For each training time $t'$, approximate finalized $Y_{t'}$ with $Y_{t'}$ as
-reported at our trial nowcast date $t$.
-* Based on earlier analysis, we shouldn't really trust this for $t'$ within 49
-  days of $t$, so filter those training times out.
-
-
-## Fit the regression model
-
-```{r regression-trial-nowcast-fit}
-#| echo: true
-
-training_test <- full_join(predictors, target, by = c("geo_value", "time_value"))
-
-training <- training_test |> drop_na()
-test <- training_test |> filter(time_value == trial_nowcast_date)
-
-fit <- training |>
-  select(all_of(predictor_descriptions$predictor_name), mortality_semistable) |>
-  lm(formula = mortality_semistable ~ .)
-
-pred <- tibble(
-  nowcast_date = trial_nowcast_date,
-  target_date = target_time_value,
-  prediction = unname(predict(fit, test))
-)
-
-pred
-```
-
-## Our prediction
-
-```{r regression-trial-nowcast-pred}
-#| echo: true
-
-pred
-```
-
-## Backtesting our nowcaster
-
-We'll wrap our nowcasting code in a function and `epix_slide()` again.
-
-* And get an error --- some versions $t$ don't include a value $Y_{t-1}$ or $Y_{t-2}$ (e.g., version 2022-06-26 doesn't).
-    * So let's try looking farther into the past at $Y_{t-3}$, etc.
-    * ... but don't look too far: $Y_{t-5}$ is the limit.
-    * The same regression approach applies to models with 3 or more features.
-    * Including more features tends to improve performance, up to a point.
-
-## Some other modifications
-
-* Add some basic checks throughout our nowcasting function.
-* Make sure we have "enough" training data to fit a model.
-* Add ability to look not just at provisional $Y_{t-k}$, but also provisional
-  $Z_{t-k}$ for some other signal $Z$.
-    * $Z$ here is HHS/NHSN COVID-19 hospitalization reporting.
-      * This was daily-resolution and daily-reporting-cadence for some time;
-        it's possible but a bit tricky to combine with our weekly-resolution
-        weekly-cadence archive.
-    * Exclude a potential predictor if it doesn't have much training data available.
-* Allow for linear regression or quantile regression at the median level (tau = 0.5)
-
-```{r regression-nowcaster-function}
-#| echo: true
-#| code-fold: true
-
-regression_nowcaster <- function(archive, settings, return_info = FALSE) {
-  if (!inherits(archive, "epi_archive")) {
-    stop("`archive` isn't an `epi_archive`")
-  }
-  if (length(unique(archive$DT$geo_value)) != 1L) {
-    stop("Expected exactly one unique `geo_value`")
-  }
-  if (archive$time_type == "day") {
-    archive <- thin_daily_to_weekly_archive(archive)
-  }
-
-  nowcast_date <- archive$versions_end
-  target_time_value <- nowcast_date
-  latest_edf <- archive |> epix_as_of(nowcast_date)
-  # print(nowcast_date)
-
-  predictor_descriptions <-
-    latest_edf |>
-    mutate(lag_days = as.integer(nowcast_date - time_value)) |>
-    select(-c(geo_value, time_value)) |>
-    pivot_longer(-lag_days, names_to = "varname", values_to = "value") |>
-    drop_na(value) |>
-    inner_join(settings$predictors, by = "varname", unmatched = "error") |>
-    filter(abs(lag_days) <= max_abs_shift_days) |>
-    arrange(varname, abs(lag_days)) |>
-    group_by(varname) |>
-    filter(seq_len(n()) <= max_n_shifts[[1]]) |>
-    ungroup() |>
-    mutate(predictor_name = paste0(varname, "_lag", lag_days, "_realtime")) |>
-    select(varname, lag_days, predictor_name)
-
-  predictor_edfs <- predictor_descriptions |>
-    pmap(function(varname, lag_days, predictor_name) {
-      get_predictor_training_data(archive, varname, lag_days, predictor_name)
-    }) |>
-    lapply(na.omit) |>
-    keep(~ nrow(.x) >= settings$min_n_training_per_predictor)
-
-  if (length(predictor_edfs) == 0) {
-    stop("Couldn't find acceptable predictors in the latest data.")
-  }
-
-  predictors <- predictor_edfs |>
-    reduce(full_join, by = c("geo_value", "time_value"))
-
-  target <- latest_edf |>
-    filter(time_value <= max(time_value) - settings$days_until_target_semistable) |>
-    select(geo_value, time_value, mortality_semistable = mortality)
-
-  training_test <- full_join(predictors, target, by = c("geo_value", "time_value"))
-
-  training <- training_test |>
-    drop_na() |>
-    slice_max(time_value, n = settings$max_n_training_intersection)
-
-  test <- training_test |>
-    filter(time_value == nowcast_date)
-
-  if (isTRUE(settings$median)) {
-    fit <- training |>
-      select(any_of(predictor_descriptions$predictor_name), mortality_semistable) |>
-      quantreg::rq(formula = mortality_semistable ~ ., tau = 0.5)
-  } else {
-    fit <- training |>
-      select(any_of(predictor_descriptions$predictor_name), mortality_semistable) |>
-      lm(formula = mortality_semistable ~ .)
-  }  
-
-  pred <- tibble(
-    geo_value = "ca",
-    nowcast_date = nowcast_date,
-    target_date = target_time_value,
-    prediction = unname(predict(fit, test))
-  )
-
-  if (return_info) {
-    return(tibble(
-      coefficients = list(coef(fit)),
-      predictions = list(pred)
-    ))
-  } else {
-    return(pred)
-  }
 }
 
 # We can apply this separately for each nowcast_date to ensure that we consider
@@ -1787,8 +1008,77 @@ thin_daily_to_weekly_archive <- function(archive) {
     }) |>
     reduce(epix_merge, sync = "locf")
 }
+```
 
-# Baseline model:
+```{r regression-nowcaster-function}
+#| echo: true
+#| code-line-numbers: 1,6-7|9-27|36-42|44-52|54-59
+regression_nowcaster <- function(archive, model_settings, return_info = FALSE) {
+  if (!inherits(archive, "epi_archive")) stop("`archive` isn't an `epi_archive`")
+  if (n_distinct(archive$DT$geo_value) != 1L) stop("Expected exactly one unique `geo_value`")
+  if (archive$time_type == "day") archive <- thin_daily_to_weekly_archive(archive)
+  nowcast_date <- archive$versions_end
+  target_time_value <- nowcast_date
+  latest_edf <- archive |> epix_as_of(nowcast_date)
+
+  predictor_descriptions <-
+    latest_edf |>
+    mutate(lag_days = as.integer(nowcast_date - time_value)) |>
+    select(-c(geo_value, time_value)) |>
+    pivot_longer(-lag_days, names_to = "varname", values_to = "value") |>
+    drop_na(value) |>
+    inner_join(model_settings$predictors, by = "varname", unmatched = "error") |>
+    filter(abs(lag_days) <= max_abs_shift_days) |>
+    arrange(varname, abs(lag_days)) |>
+    group_by(varname) |>
+    filter(seq_len(n()) <= max_n_shifts[[1]]) |>
+    ungroup() |>
+    mutate(predictor_name = paste0(varname, "_lag", lag_days, "_realtime")) |>
+    select(varname, lag_days, predictor_name)
+
+  predictor_edfs <- predictor_descriptions |>
+    pmap(function(varname, lag_days, predictor_name) get_predictor_training_data(archive, varname, lag_days, predictor_name)) |>
+    lapply(na.omit) |>
+    keep(~ nrow(.x) >= model_settings$min_n_training_per_predictor)
+
+  if (length(predictor_edfs) == 0) stop("Couldn't find acceptable predictors in the latest data.")
+
+  predictors <- reduce(predictor_edfs, full_join, by = c("geo_value", "time_value"))
+  target <- latest_edf |>
+    filter(time_value <= max(time_value) - model_settings$days_until_target_semistable) |>
+    select(geo_value, time_value, mortality_semistable = mortality)
+
+  training_and_nowcast <- full_join(predictors, target, by = c("geo_value", "time_value"))
+
+  training <- training_and_nowcast |>
+    drop_na() |>
+    slice_max(time_value, n = model_settings$max_n_training_intersection)
+
+  nowcast_features <- training_and_nowcast |> filter(time_value == nowcast_date)
+
+  form <- as.formula("mortality_semistable ~ .")
+  fit_fun <- switch(
+    model_settings$method,
+    rq = function(x) { quantreg::rq(data = x, formula = form, tau = 0.5) },
+    lm = function(x) { lm(formula = form, data = x) }
+  )
+  the_fit <- training |>
+    select(any_of(predictor_descriptions$predictor_name), mortality_semistable) |>
+    fit_fun()
+      
+  pred <- tibble(
+    geo_value = "ca",
+    nowcast_date = nowcast_date,
+    target_date = target_time_value,
+    prediction = unname(predict(the_fit, nowcast_features))
+  )
+
+  if (return_info) return(tibble(coefficients = list(coef(fit)), predictions = list(pred)))
+  return(pred)
+}
+```
+
+```{r baseline-nowcaster-model}
 locf_nowcaster <- function(archive) {
   nowcast_date <- archive$versions_end
   target_time_value <- nowcast_date
@@ -1812,18 +1102,34 @@ locf_nowcaster <- function(archive) {
 
 ## Model settings
 
-After fixing, enhancing, and parameterizing our regression nowcaster, we'll
-compare two different configurations:
+We'll compare 4 different configurations:
 
-* one with just mortality-based predictions
-* one that also uses hospitalizations as a predictor
-* and two that use quantile reg instead of linear reg
+* Using `lm()` and only mortality predictors
+* Using `lm()` with mortality and hospitalizations as a predictor
+* Using `rq()` and only mortality predictors
+* Using `rq()` with mortality and hospitalizations as a predictor
 
-## Model settings
+
+```{r hhs-archive-api}
+#| eval: false
+hhs_hosp_archive <- pub_covidcast(
+  source = "hhs",
+  signals = "confirmed_admissions_covid_1d_7dav",
+  geo_type = "state",
+  time_type = "day",
+  geo_values = "ca",
+  time_values = epirange(20210301, 20241001),
+  issues = "*"
+) |>
+  transmute(geo_value, time_value, version = issue, admissions = 7 * value) |>
+  as_epi_archive(compactify = TRUE)
+write_rds(hhs_hosp_archive$DT, here::here("_data", "hhs_hosp_archive_dt.rds"))
+```
+
 
 ```{r regression-model-settings}
 #| echo: true
-
+#| code-line-numbers: 1-14
 reg1_settings <- list(
   predictors = tribble(
     ~varname,    ~max_abs_shift_days, ~max_n_shifts,
@@ -1834,6 +1140,13 @@ reg1_settings <- list(
   min_n_training_intersection = 20, # or else raise error
   max_n_training_intersection = Inf # or else filter down rows
 )
+```
+
+```{r more-regression-model-settings}
+all_nowcast_dates = nchs_archive$DT |>
+  filter(time_value >= as.Date("2022-01-01")) |>
+  distinct(time_value) |>
+  pull(time_value)
 
 reg2_settings <- list(
   predictors = tribble(
@@ -1847,26 +1160,15 @@ reg2_settings <- list(
   max_n_training_intersection = Inf # or else filter down rows
 )
 
-reg3_settings <- c(reg1_settings, median = TRUE)
-reg4_settings <- c(reg2_settings, median = TRUE)
+reg3_settings <- c(reg1_settings, method = "rq")
+reg1_settings <- c(reg1_settings, method = "lm")
+reg4_settings <- c(reg2_settings, method = "rq")
+reg2_settings <- c(reg2_settings, method = "lm")
 ```
 
+
 ```{r regression-run-nowcasts-backtesting}
-
-hhs_hosp_archive <- pub_covidcast(
-  source = "hhs",
-  signals = "confirmed_admissions_covid_1d_7dav",
-  geo_type = "state",
-  time_type = "day",
-  geo_values = "ca",
-  time_values = epirange(20210301, 20241001),
-  issues = "*"
-) |>
-  transmute(geo_value, time_value, version = issue, admissions = 7 * value) |>
-  as_epi_archive(compactify = TRUE)
-
-nchs_ca_archive_daily <-
-  nchs_ca_archive$DT |>
+nchs_ca_archive_daily <- nchs_ca_archive$DT |>
   as_tibble() |>
   mutate(
     time_value = time_value + 6L, # align with trailing averages
@@ -1900,16 +1202,9 @@ reg4_nowcasts <- hosp_mort_archive |>
 ```
 
 ```{r regression-nowcast-wrangling}
-ratio_nowcasts_archive <- nowcasts |>
-  filter(geo_value == "ca") |>
-  rename(time_value = target_date,
-         prediction_ratio = nowcast) |>
-  as_epi_archive(compactify = TRUE)
-
 nowcast_comparison <-
   list(
     locf_nowcasts |> rename(prediction_locf = prediction),
-    ratio_nowcasts_archive$DT |> as_tibble() |> rename(nowcast_date = version, target_date = time_value),
     reg1_nowcasts |> rename(prediction_reg1 = prediction),
     reg2_nowcasts |> rename(prediction_reg2 = prediction),
     reg3_nowcasts |> rename(prediction_reg3 = prediction),
@@ -1923,11 +1218,10 @@ nowcast_comparison <-
             by = c("geo_value", "target_date" = "time_value")) |>
   pivot_longer(starts_with("prediction"), names_to = "Nowcaster", values_to = "prediction") |>
   mutate(Nowcaster = recode(Nowcaster,
-                            prediction_locf = "LOCF",
-                            prediction_ratio = "LOCF ratio model",
-                            prediction_reg1 = "Regression model",
-                            prediction_reg2 = "Regression + hosp",
-                            prediction_reg3 = "QuantReg model",
+                            prediction_locf = "Baseline",
+                            prediction_reg1 = "LinReg",
+                            prediction_reg2 = "LinReg + hosp",
+                            prediction_reg3 = "QuantReg",
                             prediction_reg4 = "QuantReg + hosp",
                             .default = Nowcaster))
 ```
@@ -1936,38 +1230,45 @@ nowcast_comparison <-
 
 ```{r regression-nowcast-plot-linreg}
 #| fig-width: 7
+#| fig-height: 3.5
 nowcast_comparison |>
   filter(target_date >= min(all_nowcast_dates) - 35,
-         !(Nowcaster %in% c("QuantReg model", "QuantReg + hosp"))) |>
+         !(Nowcaster %in% c("QuantReg", "QuantReg + hosp"))) |>
   ggplot() +
-  geom_line(aes(target_date, mortality)) +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
+  geom_line(aes(target_date, mortality), linewidth = 1) +
+  scale_y_continuous(expand = expansion(), limits = c(0, 2500)) +
+  scale_x_date(expand = expansion()) +
   scale_color_delphi() +
   xlab("Reference date") +
-  ylab("Mortality")
+  ylab("Mortality") +
+  theme(legend.position = "right")
 ```
 
 ## Comparison: quantile regression
 
+
 ```{r regression-nowcast-plot-quantreg}
 #| fig-width: 7
-
+#| fig-height: 3.5
 nowcast_comparison |>
   filter(target_date >= min(all_nowcast_dates) - 35,
-         !(Nowcaster %in% c("Regression model", "Regression + hosp"))) |>
+         !(Nowcaster %in% c("LinReg", "LinReg + hosp"))) |>
   ggplot() +
-  geom_line(aes(target_date, mortality)) +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
-  scale_color_delphi(name = "") +
+  geom_line(aes(target_date, mortality), linewidth = 1) +
+  scale_y_continuous(expand = expansion(), limits = c(0, 2500)) +
+  scale_x_date(expand = expansion()) +
+  scale_color_delphi() +
   xlab("Reference date") +
-  ylab("Mortality")
+  ylab("Mortality") +
+  theme(legend.position = "right")
 ```
+
 
 ## Evaluations
 
 ```{r regression-nowcast-eval-comparison}
-#| echo: true
-
 n_models <- length(unique(nowcast_comparison$Nowcaster))
 nowcast_comparison |>
   # Filter evaluation based on target stability
@@ -1976,46 +1277,43 @@ nowcast_comparison |>
   group_by(target_date) |>
   filter(sum(!is.na(prediction)) == n_models) |>
   ungroup() |>
-  summarize(.by = Nowcaster,
-            MAE = mean(abs(mortality - prediction)),
-            MAPE = 100*mean(abs(mortality - prediction)/abs(mortality)))
+  summarize(
+    .by = Nowcaster,
+    MAE = mean(abs(mortality - prediction)),
+    MAPE = 100 * mean(abs(mortality - prediction) / abs(mortality))
+  ) |>
+  knitr::kable(digits = 2)
 ```
 
-## Mea culpa
 
-This quickly became complicated and we've glossed over some core concepts.
-We'll explain concepts of regression, lagged features, and evaluation more
-carefully tomorrow.
 
 ## Aside on nowcasting
 
-* To some Epis, "nowcasting" can be equated with "estimate the time-varying instantaneous reproduction number, $R_t$"
+* To many Epis, [nowcasting]{.secondary} means [estimate the instantaneous 
+reproduction number, $R_t$]{.secondary}
 
-* Ex. using the number of reported COVID-19 cases in British Columbia between Jan. 2020 and Apr. 15, 2023. 
+* Example: Reported COVID-19 cases in British Columbia (Jan. 2020 &ndash; Apr. 2023) 
 
-<!-- This data is the number of reported COVID-19 cases in British Columbia between January 2020 and April 15, 2023. The values are.up-to-date as of August 2023. -->
 ```{r rtestim}
-#| fig-width: 9
+#| fig-width: 7
 #| fig-height: 3
-#| out-height: "400px"
 library(rtestim)
 source(here::here("_code/bccovid.R"))
 
 p1 <- bccovid|>
   ggplot(aes(date, cases)) + 
   geom_line(colour = primary) +
-  geom_vline(xintercept = ymd("2023-04-15"), colour = secondary,
-             linewidth = 2) +
-  labs(y = "BC Covid-19 cases", x = "Date") +
-  scale_y_continuous(expand = expansion(c(0, NA)))
+  labs(y = "BC Covid-19 cases", x = "") +
+  scale_y_continuous(expand = expansion(c(0, 0.05))) +
+  scale_x_date(expand = expansion())
 bc_rt <- estimate_rt(bccovid$cases, x = bccovid$date, 
                      lambda = c(1e6, 1e5))
 p2 <- plot(confband(bc_rt, lambda = 1e5)) + 
   coord_cartesian(ylim = c(0.5, 2)) +
-  scale_y_continuous(expand = expansion(0))
+  labs(x = "") +
+  scale_y_continuous(expand = expansion(0)) +
+  scale_x_date(expand = expansion())
 cowplot::plot_grid(p1, p2)
 ```
 
-* Group built [`{rtestim}`](https://dajmcdon.github.io/rtestim) doing for this nonparametrically.
-
-* We may come back to this later...
+* More after lunch...

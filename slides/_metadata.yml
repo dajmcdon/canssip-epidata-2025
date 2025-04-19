@@ -10,7 +10,7 @@ format:
     title-slide-attributes:
       data-background-image: gfx/cover-art-1.svg
     css: tachyons-minimal.css
-    chalkboard: true
+    chalkboard: false
     width: 1600
     height: 900
     html-math-method: mathjax
@@ -19,6 +19,7 @@ format:
     fig-align: center
     fig-width: 5.33
     fig-height: 3
+    self-contained: false
     scrollable: false
     number-sections: true
     number-depth: 1
