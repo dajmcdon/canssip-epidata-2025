@@ -1,0 +1,1374 @@
+[
+  {
+    "objectID": "slides/lecture4.html#outline",
+    "href": "slides/lecture4.html#outline",
+    "title": "EpiData Workshop 2025",
+    "section": "Outline",
+    "text": "Outline\n\nFundamentals of Forecasting\n{epipredict}\nCustomizing arx_forecaster()\nAdvanced Customizations\nBuild a Forecaster from Scratch\nAdvanced Topics"
+  },
+  {
+    "objectID": "slides/lecture4.html#care-with-your-data",
+    "href": "slides/lecture4.html#care-with-your-data",
+    "title": "EpiData Workshop 2025",
+    "section": "Care with your data",
+    "text": "Care with your data\n\nData splitting\n\nSome data you see. You can use it to create your model: Training data.\nSome data you don’t see. It may arrive later, or you may hold it out to validate your process.\n\nOnly training data can be used to create your model.\n\nMuch more subtle than it sounds.\nEverything about your model must flow from this\n\nChoosing the model: AR vs ARX, number of lags to use\nEstimates of model parameters\nHow much regularization to use\nAny transformations you make of your data\n\n\n\nWe’ve emphasized most of this already.\nBut that point about transformations is VERY important. And often overlooked."
+  },
+  {
+    "objectID": "slides/lecture4.html#preprocessing-correctly",
+    "href": "slides/lecture4.html#preprocessing-correctly",
+    "title": "EpiData Workshop 2025",
+    "section": "Preprocessing correctly",
+    "text": "Preprocessing correctly\n\nA standard proprecessing routine is to scale() each of the predictors.\nThis requires calculating the mean and standard deviation on the training data.\nAnd using those values when you make predictions\nThis is hard to do with standard R operations.\n\n\nchicago_ell &lt;- modeldata::Chicago |&gt;\n  select(ridership, temp, humidity, percip) |&gt;\n  mutate(across(everything(), scale))\n\n\nlm(ridership ~ ., data = chicago_ell)\n\nWe didn’t save the means and variances.\nWe need them to process the test data.\nWe would also need to invert (postprocess) the predictions.\nFor example: undoing scaling to predict deaths not deaths per 100K population"
+  },
+  {
+    "objectID": "slides/lecture4.html#tidymodels",
+    "href": "slides/lecture4.html#tidymodels",
+    "title": "EpiData Workshop 2025",
+    "section": "{tidymodels}",
+    "text": "{tidymodels}\n\nThe {tidymodels} suite of packages is intended to handle this situation correctly.\nIt’s written by programmers at Posit (the people behind {tidyverse})\nIt doesn’t work for panel data.\nThat’s what we need for Epidemiological Time Series\nWe’ve been working with their team to develop this functionality."
+  },
+  {
+    "objectID": "slides/lecture4.html#anatomy-of-a-forecaster",
+    "href": "slides/lecture4.html#anatomy-of-a-forecaster",
+    "title": "EpiData Workshop 2025",
+    "section": "Anatomy of a forecaster",
+    "text": "Anatomy of a forecaster\n\nWe should build up modular components\nBe able to add/remove layers of complexity sequentially, not all at once\nWe should be able to make preprocessing independent of the model fitting\nWe should be able to postprocess the predictions\n\n\n\nPreprocessor: do things to the data before model training\nTrainer: train a model on data, resulting in a fitted model object\nPredictor: make predictions, using a fitted model object\nPostprocessor: do things to the predictions before returning"
+  },
+  {
+    "objectID": "slides/lecture4.html#what-epipredict-provides-i",
+    "href": "slides/lecture4.html#what-epipredict-provides-i",
+    "title": "EpiData Workshop 2025",
+    "section": "What {epipredict} provides (i)",
+    "text": "What {epipredict} provides (i)\nBasic and easy to use “canned” forecasters:\n\nBaseline flat forecaster\nAutoregressive forecaster (ARX)\nAutoregressive classifier\nCDC FluSight flatline forecaster\n\nThese are supposed to work easily\n\nHandle lots of cases we’ve already seen\n\nWe’ll start here"
+  },
+  {
+    "objectID": "slides/lecture4.html#what-epipredict-provides-ii",
+    "href": "slides/lecture4.html#what-epipredict-provides-ii",
+    "title": "EpiData Workshop 2025",
+    "section": "What {epipredict} provides (ii)",
+    "text": "What {epipredict} provides (ii)\n\nA framework for creating custom forecasters out of modular components.\nThis is highly customizable, extends {tidymodels} to panel data\nGood for building a new forecaster from scratch\nWe’ll do an example at the end\nThere are four types of components:\n\nPreprocessor: do things to the data before model training\nTrainer: train a model on data, resulting in a fitted model object\nPredictor: make predictions, using a fitted model object\nPostprocessor: do things to the predictions before returning"
+  },
+  {
+    "objectID": "slides/lecture4.html#examples-of-pre-processing",
+    "href": "slides/lecture4.html#examples-of-pre-processing",
+    "title": "EpiData Workshop 2025",
+    "section": "Examples of pre-processing",
+    "text": "Examples of pre-processing\n\nEDA type stuff\n\nMaking locations/signals commensurate (scaling)\nDealing with revisions\nDetecting and removing outliers\nImputing or removing missing data\n\n\n\nFeature engineering\n\nCreating lagged predictors\nDay of Week effects\nRolling averages for smoothing\nLagged differences\nGrowth rates instead of raw signals\nThe sky’s the limit"
+  },
+  {
+    "objectID": "slides/lecture4.html#fit-arx_forecaster-on-training-set",
+    "href": "slides/lecture4.html#fit-arx_forecaster-on-training-set",
+    "title": "EpiData Workshop 2025",
+    "section": "Fit arx_forecaster() on training set",
+    "text": "Fit arx_forecaster() on training set\n\nARX(1) model for COVID deaths: \\(\\quad \\hat y_{t+28} = \\hat\\phi + \\hat\\phi_0 y_{t} + \\hat\\beta_0 x_{t}\\)\nOnly focus on California (for now)\nUsing {epipredict}\n\n\n# split into train and test \nca &lt;- cases_deaths |&gt; filter(geo_value == \"ca\")\nt0_date &lt;- as.Date('2021-04-01')\ntrain &lt;- ca |&gt; filter(time_value &lt;= t0_date)\ntest &lt;- ca |&gt; filter(time_value &gt; t0_date)\n\n# fit ARX\nepi_arx &lt;- arx_forecaster(\n  epi_data = train |&gt; as_epi_df(), \n  outcome = \"deaths\", \n  predictors = c(\"cases\", \"deaths\"),\n  trainer = linear_reg(),\n  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#arx_forecaster-output",
+    "href": "slides/lecture4.html#arx_forecaster-output",
+    "title": "EpiData Workshop 2025",
+    "section": "arx_forecaster() output",
+    "text": "arx_forecaster() output\n\nA workflow object which can be used any time in the future to create forecasts ($epi_workflow).\n\nAll necessary preprocessing; both the sequence of steps, and any necessary statistics\nThe fitted model object\nThe sequence of steps for postprocessing\n\nA forecast (point prediction + interval) for 28 days after the last available time value in the data ($predictions)."
+  },
+  {
+    "objectID": "slides/lecture4.html#arx_forecaster-output-1",
+    "href": "slides/lecture4.html#arx_forecaster-output-1",
+    "title": "EpiData Workshop 2025",
+    "section": "arx_forecaster() output",
+    "text": "arx_forecaster() output\n\nepi_arx \n## ══ A basic forecaster of type ARX Forecaster ═══════════════════════════════════\n## \n## This forecaster was fit on 2025-04-13 07:46:50.\n## \n## Training data was an &lt;epi_df&gt; with:\n## • Geography: state,\n## • Time type: day,\n## • Using data up-to-date as of: 2025-04-13 07:46:06.\n## • With the last data available on 2021-04-01\n## \n## ── Predictions ─────────────────────────────────────────────────────────────────\n## \n## A total of 1 prediction is available for\n## • 1 unique geographic region,\n## • At forecast date: 2021-04-01,\n## • For target date: 2021-04-29,\n##"
+  },
+  {
+    "objectID": "slides/lecture4.html#extract-fitted-object",
+    "href": "slides/lecture4.html#extract-fitted-object",
+    "title": "EpiData Workshop 2025",
+    "section": "Extract fitted object",
+    "text": "Extract fitted object\n\n\n## \n## ══ Epi Workflow [trained] ══════════════════════════════════════════════════════\n## Preprocessor: Recipe\n## Model: linear_reg()\n## Postprocessor: Frosting\n## \n## ── Preprocessor ────────────────────────────────────────────────────────────────\n## \n## 7 Recipe steps.\n## 1. step_epi_lag()\n## 2. step_epi_lag()\n## 3. step_epi_ahead()\n## 4. step_naomit()\n## 5. step_naomit()\n## 6. step_training_window()\n## 7. check_enough_data()\n## \n## ── Model ───────────────────────────────────────────────────────────────────────\n## \n## Call:\n## stats::lm(formula = ..y ~ ., data = data)\n## \n## Coefficients:\n##  (Intercept)   lag_0_cases  lag_0_deaths  \n##     0.075387      0.009953      0.201329\n## \n## ── Postprocessor ───────────────────────────────────────────────────────────────\n## \n## 5 Frosting layers.\n## 1. layer_predict()\n## 2. layer_residual_quantiles()\n## 3. layer_add_forecast_date()\n## 4. layer_add_target_date()\n## 5. layer_threshold()\n##"
+  },
+  {
+    "objectID": "slides/lecture4.html#epi_workflow",
+    "href": "slides/lecture4.html#epi_workflow",
+    "title": "EpiData Workshop 2025",
+    "section": "$epi_workflow",
+    "text": "$epi_workflow\nContains information on\n\nPre-processing steps automatically performed by arx_forecaster (e.g. compute lags of the predictors)\nFitted model\nPost-processing steps automatically performed by arx_forecaster (e.g. compute quantiles)"
+  },
+  {
+    "objectID": "slides/lecture4.html#extract-predictions",
+    "href": "slides/lecture4.html#extract-predictions",
+    "title": "EpiData Workshop 2025",
+    "section": "Extract predictions",
+    "text": "Extract predictions\n\nepi_arx$predictions\n\n# A tibble: 1 × 5\n  geo_value .pred .pred_distn forecast_date target_date\n  &lt;chr&gt;     &lt;dbl&gt;   &lt;qtls(3)&gt; &lt;date&gt;        &lt;date&gt;     \n1 ca        0.218     [0.218] 2021-04-01    2021-04-29 \n\n\n\n\n\nNote\n\n\n\n.pred_distn is actually a “distribution”, parameterized by its quantiles\narx_forecaster estimates the quantiles in a different way than lm"
+  },
+  {
+    "objectID": "slides/lecture4.html#extract-predictions-1",
+    "href": "slides/lecture4.html#extract-predictions-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Extract predictions",
+    "text": "Extract predictions\nWe can extract the distribution into a “long” epi_df\n\nepi_arx$predictions |&gt;\n  pivot_quantiles_longer(.pred_distn)\n\n# A tibble: 3 × 6\n  geo_value .pred forecast_date target_date .pred_distn_value\n  &lt;chr&gt;     &lt;dbl&gt; &lt;date&gt;        &lt;date&gt;                  &lt;dbl&gt;\n1 ca        0.218 2021-04-01    2021-04-29              0.137\n2 ca        0.218 2021-04-01    2021-04-29              0.218\n3 ca        0.218 2021-04-01    2021-04-29              0.300\n# ℹ 1 more variable: .pred_distn_quantile_level &lt;dbl&gt;\n\n\nor into a “wide” epi_df\n\nepi_arx$predictions |&gt;\n  pivot_quantiles_wider(.pred_distn)\n\n# A tibble: 1 × 7\n  geo_value .pred forecast_date target_date `0.1` `0.5` `0.9`\n  &lt;chr&gt;     &lt;dbl&gt; &lt;date&gt;        &lt;date&gt;      &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;\n1 ca        0.218 2021-04-01    2021-04-29  0.137 0.218 0.300"
+  },
+  {
+    "objectID": "slides/lecture4.html#predict-with-fitted-arx-split-sample",
+    "href": "slides/lecture4.html#predict-with-fitted-arx-split-sample",
+    "title": "EpiData Workshop 2025",
+    "section": "Predict with fitted ARX (split-sample)",
+    "text": "Predict with fitted ARX (split-sample)\n\narx_forecaster fits a model to the training set, and outputs only one prediction (for time \\(t_0+h\\)).\nTo get predictions for the test set:\n\n\npredict(epi_arx$epi_workflow, test)\n\nAn `epi_df` object, 707 x 6 with metadata:\n* geo_type  = state\n* time_type = day\n* as_of     = 2025-04-13 07:46:06.137479\n\n# A tibble: 707 × 6\n   geo_value time_value .pred .pred_distn forecast_date target_date\n   &lt;chr&gt;     &lt;date&gt;     &lt;dbl&gt;   &lt;qtls(3)&gt; &lt;date&gt;        &lt;date&gt;     \n 1 ca        2021-04-02 0.213     [0.213] 2021-04-01    2021-04-29 \n 2 ca        2021-04-03 0.202     [0.202] 2021-04-01    2021-04-29 \n 3 ca        2021-04-04 0.197     [0.197] 2021-04-01    2021-04-29 \n 4 ca        2021-04-05 0.201     [0.201] 2021-04-01    2021-04-29 \n 5 ca        2021-04-06 0.199     [0.199] 2021-04-01    2021-04-29 \n 6 ca        2021-04-07 0.195     [0.195] 2021-04-01    2021-04-29 \n 7 ca        2021-04-08 0.195     [0.195] 2021-04-01    2021-04-29 \n 8 ca        2021-04-09 0.196     [0.196] 2021-04-01    2021-04-29 \n 9 ca        2021-04-10 0.208     [0.208] 2021-04-01    2021-04-29 \n10 ca        2021-04-11 0.213     [0.213] 2021-04-01    2021-04-29 \n# ℹ 697 more rows"
+  },
+  {
+    "objectID": "slides/lecture4.html#predict-with-arx-when-re-fitting",
+    "href": "slides/lecture4.html#predict-with-arx-when-re-fitting",
+    "title": "EpiData Workshop 2025",
+    "section": "Predict with ARX (when re-fitting)",
+    "text": "Predict with ARX (when re-fitting)\n\nIn practice, if we want to re-train the forecasters as new data arrive, we fit and predict combining arx_forecaster with epix_slide\nFrom now on, we will only used versioned data, and make predictions once a week"
+  },
+  {
+    "objectID": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window",
+    "href": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window",
+    "title": "EpiData Workshop 2025",
+    "section": "Predict with ARX (re-fitting on trailing window)",
+    "text": "Predict with ARX (re-fitting on trailing window)\n\nh &lt;- 28         # horizon\nw &lt;- 120 + h    # trailing window length\n\n# Specify the forecast dates\nfc_time_values &lt;- seq(from = t0_date, to = as.Date(\"2023-02-09\"), by = \"1 week\")\n\n# Slide the arx_forecaster over the epi_archive\npred_arx &lt;- ca_archive |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"cases\", \"deaths\"), \n                   trainer = linear_reg(),\n                   args_list = arx_args_list(lags = 0, ahead = h, quantile_levels = c(0.1, 0.9))\n  )$predictions |&gt;\n    pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#predict-with-arx",
+    "href": "slides/lecture4.html#predict-with-arx",
+    "title": "EpiData Workshop 2025",
+    "section": "Predict with ARX",
+    "text": "Predict with ARX\n\n\n\nNote (window length)\n\n\nWe set \\(w = 120 + h\\) to match the window size of the ARX model we fitted manually.\nWhen considering a window from \\(t-w\\) to \\(t\\), we had access to all outcomes in that window, and to all predictors between \\(t-w-h\\) and \\(t-h\\).\n(That’s because we lagged \\(x\\) before applying the window.)\nSo we were “cheating” by saying that the trailing window had length \\(w=120\\), as its actual size was \\(120+h\\)!\n\n\n\n\n\n\nNote (all past)\n\n\nThe method fitting on all past data up to the forecasting date can be implemented by setting:\n.before = Inf in epix_slide()."
+  },
+  {
+    "objectID": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window-1",
+    "href": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Predict with ARX (re-fitting on trailing window)",
+    "text": "Predict with ARX (re-fitting on trailing window)\n\n\npred_arx \n\n# A tibble: 98 × 8\n   version    geo_value  .pred forecast_date target_date  `0.1`  `0.5` `0.9`\n * &lt;date&gt;     &lt;chr&gt;      &lt;dbl&gt; &lt;date&gt;        &lt;date&gt;       &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl&gt;\n 1 2021-04-01 ca        0.396  2021-03-31    2021-04-28  0.192  0.396  0.599\n 2 2021-04-08 ca        0.395  2021-04-07    2021-05-05  0.197  0.395  0.594\n 3 2021-04-15 ca        0.403  2021-04-14    2021-05-12  0.211  0.403  0.595\n 4 2021-04-22 ca        0.312  2021-04-21    2021-05-19  0.142  0.312  0.482\n 5 2021-04-29 ca        0.261  2021-04-28    2021-05-26  0.0879 0.261  0.433\n 6 2021-05-06 ca        0.209  2021-05-05    2021-06-02  0.0238 0.209  0.394\n 7 2021-05-13 ca        0.158  2021-05-12    2021-06-09  0      0.158  0.345\n 8 2021-05-20 ca        0.118  2021-05-19    2021-06-16  0      0.118  0.296\n 9 2021-05-27 ca        0.0775 2021-05-26    2021-06-23  0      0.0775 0.239\n10 2021-06-03 ca        0.0552 2021-06-02    2021-06-30  0      0.0552 0.137\n# ℹ 88 more rows"
+  },
+  {
+    "objectID": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window-2",
+    "href": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window-2",
+    "title": "EpiData Workshop 2025",
+    "section": "Predict with ARX (re-fitting on trailing window)",
+    "text": "Predict with ARX (re-fitting on trailing window)\n\n\n\n        MAE     MASE  Coverage\n 0.07889637 264.5207 0.4285714"
+  },
+  {
+    "objectID": "slides/lecture4.html#customizing-arx_forecaster",
+    "href": "slides/lecture4.html#customizing-arx_forecaster",
+    "title": "EpiData Workshop 2025",
+    "section": "Customizing arx_forecaster()",
+    "text": "Customizing arx_forecaster()\n\narx_forecaster(\n  epi_data = train, \n  outcome = \"deaths\", \n  predictors = c(\"cases\", \"deaths\"),\n  trainer = linear_reg() |&gt; set_engine(\"lm\"),\n  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n)\n\n\n\nModify predictors to add/drop predictors\n\ne.g. drop deaths for regression with a lagged predictor, or drop cases to get AR model\ndefault: predictors = outcome"
+  },
+  {
+    "objectID": "slides/lecture4.html#customizing-arx_forecaster-1",
+    "href": "slides/lecture4.html#customizing-arx_forecaster-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Customizing arx_forecaster()",
+    "text": "Customizing arx_forecaster()\n\narx_forecaster(\n  epi_data = train, \n  outcome = \"deaths\", \n  predictors = c(\"cases\", \"deaths\"),\n  trainer = linear_reg(),\n  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n)\n\n\nModify arx_args_list to change lags, horizon, quantile levels, …\n\n\n\narx_args_list(\n  lags = c(0L, 7L, 14L),\n  ahead = 7L,\n  n_training = Inf,\n  forecast_date = NULL,\n  target_date = NULL,\n  adjust_latency = c(\"none\", \"extend_ahead\", \"extend_lags\", \"locf\"),\n  warn_latency = TRUE,\n  quantile_levels = c(0.05, 0.95),\n  symmetrize = TRUE,\n  nonneg = TRUE,\n  quantile_by_key = character(0L),\n  check_enough_data_n = NULL,\n  check_enough_data_epi_keys = NULL,\n  ...\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#customizing-arx_forecaster-2",
+    "href": "slides/lecture4.html#customizing-arx_forecaster-2",
+    "title": "EpiData Workshop 2025",
+    "section": "Customizing arx_forecaster()",
+    "text": "Customizing arx_forecaster()\nChange predictors: doctor visits instead of cases\n\ndv_archive &lt;- pub_covidcast(\n  source = \"doctor-visits\",\n  signals = \"smoothed_adj_cli\",\n  time_type = \"day\",\n  geo_type = \"state\",\n  time_values = epirange(20200401, 20230401),\n  geo_values = \"*\",\n  issues = epirange(20200401, 20230401)) |&gt;\n  select(geo_value, time_value, version = issue, doctor_visits = value) |&gt;\n  arrange(geo_value, time_value) |&gt;\n  as_epi_archive(compactify = FALSE)"
+  },
+  {
+    "objectID": "slides/lecture4.html#customizing-arx_forecaster-3",
+    "href": "slides/lecture4.html#customizing-arx_forecaster-3",
+    "title": "EpiData Workshop 2025",
+    "section": "Customizing arx_forecaster()",
+    "text": "Customizing arx_forecaster()\nChange predictors: doctor visits instead of cases\n\npred_arx_hosp &lt;- ca_archive_dv |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"deaths\", \"doctor_visits\"), \n                   trainer = linear_reg(),\n                   args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n  )$predictions |&gt;\n    pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-doctor-visits-instead-of-cases-in-predictor-set",
+    "href": "slides/lecture4.html#predictions-doctor-visits-instead-of-cases-in-predictor-set",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (doctor visits instead of cases in predictor set)",
+    "text": "Predictions (doctor visits instead of cases in predictor set)\n\n\n\n        MAE     MASE  Coverage\n 0.06040473 202.5227 0.5510204"
+  },
+  {
+    "objectID": "slides/lecture4.html#customizing-arx_forecaster-4",
+    "href": "slides/lecture4.html#customizing-arx_forecaster-4",
+    "title": "EpiData Workshop 2025",
+    "section": "Customizing arx_forecaster()",
+    "text": "Customizing arx_forecaster()\nAdd more lags\n\npred_arx_more_lags &lt;- ca_archive_dv |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"deaths\", \"doctor_visits\"), \n                   trainer = linear_reg(),\n                   args_list = arx_args_list(\n                     lags = c(0, 7, 14), \n                     ahead = 28, quantile_levels = c(0.1, 0.9)\n                   )\n  )$predictions |&gt;\n    pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-more-lags",
+    "href": "slides/lecture4.html#predictions-more-lags",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (more lags)",
+    "text": "Predictions (more lags)\n\n\n\n      MAE     MASE  Coverage\n 0.077735 260.6269 0.3367347"
+  },
+  {
+    "objectID": "slides/lecture4.html#customizing-arx_forecaster-5",
+    "href": "slides/lecture4.html#customizing-arx_forecaster-5",
+    "title": "EpiData Workshop 2025",
+    "section": "Customizing arx_forecaster()",
+    "text": "Customizing arx_forecaster()\nMultiple horizons\n\nforecast_times &lt;- seq(from = t0_date, to = as.Date(\"2023-02-23\"), by = \"1 month\")\npred_h_days_ahead &lt;- function(epi_archive, ahead = 7) {\n  epi_archive |&gt;\n    epix_slide(\n      ~ arx_forecaster(epi_data = .x,\n                       outcome = \"deaths\", \n                       predictors = c(\"deaths\", \"doctor_visits\"), \n                       trainer = linear_reg() |&gt; set_engine(\"lm\"),\n                       args_list = arx_args_list(\n                         lags = 0,  \n                         ahead = ahead,\n                         quantile_levels = c(0.1, 0.9))\n      )$predictions |&gt; \n        pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = forecast_times\n  )\n}\nh &lt;- c(7, 14, 21, 28)\nforecasts &lt;- bind_rows(map(h, ~ pred_h_days_ahead(ca_archive_dv, ahead = .x)))"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-multiple-horizons",
+    "href": "slides/lecture4.html#predictions-multiple-horizons",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (multiple horizons)",
+    "text": "Predictions (multiple horizons)"
+  },
+  {
+    "objectID": "slides/lecture4.html#changing-trainer",
+    "href": "slides/lecture4.html#changing-trainer",
+    "title": "EpiData Workshop 2025",
+    "section": "Changing trainer",
+    "text": "Changing trainer\n\narx_forecaster(epi_data = train |&gt; as_epi_df(), \n               outcome = \"deaths\", \n               predictors = c(\"cases\", \"deaths\"),\n               trainer = linear_reg() |&gt; set_engine(\"lm\"),\n               args_list = arx_args_list(lags = 0, ahead = 28,\n                                         quantile_levels = c(0.1, 0.9)))\n\nModify trainer to use a model that is not lm (default)\n\ne.g. trainer = rand_forest()\ncan use any {parsnip} models, see list\n{epipredict} has a number of custom engines as well"
+  },
+  {
+    "objectID": "slides/lecture4.html#changing-trainer-1",
+    "href": "slides/lecture4.html#changing-trainer-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Changing trainer",
+    "text": "Changing trainer\n\npred_arx_rf &lt;- ca_archive_dv |&gt;\n  epix_slide(\n    ~ arx_forecaster(epi_data = .x,\n                     outcome = \"deaths\", \n                     predictors = c(\"deaths\", \"doctor_visits\"), \n                     trainer = parsnip::rand_forest(mode = \"regression\"), # defaults to ranger\n                     args_list = arx_args_list(\n                       lags = 0,\n                       ahead = 28,\n                       quantile_levels = c(0.1, 0.9))\n                     )$predictions |&gt;\n        pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-trained-using-random-forest",
+    "href": "slides/lecture4.html#predictions-trained-using-random-forest",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (trained using random forest)",
+    "text": "Predictions (trained using random forest)\n\n\n\n        MAE     MASE  Coverage\n 0.08085227 271.0784 0.1122449"
+  },
+  {
+    "objectID": "slides/lecture4.html#warning",
+    "href": "slides/lecture4.html#warning",
+    "title": "EpiData Workshop 2025",
+    "section": "Warning!",
+    "text": "Warning!\n\nRandom forests has really poor coverage here.\nThe reason is the way intervals are calculated.\nCan change engine to get better coverage:\n\nspecify engine = \"grf_quantiles\" in the rand_forest call"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-from-a-random-forest-with-grf_quantiles",
+    "href": "slides/lecture4.html#predictions-from-a-random-forest-with-grf_quantiles",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions from a random forest with grf_quantiles",
+    "text": "Predictions from a random forest with grf_quantiles\n\n\n\n        MAE     MASE  Coverage\n 0.08840922 296.4151 0.3979592"
+  },
+  {
+    "objectID": "slides/lecture4.html#geo-pooling",
+    "href": "slides/lecture4.html#geo-pooling",
+    "title": "EpiData Workshop 2025",
+    "section": "Geo-pooling",
+    "text": "Geo-pooling\n\nWhen we observe data over time from multiple locations (e.g. states or counties).\n\n\n\nWe could\n\nEstimate coefficients separately for each location (as we have done so far), or\nFit one model using all locations together at each time point (geo-pooling).\nEstimated coefficients will not be location specific.\n\n\n\n\nWe will now pool data from all US states to make predictions."
+  },
+  {
+    "objectID": "slides/lecture4.html#geo-pooling-1",
+    "href": "slides/lecture4.html#geo-pooling-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Geo-pooling",
+    "text": "Geo-pooling\n\npred_arx_geo_pool &lt;- usa_archive_dv |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"deaths\", \"doctor_visits\"), \n                   args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n  )$predictions |&gt;\n    pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)\n\nNote: geo-pooling is the default in epipredict"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-geo-pooling-h28",
+    "href": "slides/lecture4.html#predictions-geo-pooling-h28",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (geo-pooling, \\(h=28\\))",
+    "text": "Predictions (geo-pooling, \\(h=28\\))\n\n\n\n         MAE     MASE  Coverage\nCA 0.1342220 450.0143 0.8673469\nMA 0.1200344 296.9929 0.8041237\nNY 0.1328566 327.4008 0.8556701\nTX 0.1601115 343.0498 0.8350515"
+  },
+  {
+    "objectID": "slides/lecture4.html#predict-without-geo-pooling",
+    "href": "slides/lecture4.html#predict-without-geo-pooling",
+    "title": "EpiData Workshop 2025",
+    "section": "Predict without geo-pooling",
+    "text": "Predict without geo-pooling\n\npred_arx_no_geo_pool &lt;- function(archive, ahead = 28, lags = 0){\n  archive |&gt;\n    epix_slide(\n      ~ group_by(.x, geo_value) |&gt; \n        group_map(.keep = TRUE, function(group_data, group_key) {\n          arx_forecaster(epi_data = group_data,\n                         outcome = \"deaths\", \n                         predictors = c(\"deaths\", \"doctor_visits\"), \n                         trainer = linear_reg() |&gt; set_engine(\"lm\"),\n                         args_list = arx_args_list(\n                           lags = lags,\n                           ahead = ahead,\n                           quantile_levels = c(0.1, 0.9))\n                         )$predictions |&gt;\n            pivot_quantiles_wider(.pred_distn)\n        }) |&gt;\n        list_rbind(),\n    .before = w, \n    .versions = fc_time_values\n    )}\n\npred_no_geo_pool_28 &lt;- pred_arx_no_geo_pool(usa_archive_dv$DT |&gt; \n                                              filter(geo_value %in% c(\"ca\", \"ma\", \"ny\", \"tx\")) |&gt; \n                                              as_epi_archive())"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-without-geo-pooling-h28",
+    "href": "slides/lecture4.html#predictions-without-geo-pooling-h28",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (without geo-pooling, \\(h=28\\))",
+    "text": "Predictions (without geo-pooling, \\(h=28\\))\n\n\n\n          MAE     MASE  Coverage\nCA 0.06040473 202.5227 0.5510204\nMA 0.33532528 823.3607 0.3367347\nNY 0.21072571 516.3337 0.5408163\nTX 0.14144058 306.2029 0.4285714"
+  },
+  {
+    "objectID": "slides/lecture4.html#geo-pooling-or-not",
+    "href": "slides/lecture4.html#geo-pooling-or-not",
+    "title": "EpiData Workshop 2025",
+    "section": "Geo-pooling or not?",
+    "text": "Geo-pooling or not?\n\nGeo-pooled predictions tend to be more stable\nGenerally with wider intervals (and better coverage)\nMeanwhile, predictions from state-wise models tend to be more volatile\n\nThe extent to which this occurs differs based on the horizon.\nPreviously we studied \\(h=28\\). What happens for \\(h=7\\)?"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-geo-pooling-h-7",
+    "href": "slides/lecture4.html#predictions-geo-pooling-h-7",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (geo-pooling, \\(h = 7\\))",
+    "text": "Predictions (geo-pooling, \\(h = 7\\))\n\n\n\n          MAE     MASE  Coverage\nCA 0.09676644 320.9851 0.9081633\nMA 0.09278403 234.9664 0.8350515\nNY 0.09029822 222.3488 0.9381443\nTX 0.11307616 239.1528 0.8659794"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-without-geo-pooling-h7",
+    "href": "slides/lecture4.html#predictions-without-geo-pooling-h7",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (without geo-pooling, \\(h=7\\))",
+    "text": "Predictions (without geo-pooling, \\(h=7\\))\n\n\n\n          MAE     MASE  Coverage\nCA 0.03971988 131.7553 0.6734694\nMA 0.06579422 168.3530 0.5714286\nNY 0.05005395 124.5359 0.6836735\nTX 0.05756194 122.0824 0.7040816"
+  },
+  {
+    "objectID": "slides/lecture4.html#what-are-these-arx-intervals",
+    "href": "slides/lecture4.html#what-are-these-arx-intervals",
+    "title": "EpiData Workshop 2025",
+    "section": "What are these ARX intervals?",
+    "text": "What are these ARX intervals?\n\n{epipredict} takes quantiles of training residuals to form its prediction intervals\nIn comparison to traditional (parametric) intervals from lm(), this is more flexible\nIt can in principle adapt to asymmetric or heavy-tailed error distributions\n\n\nTaking quantiles of training residuals can be problematic if the model is overfit.\n\nQuantile regression provides an alternative, wherein we estimate these quantiles directly\nTechnically, grf_quantiles was using Quantile Loss with Random Forests"
+  },
+  {
+    "objectID": "slides/lecture4.html#quantile-regression",
+    "href": "slides/lecture4.html#quantile-regression",
+    "title": "EpiData Workshop 2025",
+    "section": "Quantile regression",
+    "text": "Quantile regression\nNow we directly target conditional quantiles of the outcome over time.\nEstimating tail quantiles requires more data, so\n\nunsuitable for settings with small training set (e.g. trailing window on one state)\ncan benefit by combination with geo-pooling (much more data to train on)\n\n\nlibrary(quantreg)\n\npred_qr_geo_pool &lt;- usa_archive_dv |&gt;\n  epix_slide(\n    ~ arx_forecaster(epi_data = .x,\n                     outcome = \"deaths\", \n                     predictors = c(\"deaths\", \"doctor_visits\"), \n                     trainer = quantile_reg(),\n                     args_list = arx_args_list(\n                       lags = 0, \n                       ahead = 28,\n                       quantile_levels = c(0.1, 0.9))\n                     )$predictions |&gt;\n        pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-geo-pooling-quantile-regression-h28",
+    "href": "slides/lecture4.html#predictions-geo-pooling-quantile-regression-h28",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (geo-pooling + quantile regression, \\(h=28\\))",
+    "text": "Predictions (geo-pooling + quantile regression, \\(h=28\\))\n\n\n\n         MAE     MASE  Coverage\nCA 0.1447173 485.2027 0.8877551\nMA 0.1214715 300.5488 0.7216495\nNY 0.1384252 341.1235 0.7525773\nTX 0.1604103 343.6901 0.7835052"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-geo-pooling-linear-regression-h28",
+    "href": "slides/lecture4.html#predictions-geo-pooling-linear-regression-h28",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (geo-pooling + linear regression, \\(h=28\\))",
+    "text": "Predictions (geo-pooling + linear regression, \\(h=28\\))\n\n\n\n         MAE     MASE  Coverage\nCA 0.1342220 450.0143 0.8673469\nMA 0.1200344 296.9929 0.8041237\nNY 0.1328566 327.4008 0.8556701\nTX 0.1601115 343.0498 0.8350515"
+  },
+  {
+    "objectID": "slides/lecture4.html#build-a-forecaster-from-scratch-1",
+    "href": "slides/lecture4.html#build-a-forecaster-from-scratch-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Build a forecaster from scratch",
+    "text": "Build a forecaster from scratch\n\nSo far, we performed manual pre-processing,\nand then relied on a canned forecaster\nto automatically perform more pre-processing, training, predicting, and post-processing.\n\n\n\n\nWhat if we want more direct control on each single step?"
+  },
+  {
+    "objectID": "slides/lecture4.html#under-the-hood-of-arx_forecaster",
+    "href": "slides/lecture4.html#under-the-hood-of-arx_forecaster",
+    "title": "EpiData Workshop 2025",
+    "section": "Under the hood of arx_forecaster()",
+    "text": "Under the hood of arx_forecaster()\n\n# A preprocessing \"recipe\" that turns raw data into features / response\nrec &lt;- epi_recipe(ca) |&gt;\n  step_epi_lag(cases, lag = c(0, 7, 14)) |&gt;\n  step_epi_lag(deaths, lag = c(0, 7, 14)) |&gt;\n  step_epi_ahead(deaths, ahead = 28) |&gt;\n  step_epi_naomit()\n\n# Training engine\neng &lt;- quantile_reg(quantile_levels = c(.1, .5, .9))\n\n# A post-processing routine describing what to do to the predictions\nfrost &lt;- frosting() |&gt;\n  layer_predict() |&gt;\n  layer_threshold(.pred, lower = 0) |&gt; # predictions / intervals should be non-negative\n  layer_add_target_date() |&gt;\n  layer_add_forecast_date()\n\n# Bundle up the preprocessor, training engine, and postprocessor\n# We use quantile regression\newf &lt;- epi_workflow(rec, eng, frost)\n\n# Fit it to data (we could fit this to ANY data that has the same format)\ntrained_ewf &lt;- fit(ewf, data = ca)\n\n# Make predictions from the end of our training data\n# we could have made predictions using the same model on ANY test data\nfcasts &lt;- forecast(trained_ewf)"
+  },
+  {
+    "objectID": "slides/lecture4.html#predicting-influenza-hospitalizations",
+    "href": "slides/lecture4.html#predicting-influenza-hospitalizations",
+    "title": "EpiData Workshop 2025",
+    "section": "Predicting influenza hospitalizations",
+    "text": "Predicting influenza hospitalizations\n\nCurrent task: predict influenza hospitalizations for all states + DC + PR.\nForecasts submitted to CDC Flusight Forecast Hub\n\nSpecifically:\n\nFrom November 20, 2024 until May 31, 2025\nEvery Wednesday at 11pm EDT\nPredict 0, 1, 2, 3 epiweeks ahead\nPoint forecast + 23 quantiles\nResponse is NHSN Weekly Hospitalizations\n\nFrom here on, the emphasis is “how” to make these adjustments. Ran out of time to evaluate!"
+  },
+  {
+    "objectID": "slides/lecture4.html#aside-data-issues",
+    "href": "slides/lecture4.html#aside-data-issues",
+    "title": "EpiData Workshop 2025",
+    "section": "Aside: data issues",
+    "text": "Aside: data issues\n\nHospital reporting was down for a period over the summer.\nThe current data doesn’t seem to match the historical data very well."
+  },
+  {
+    "objectID": "slides/lecture4.html#we-dont-know-if-we-trust-the-data-yet-enough",
+    "href": "slides/lecture4.html#we-dont-know-if-we-trust-the-data-yet-enough",
+    "title": "EpiData Workshop 2025",
+    "section": "We don’t know if we trust the data yet enough",
+    "text": "We don’t know if we trust the data yet enough\n\nIt may get revised significantly\nLet’s do something super simple, until we’re more confident\n\n\nClimatological forecaster\n\nFor a given epiweek, predict the historical quantiles\n\n\nMake adjustments to address the fact that we have some new data\n\n\nPrivledge the history\n\n\nThink like the weather: “what is the typical weather in February in Georgia, that’s our forecast”"
+  },
+  {
+    "objectID": "slides/lecture4.html#climatological-forecaster",
+    "href": "slides/lecture4.html#climatological-forecaster",
+    "title": "EpiData Workshop 2025",
+    "section": "Climatological forecaster",
+    "text": "Climatological forecaster\n\nclimatological_model &lt;- function(epi_data, forecast_date, ahead, window_size = 3, geo_agg = FALSE) {\n  forecast_week &lt;- epiweek(forecast_date)\n  last_date_data &lt;- max(epi_data$time_value)\n  probs &lt;- c(.1, .5, .9)\n  filtered &lt;- epi_data |&gt; \n    filter(\n      (season != \"2020/21\") & (season != \"2021/22\"), # drop weird years\n      # keep data either within the window, or within the past window weeks\n      (abs(forecast_week + ahead - epiweek) &lt;= window_size) |\n        (last_date_data - time_value &lt;= window_size * 7)\n    )\n  if (geo_agg) {\n    filtered &lt;- filtered |&gt;\n      left_join(state_census |&gt; select(geo_value = abbr, pop), by = \"geo_value\") |&gt;\n      mutate(nhsn = nhsn / pop * 1e5) %&gt;%\n      select(geo_value, epiweek, epiyear, season, season_week, nhsn, pop)\n  } else {\n    filtered &lt;- filtered |&gt; group_by(geo_value)\n  }\n  naive_preds &lt;- filtered |&gt; reframe(enframe(\n    quantile(nhsn, probs = probs, na.rm = TRUE, type = 8), name = \"quantile\"\n  )) |&gt;\n    mutate(\n      forecast_date = forecast_date,\n      target_end_date = forecast_date + ahead * 7,\n      quantile = as.numeric(sub(\"%\", \"\", quantile)) / 100,\n      value = pmax(0, value)\n    )\n  if (geo_agg) {\n    naive_preds &lt;- naive_preds |&gt;\n      expand_grid(filtered |&gt; distinct(geo_value, pop)) |&gt;\n      mutate(value = value * pop / 1e5) |&gt;\n      select(-pop) |&gt;\n      select(geo_value, forecast_date, target_end_date, quantile, value) |&gt;\n      arrange(geo_value, forecast_date, target_end_date)\n  }\n  naive_preds |&gt; ungroup() |&gt; mutate(value = pmax(0, value))\n}"
+  },
+  {
+    "objectID": "slides/lecture4.html#climate-predictions-for-this-week",
+    "href": "slides/lecture4.html#climate-predictions-for-this-week",
+    "title": "EpiData Workshop 2025",
+    "section": "Climate predictions for this week",
+    "text": "Climate predictions for this week"
+  },
+  {
+    "objectID": "slides/lecture4.html#almost-our-production-forecaster-data-munging",
+    "href": "slides/lecture4.html#almost-our-production-forecaster-data-munging",
+    "title": "EpiData Workshop 2025",
+    "section": "Almost our production forecaster (data munging)",
+    "text": "Almost our production forecaster (data munging)\n\nclimate &lt;- climatological_feature(climate_data |&gt; select(nhsn, epiweek, season, geo_value))\nnssp &lt;- pub_covidcast( # time_value is first day of the epiweek\n  source = \"nssp\",\n  signal = \"pct_ed_visits_influenza\",\n  time_type = \"week\",\n  geo_type = \"state\",\n  geo_values = \"*\"\n) |&gt;\n  select(geo_value, time_value, nssp = value)\n\nflu_data &lt;- hhs_v_nhsn |&gt;\n  select(time_value, geo_value, hhs = new_source) |&gt;\n  left_join(nssp |&gt; mutate(time_value = time_value + 6), by = join_by(geo_value, time_value))\n\nn_geos &lt;- n_distinct(flu_data$geo_value)\nmax_time_value &lt;- max(flu_data$time_value)\nempty_data &lt;- tibble(\n  time_value = rep(max_time_value + days(1:3 * 7), each = n_geos),\n  geo_value = rep(unique(flu_data$geo_value), times = 3),\n  nssp = NA, hhs = NA\n)\n\nflu_data &lt;- flu_data |&gt;\n  filter(month(time_value) %in% 8:12, year(time_value) %nin% c(2020, 2021)) |&gt;\n  add_row(empty_data) |&gt;\n  mutate(epiweek = epiweek(time_value)) |&gt;\n  left_join(climate, by = join_by(geo_value, epiweek)) |&gt;\n  select(!epiweek) |&gt;\n  filter(geo_value %nin% c(\"as\", \"vi\", \"gu\", \"mp\", \"usa\")) |&gt;\n  arrange(geo_value, time_value) |&gt;\n  as_epi_df()"
+  },
+  {
+    "objectID": "slides/lecture4.html#almost-our-production-forecaster-workflow",
+    "href": "slides/lecture4.html#almost-our-production-forecaster-workflow",
+    "title": "EpiData Workshop 2025",
+    "section": "Almost our production forecaster (workflow)",
+    "text": "Almost our production forecaster (workflow)\n\nr &lt;- epi_recipe(flu_data) |&gt;\n  step_population_scaling(\n    hhs, nssp,\n    df = epidatasets::state_census,\n    df_pop_col = \"pop\",\n    create_new = FALSE,\n    rate_rescaling = 1e5,\n    by = c(\"geo_value\" = \"abbr\")) |&gt;\n  recipes::step_mutate(hhs = hhs^(1/4), nssp = nssp^(1/4), climate_pred = climate_pred^(1/4)) |&gt;\n  step_epi_lag(hhs, lag = c(0, 7, 14)) |&gt;\n  step_epi_lag(nssp, lag = c(0, 7, 14)) |&gt;\n  step_epi_ahead(hhs, ahead = 21) |&gt;\n  step_epi_ahead(climate_pred, ahead = 21, role = \"predictor\") |&gt;\n  step_epi_naomit()\n\ne &lt;- quantile_reg(quantile_levels = c(0.1, 0.25, 0.5, 0.75, 0.9)) \n\nf &lt;- frosting() |&gt;\n  layer_predict() |&gt;\n  layer_threshold(.pred, lower = 0)\newf &lt;- epi_workflow(r, e, f)\ntrained_ewf &lt;- ewf |&gt; fit(flu_data)\n\npreds &lt;- forecast(trained_ewf) |&gt;\n  left_join(epidatasets::state_census |&gt; select(pop, abbr), join_by(geo_value == abbr)) |&gt;\n  mutate(\n    .pred = .pred^4 * pop / 1e5,\n    forecast_date = time_value + days(7),\n    target_date = forecast_date + days(14),\n    time_value = NULL,\n    pop = NULL\n  )"
+  },
+  {
+    "objectID": "slides/lecture4.html#plot-our-forecasts",
+    "href": "slides/lecture4.html#plot-our-forecasts",
+    "title": "EpiData Workshop 2025",
+    "section": "Plot our forecasts",
+    "text": "Plot our forecasts"
+  },
+  {
+    "objectID": "slides/lecture4.html#ensembling",
+    "href": "slides/lecture4.html#ensembling",
+    "title": "EpiData Workshop 2025",
+    "section": "Ensembling",
+    "text": "Ensembling\nInstead of choosing one model, we can combine the predictions from multiple base models. Ensemble types:\n\nuntrained: combine base models, agnostic to past performance\ntrained: weight base models, accounting for past performance\n\nSimplest untrained method: simple average of base model forecasts\n\\[\n\\hat{y}^{\\text{avg}}_{t+h|t} = \\frac{1}{p} \\sum_{j=1}^p \\hat{y}^j_{t+h|t}\n\\]\nA more robust option: simple median of base model forecasts\n\\[\n\\hat{y}^{\\text{med}}_{t+h|t} = \\mathrm{median}\\Big\\{ \\hat{y}^j_{t+h|t} : j = 1,\\dots,p \\Big\\}\n\\]"
+  },
+  {
+    "objectID": "slides/lecture4.html#example-from-the-covid-19-forecast-hub",
+    "href": "slides/lecture4.html#example-from-the-covid-19-forecast-hub",
+    "title": "EpiData Workshop 2025",
+    "section": "Example from the Covid-19 Forecast Hub",
+    "text": "Example from the Covid-19 Forecast Hub"
+  },
+  {
+    "objectID": "slides/lecture4.html#two-key-goals-of-ensembling",
+    "href": "slides/lecture4.html#two-key-goals-of-ensembling",
+    "title": "EpiData Workshop 2025",
+    "section": "Two key goals of ensembling",
+    "text": "Two key goals of ensembling\n1 Compete-with-best: ensemble should have accuracy competitive with best individual constituent model\n\nRobustness-over-all: ensemble should have greater robustness than any individual constituent model\n\nTypically these are hard to accomplish simultaneously, and untrained methods excel at point 2, whereas trained methods can achieve point 1"
+  },
+  {
+    "objectID": "slides/lecture4.html#linear-stacking",
+    "href": "slides/lecture4.html#linear-stacking",
+    "title": "EpiData Workshop 2025",
+    "section": "Linear stacking",
+    "text": "Linear stacking\nOne of the simplest trained ensemble methods is to directly fit a weighted combination of base forecasts to optimize accuracy (MSE, MAE, etc.), often called linear stacking: e.g., to form the forecast at time \\(t\\), we solve\n\\[\\begin{alignat*}{2}\n&\\min_{w \\in \\R^p} && \\hspace{-6pt} \\sum_{s=t_0+1}^t \\bigg( y_s - \\sum_{j=1}^p\nw_j \\cdot \\hat{y}^j_{s|s-h} \\bigg)^2 \\\\   \n&\\st \\quad && \\sum_{j=1}^p w_j = 1, \\;\\;\\text{and} \\;\\; w_j \\geq 0, \\;\nj=1,\\dots,p   \n\\end{alignat*}\\]\nthen use\n\\[\n\\hat{y}^{\\text{stack}}_{t+h|t} = \\sum_{j=1}^p \\hat{w}^t_j \\cdot\n\\hat{y}^j_{t+h|t}\n\\]\nNote that the stacking optimization problem uses forward-looking predictions (as in time series cross-validation)"
+  },
+  {
+    "objectID": "slides/lecture4.html#recalibration",
+    "href": "slides/lecture4.html#recalibration",
+    "title": "EpiData Workshop 2025",
+    "section": "Recalibration",
+    "text": "Recalibration\n\nWe have seen that prediction intervals often have empirical coverage &lt;&lt; nominal coverage, e.g., our 80% predictive intervals in practice cover \\(\\approx\\) 60% of the time\nRecalibration methods aim at adjusting the intervals so that nominal coverage \\(\\approx\\) empirical coverage"
+  },
+  {
+    "objectID": "slides/lecture4.html#quantile-tracking",
+    "href": "slides/lecture4.html#quantile-tracking",
+    "title": "EpiData Workshop 2025",
+    "section": "Quantile tracking",
+    "text": "Quantile tracking\nQuantile tracking is a method for producing calibrated prediction intervals from base forecasts and scores. In the simplest case, we can take the score to be absolute error of point forecasts:\n\\[e_t = |y_t - \\hat y_{t|t-1}|\\]\n\nLet \\(\\hat q_{t}^{1-\\alpha}\\) be a predicted level \\(1-\\alpha\\) quantile of the distribution of \\(e_t\\)\nDefine \\(I_{t|t-1}^{1-\\alpha} = [\\hat{y}_{t|t-1} - \\hat{q}_t^{1-\\alpha}, \\;     \\hat{y}_{t|t-1} + \\hat{q}_t^{1-\\alpha}]\\). Note that\n\\[\n  e_t \\leq \\hat{q}_t^{1-\\alpha} \\iff y_t \\in I_{t|t-1}^{1-\\alpha}\n  \\]\nTherefore we the reduced the problem of producing prediction intervals \\(I_{t|t-1}^{1-\\alpha}\\) to one of tracking a quantile of \\(e_t\\)"
+  },
+  {
+    "objectID": "slides/lecture4.html#quantile-updates",
+    "href": "slides/lecture4.html#quantile-updates",
+    "title": "EpiData Workshop 2025",
+    "section": "Quantile updates",
+    "text": "Quantile updates\nWe begin with some estimate \\(\\hat{q}_{t_0+1}^{1-\\alpha}\\) based on a burn-in set. Then repeat the following updates as \\(t\\) increases, for a step size \\(\\eta &gt; 0\\):\n\\[\\hat q_{t+1}^{1-\\alpha} = \\begin{cases}\n\\hat q_{t}^{1-\\alpha} + \\eta(1-\\alpha) \\quad \\text{if } y_t\\notin I_{t|t-1}^{1-\\alpha} \\\\\n\\hat q_{t}^{1-\\alpha} - \\eta\\alpha \\quad \\quad \\quad \\,\\,\\, \\text{if } y_t\\in I_{t|t-1}^{1-\\alpha}\n\\end{cases}\\]\nIn words:\n\nif the latest interval does not cover, then we increase the quantile (make the next interval wider),\notherwise we decrease the quantile by (make the next interval narrower).\n\nThis method has the following guarantee:\n\\[\n\\Bigg| \\frac{1}{T} \\sum_{t=t_0+1}^{t_0+T} 1 \\big\\{ y_t \\in I_{t|t-1}^{1-\\alpha} \\big\\} - (1-\\alpha) \\Bigg| \\leq \\frac{b/\\eta + 1}{T}\n\\]\nwhere \\(b\\) is a bound on the errors (largest error possible/observable)."
+  },
+  {
+    "objectID": "slides/lecture4.html#multi-horizon-smoothing",
+    "href": "slides/lecture4.html#multi-horizon-smoothing",
+    "title": "EpiData Workshop 2025",
+    "section": "Multi-horizon smoothing",
+    "text": "Multi-horizon smoothing"
+  },
+  {
+    "objectID": "slides/lecture2.html#outline",
+    "href": "slides/lecture2.html#outline",
+    "title": "EpiData Workshop 2025",
+    "section": "Outline",
+    "text": "Outline\n\nWarmup: Examining Snapshots\nSignal processing with snapshots\nTracking Revisions\nNowcasting Using {epiprocess}\nNowcasting with Regression"
+  },
+  {
+    "objectID": "slides/lecture2.html#now-that-you-have-data-what-do-you-do-with-it",
+    "href": "slides/lecture2.html#now-that-you-have-data-what-do-you-do-with-it",
+    "title": "EpiData Workshop 2025",
+    "section": "Now that you have data, what do you do with it?",
+    "text": "Now that you have data, what do you do with it?\n\n\n\nR4DS by Wickham, Çetinkaya-Rundel, and Grolemund\n\n\n\nComplications\n\nUsually panel data (multiple locations at once)\nUsually accessing in real time\nData have revisions\nData are reported irregularly, NA’s are frequent\nIndividual streams have high signal-to-noise ratio\n\n\n\nResult: spend lots of time doing processing and dealing with corner behaviour"
+  },
+  {
+    "objectID": "slides/lecture2.html#r-packages-we-maintain-to-facilitate-typical-analyses",
+    "href": "slides/lecture2.html#r-packages-we-maintain-to-facilitate-typical-analyses",
+    "title": "EpiData Workshop 2025",
+    "section": "R packages we maintain to facilitate typical analyses",
+    "text": "R packages we maintain to facilitate typical analyses"
+  },
+  {
+    "objectID": "slides/lecture2.html#epi_df-snapshot-of-a-data-set",
+    "href": "slides/lecture2.html#epi_df-snapshot-of-a-data-set",
+    "title": "EpiData Workshop 2025",
+    "section": "epi_df: snapshot of a data set",
+    "text": "epi_df: snapshot of a data set\n\na tibble with a couple of required columns, geo_value and time_value.\narbitrary additional columns containing measured values, called signals\nadditional keys that index subsets (health region, age_group, ethnicity, etc.)\n\n\n\n\n\n\n\nepi_df\n\n\nRepresents a snapshot that contains the most up-to-date values of the signal variables, as of a given time."
+  },
+  {
+    "objectID": "slides/lecture2.html#epi_df-snapshot-of-a-dataset",
+    "href": "slides/lecture2.html#epi_df-snapshot-of-a-dataset",
+    "title": "EpiData Workshop 2025",
+    "section": "epi_df: Snapshot of a dataset",
+    "text": "epi_df: Snapshot of a dataset\n\ncan_edf &lt;- can_cases_deaths |&gt;\n  rename(geo_value = region) |&gt;\n  as_epi_df(as_of = \"2024-04-13\", other_keys = \"hr\")\ncan_edf\n\nAn `epi_df` object, 150,951 x 5 with metadata:\n* geo_type  = nation\n* time_type = day\n* other_keys = hr\n* as_of     = 2024-04-13\n\n# A tibble: 150,951 × 5\n   geo_value hr       time_value cases deaths\n * &lt;chr&gt;     &lt;chr&gt;    &lt;date&gt;     &lt;dbl&gt;  &lt;dbl&gt;\n 1 AB        South    2020-03-05     0      0\n 2 AB        Calgary  2020-03-05     1      0\n 3 AB        Central  2020-03-05     0      0\n 4 AB        Edmonton 2020-03-05     0      0\n 5 AB        North    2020-03-05     0      0\n 6 AB        Other    2020-03-05     0      0\n 7 AB        South    2020-03-06     0      0\n 8 AB        Calgary  2020-03-06     0      0\n 9 AB        Central  2020-03-06     0      0\n10 AB        Edmonton 2020-03-06     0      0\n# ℹ 150,941 more rows"
+  },
+  {
+    "objectID": "slides/lecture2.html#warm-up-plotting",
+    "href": "slides/lecture2.html#warm-up-plotting",
+    "title": "EpiData Workshop 2025",
+    "section": "Warm up: plotting",
+    "text": "Warm up: plotting\n\ncan_edf |&gt;\n  filter(geo_value == \"MB\") |&gt;\n  autoplot(cases, deaths) +\n  scale_y_continuous(name = \"\", expand = expansion(c(0, .05))) + xlab(\"\") + scale_color_delphi(name = \"\")\n\n\n\nWeird reporting behaviour.\n\nMB stopped reporting deaths by HR.\nPut them all in “Other”\nLots of missing values"
+  },
+  {
+    "objectID": "slides/lecture2.html#warm-up-handling-missingness",
+    "href": "slides/lecture2.html#warm-up-handling-missingness",
+    "title": "EpiData Workshop 2025",
+    "section": "Warm up: handling missingness",
+    "text": "Warm up: handling missingness\nTwo types of missing data\n\nExplicit missingness means that there’s an NA\nImplicit missingness means that a combination of time_value and geo_value is not in the data.\n\n\ncan_edf &lt;- can_edf |&gt;\n  complete(time_value = full_seq(time_value, period = 1), fill = list(cases = 0, deaths = 0)) \ncan_edf\n\nAn `epi_df` object, 150,951 x 5 with metadata:\n* geo_type  = nation\n* time_type = day\n* other_keys = hr\n* as_of     = 2024-04-13\n\n# A tibble: 150,951 × 5\n   time_value geo_value hr                               cases deaths\n   &lt;date&gt;     &lt;chr&gt;     &lt;chr&gt;                            &lt;dbl&gt;  &lt;dbl&gt;\n 1 2020-01-15 ON        Algoma                               0      0\n 2 2020-01-15 ON        Brant                                0      0\n 3 2020-01-15 ON        Durham                               0      0\n 4 2020-01-15 ON        Grey Bruce                           0      0\n 5 2020-01-15 ON        Haldimand-Norfolk                    0      0\n 6 2020-01-15 ON        Haliburton, Kawartha, Pine Ridge     0      0\n 7 2020-01-15 ON        Halton                               0      0\n 8 2020-01-15 ON        Hamilton                             0      0\n 9 2020-01-15 ON        Hastings and Prince Edward           0      0\n10 2020-01-15 ON        Chatham-Kent                         0      0\n# ℹ 150,941 more rows"
+  },
+  {
+    "objectID": "slides/lecture2.html#warm-up-aggregating",
+    "href": "slides/lecture2.html#warm-up-aggregating",
+    "title": "EpiData Workshop 2025",
+    "section": "Warm up: aggregating",
+    "text": "Warm up: aggregating\n\ncan_prov &lt;- can_edf |&gt;\n  sum_groups_epi_df(c(cases, deaths), group_cols = \"geo_value\")\ncan_prov\n\nAn `epi_df` object, 16,862 x 4 with metadata:\n* geo_type  = nation\n* time_type = day\n* as_of     = 2024-04-13\n\n# A tibble: 16,862 × 4\n   geo_value time_value cases deaths\n   &lt;chr&gt;     &lt;date&gt;     &lt;dbl&gt;  &lt;dbl&gt;\n 1 AB        2020-03-05     1      0\n 2 AB        2020-03-06     0      0\n 3 AB        2020-03-07     1      0\n 4 AB        2020-03-08     1      0\n 5 AB        2020-03-09     4      0\n 6 AB        2020-03-10     9      0\n 7 AB        2020-03-11     7      0\n 8 AB        2020-03-12     3      0\n 9 AB        2020-03-13     8      0\n10 AB        2020-03-14    22      0\n# ℹ 16,852 more rows"
+  },
+  {
+    "objectID": "slides/lecture2.html#warm-up-per-capita-scaling",
+    "href": "slides/lecture2.html#warm-up-per-capita-scaling",
+    "title": "EpiData Workshop 2025",
+    "section": "Warm up: per capita scaling",
+    "text": "Warm up: per capita scaling\n\ncan_prov &lt;- can_prov |&gt;\n  inner_join(prov_pop, by = join_by(geo_value == region)) |&gt;\n  mutate(case_rate = cases / pop * 1e5, death_rate = deaths / pop * 1e6) |&gt;\n  select(-pop)\n\n\n\n\nNegative incidence is often due to cummulatives being differenced\nBut sometimes due to correcting an error.\nWith luck, the source would make an adjustment.\n\n\n\nAn `epi_df` object, 15 x 4 with metadata:\n* geo_type  = nation\n* time_type = day\n* as_of     = 2024-04-13\n\n# A tibble: 15 × 4\n   geo_value time_value cases deaths\n   &lt;chr&gt;     &lt;date&gt;     &lt;dbl&gt;  &lt;dbl&gt;\n 1 AB        2020-10-08   186     -1\n 2 AB        2021-04-26  1547     -7\n 3 AB        2021-06-21    67     -2\n 4 AB        2021-08-05   365     -4\n 5 AB        2021-12-08   354     -1\n 6 AB        2021-12-15   467     -1\n 7 AB        2022-03-15   578    -12\n 8 AB        2022-07-11   176     -4\n 9 AB        2023-01-23    50     -5\n10 AB        2023-03-13    60     -3\n11 AB        2023-03-27    40   -700\n12 NL        2021-08-25     2     -1\n13 NS        2021-05-15    86     -1\n14 SK        2020-12-28     0     -1\n15 SK        2021-04-03   281     -1"
+  },
+  {
+    "objectID": "slides/lecture2.html#examples-of-signal-processing",
+    "href": "slides/lecture2.html#examples-of-signal-processing",
+    "title": "EpiData Workshop 2025",
+    "section": "Examples of signal processing",
+    "text": "Examples of signal processing\n\n\nCorrelating signals across location or time\nComputing growth rates\nDetecting and removing outliers\nCalculating summaries with rolling windows"
+  },
+  {
+    "objectID": "slides/lecture2.html#correlations-at-different-lags-province-level",
+    "href": "slides/lecture2.html#correlations-at-different-lags-province-level",
+    "title": "EpiData Workshop 2025",
+    "section": "Correlations at different lags (province-level)",
+    "text": "Correlations at different lags (province-level)\n\ncor0 &lt;- epi_cor(can_prov, case_rate, death_rate, cor_by = geo_value)\ncor21 &lt;- epi_cor(can_prov, case_rate, death_rate, cor_by = geo_value, dt1 = -21)\n\n\n\n\nAre case and death rates linearly associated across all days for each geography?\nDeaths and cases likely not contemporaneous, expect cases to precede deaths."
+  },
+  {
+    "objectID": "slides/lecture2.html#lag-analysis-more-systematically",
+    "href": "slides/lecture2.html#lag-analysis-more-systematically",
+    "title": "EpiData Workshop 2025",
+    "section": "Lag analysis more systematically",
+    "text": "Lag analysis more systematically\n\nlags &lt;- 0:35\ncan_lag_cors &lt;- map(lags, \\(l) epi_cor(can_prov, case_rate, death_rate, cor_by = geo_value, dt1 = -l)) |&gt;\n  set_names(lags) |&gt; \n  list_rbind(names_to = \"lag\") |&gt;\n  summarize(mean_cor = mean(cor, na.rm = TRUE), .by = lag) |&gt;\n  mutate(lag = as.numeric(lag))\n\n\n\n\nReally strong weekly pattern.\nBut we can fix that."
+  },
+  {
+    "objectID": "slides/lecture2.html#quickly-compute-rolling-functions-by-group",
+    "href": "slides/lecture2.html#quickly-compute-rolling-functions-by-group",
+    "title": "EpiData Workshop 2025",
+    "section": "Quickly compute rolling functions by group",
+    "text": "Quickly compute rolling functions by group\n\n# trailing by default, new names are automatically created\ncan_prov &lt;- epi_slide_mean(can_prov, c(case_rate, death_rate), .window_size = 7L)\ncan_lag_cors &lt;- map(\n  lags, \n  \\(l) epi_cor(can_prov, case_rate_7dav, death_rate_7dav, cor_by = geo_value, dt1 = -l)\n)"
+  },
+  {
+    "objectID": "slides/lecture2.html#notes-on-lagged-correlations",
+    "href": "slides/lecture2.html#notes-on-lagged-correlations",
+    "title": "EpiData Workshop 2025",
+    "section": "Notes on lagged correlations",
+    "text": "Notes on lagged correlations\n Trailing average pushes the correlation backward\n But weekly reporting aggregates incidence forward\n These may roughly offset, but better if you know the probability of reports and deconvolve\nmore on this later\n We were only averaging over 13 provinces + territories\n Implicitly assuming that reporting / testing / disease behaviour is stable over 4 years"
+  },
+  {
+    "objectID": "slides/lecture2.html#compare-to-the-us",
+    "href": "slides/lecture2.html#compare-to-the-us",
+    "title": "EpiData Workshop 2025",
+    "section": "Compare to the US",
+    "text": "Compare to the US\n\n# Only consider the 50 US states (no territories)\nus_edf &lt;- covid_case_death_rates |&gt; filter(geo_value %in% tolower(state.abb)) \ncor0 &lt;- epi_cor(us_edf, case_rate, death_rate, cor_by = geo_value)\ncor21 &lt;- epi_cor(us_edf, case_rate, death_rate, cor_by = geo_value, dt1 = -21)"
+  },
+  {
+    "objectID": "slides/lecture2.html#compare-to-the-us-1",
+    "href": "slides/lecture2.html#compare-to-the-us-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Compare to the US",
+    "text": "Compare to the US\n\n\nAggregate cases tend to lead deaths by ≈23 days (arg max \\(\\rho\\))\n Same was true for Canada after smoothing, but lower correlation"
+  },
+  {
+    "objectID": "slides/lecture2.html#examining-how-correlations-change-over-time",
+    "href": "slides/lecture2.html#examining-how-correlations-change-over-time",
+    "title": "EpiData Workshop 2025",
+    "section": "Examining how correlations change over time",
+    "text": "Examining how correlations change over time\n\ncor0 &lt;- epi_cor(us_edf, case_rate, death_rate, cor_by = time_value, method = \"kendall\")\ncor21 &lt;- epi_cor(us_edf, case_rate, death_rate, cor_by = time_value, method = \"kendall\", dt1 = -21)"
+  },
+  {
+    "objectID": "slides/lecture2.html#compute-growth-rates",
+    "href": "slides/lecture2.html#compute-growth-rates",
+    "title": "EpiData Workshop 2025",
+    "section": "Compute growth rates",
+    "text": "Compute growth rates\n\nedfg &lt;- filter(can_prov, geo_value %in% c(\"MB\", \"BC\"), !is.na(case_rate_7dav)) |&gt;\n  mutate(gr_cases = growth_rate(case_rate_7dav, time_value, method = \"linear_reg\", h = 21L), .by = geo_value)"
+  },
+  {
+    "objectID": "slides/lecture2.html#outlier-detection",
+    "href": "slides/lecture2.html#outlier-detection",
+    "title": "EpiData Workshop 2025",
+    "section": "Outlier detection",
+    "text": "Outlier detection\n\noutliers &lt;- outliers |&gt;\n  mutate(detect_outlr_rm(time_value, cases), .by = geo_value)"
+  },
+  {
+    "objectID": "slides/lecture2.html#advanced-sliding-on-an-epi_df",
+    "href": "slides/lecture2.html#advanced-sliding-on-an-epi_df",
+    "title": "EpiData Workshop 2025",
+    "section": "Advanced sliding on an epi_df",
+    "text": "Advanced sliding on an epi_df\n\nCompute rolling summaries of signals.\nThese depend on the reference time\nComputed separately over geographies (and other groups).\n\n\nepi_slide(\n  .x,\n  .f,\n  ..., # for tidy-evaluation\n  .window_size = NULL,\n  .align = c(\"right\", \"center\", \"left\"),\n  .ref_time_values = NULL, # at which time values do I calculate the function\n  .new_col_name = NULL, # add a new column with this name rather than the default\n  .all_rows = FALSE # do return all available time_values, or only the ones with a result\n)\n\n\n.f “sees” a data set with a time value and other columns\nThat data is labeled with\n\nA reference time (the time around which the window is taken)\nA grouping key\n\n\n\n\nepi_slide() is very general, often too much so.\nWe already saw the most common special case epi_slide_mean()\nFor other common cases, there is epi_slide_opt()"
+  },
+  {
+    "objectID": "slides/lecture2.html#really-ugly-but-actually-deployed-slide-functions",
+    "href": "slides/lecture2.html#really-ugly-but-actually-deployed-slide-functions",
+    "title": "EpiData Workshop 2025",
+    "section": "Really ugly, but actually deployed slide functions",
+    "text": "Really ugly, but actually deployed slide functions\nFunction to flag outliers for corrections during late-2020 and early-2021\n\nflag_covid_outliers &lt;- function(signal, sig_cut = 2.75, size_cut = 20, sig_consec = 1.2) {\n  signal &lt;- rlang::enquo(signal)\n  function(x, g, t) {\n    .fns &lt;- list(m = ~ mean(.x, na.rm = TRUE), med = ~ median(.x, na.rm = TRUE), \n                 sd = ~ sd(.x, na.rm = TRUE), mad = ~ median(abs(.x - median(.x)))\n    )\n    fs &lt;- filter(x, time_value &lt;= t) |&gt; summarise(across(!!signal, .fns, .names = \"{.fn}\"))\n    ss &lt;- summarise(x, across(!!signal, .fns, .names = \"{.fn}\"))\n    mutate(\n      x, \n      ftstat = abs(!!signal - fs$med) / fs$sd, # mad in denominator is wrong scale, \n      ststat = abs(!!signal - ss$med) / ss$sd, # basically results in all the data flagged\n      flag = \n        (abs(!!signal) &gt; size_cut & !is.na(ststat) & ststat &gt; sig_cut) | # best case\n        (is.na(ststat) & abs(!!signal) &gt; size_cut & !is.na(ftstat) & ftstat &gt; sig_cut) | \n        # use filter if smoother is missing\n        (!!signal &lt; -size_cut & (!is.na(ststat) | !is.na(ftstat))), # big negative\n      flag = flag | # these allow smaller values to also be outliers if they are consecutive\n        (lead(flag) & !is.na(ststat) & ststat &gt; sig_consec) | \n        (lag(flag) & !is.na(ststat) & ststat &gt; sig_consec) |\n        (lead(flag) & is.na(ststat) & ftstat &gt; sig_consec) |\n        (lag(flag) & is.na(ststat) & ftstat &gt; sig_consec)\n    ) |&gt; filter(time_value == t) |&gt; pull(flag)\n  }\n}"
+  },
+  {
+    "objectID": "slides/lecture2.html#really-ugly-but-actually-deployed-slide-functions-1",
+    "href": "slides/lecture2.html#really-ugly-but-actually-deployed-slide-functions-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Really ugly, but actually deployed slide functions",
+    "text": "Really ugly, but actually deployed slide functions\nFunction to back distribute data randomly\n\ncorrections_multinom_roll &lt;- function(x, excess, flag, time_value, max_lag = 30L, reweight = exp_w) {\n  locs &lt;- which(flag)\n  if (length(locs) == 0) return(x)\n  for (ii in locs) {\n    if (ii &lt;= max_lag) ii_lag &lt;- seq_len(ii)\n    else ii_lag &lt;- seq(ii - max_lag + 1, ii)\n    w &lt;- reweight(length(ii_lag)) / length(ii_lag)\n    x[ii] &lt;- x[ii] - excess[ii]\n    prop &lt;- x[ii_lag] + sign(excess[ii]) * rmultinom(1, abs(excess[ii]), w)\n    x[ii_lag] &lt;- prop\n  }\n  x\n}\nexp_w &lt;- function(n, std_decay = 30L, b0 = 8, a = exp(1) / 2){\n  w &lt;- (1:std_decay) / std_decay\n  w &lt;- tail(w, n)\n  1 / (1 + exp(-w * b0 + a))\n}"
+  },
+  {
+    "objectID": "slides/lecture2.html#roll-our-outlier-detector-then-calculate-the-corrections",
+    "href": "slides/lecture2.html#roll-our-outlier-detector-then-calculate-the-corrections",
+    "title": "EpiData Workshop 2025",
+    "section": "Roll our outlier detector, then calculate the corrections",
+    "text": "Roll our outlier detector, then calculate the corrections\n\ncorrections_df &lt;- epi_slide(\n  corrections_df, .align = \"center\", .window_size = 14L, .new_col_name = \"flag\",\n  .f = flag_covid_outliers(deaths)\n) |&gt; mutate(corrected_deaths = corrections_multinom_roll(deaths, deaths, flag, time_value), .by = geo_value)"
+  },
+  {
+    "objectID": "slides/lecture2.html#epi_archive-collection-of-epi_dfs",
+    "href": "slides/lecture2.html#epi_archive-collection-of-epi_dfs",
+    "title": "EpiData Workshop 2025",
+    "section": "epi_archive: Collection of epi_dfs",
+    "text": "epi_archive: Collection of epi_dfs\n\nFull version history of a data set\nActs like a bunch of epi_df’s — but stored compactly\nSimilar functionality as we saw but using only data that would have been available at the time\n\n\n\n\n\n\n\nRevisions\n\n\nEpidemiology data gets revised frequently.\n\nWe may want to use the data as it looked in the past.\nor we may want to examine the history of revisions."
+  },
+  {
+    "objectID": "slides/lecture2.html#epi_archive-collection-of-epi_dfs-1",
+    "href": "slides/lecture2.html#epi_archive-collection-of-epi_dfs-1",
+    "title": "EpiData Workshop 2025",
+    "section": "epi_archive: Collection of epi_dfs",
+    "text": "epi_archive: Collection of epi_dfs\nSubset of daily COVID-19 doctor visits (Optum) and cases (JHU CSSE) from all U.S. states in archive format:\n\narchive_cases_dv_subset_all_states"
+  },
+  {
+    "objectID": "slides/lecture2.html#summarize-revision-behaviour",
+    "href": "slides/lecture2.html#summarize-revision-behaviour",
+    "title": "EpiData Workshop 2025",
+    "section": "Summarize revision behaviour",
+    "text": "Summarize revision behaviour\n\nrevision_data &lt;- revision_summary(archive_cases_dv_subset, case_rate_7d_av)\nrevision_data"
+  },
+  {
+    "objectID": "slides/lecture2.html#visualize-revision-patterns",
+    "href": "slides/lecture2.html#visualize-revision-patterns",
+    "title": "EpiData Workshop 2025",
+    "section": "Visualize revision patterns",
+    "text": "Visualize revision patterns"
+  },
+  {
+    "objectID": "slides/lecture2.html#finalized-data",
+    "href": "slides/lecture2.html#finalized-data",
+    "title": "EpiData Workshop 2025",
+    "section": "Finalized data",
+    "text": "Finalized data\n\nCounts are revised as time proceeds\nWant to know the final value\nOften not available until weeks/months later\n\n\nBackcasting\n\nAt time \\(t\\), predict the final value for time \\(t-h\\), \\(h &lt; 0\\)\n\n\n\n\nNowcasting\n\nAt time \\(t\\), predict the final value for time \\(t\\)\n\n\n\n\nForecasting\n\nAt time \\(t\\), predict the final value for time \\(t+h\\), \\(h &gt; 0\\)"
+  },
+  {
+    "objectID": "slides/lecture2.html#sliding-computations-over-archives",
+    "href": "slides/lecture2.html#sliding-computations-over-archives",
+    "title": "EpiData Workshop 2025",
+    "section": "Sliding computations over archives",
+    "text": "Sliding computations over archives\n\nepix_slide(\n  .x,\n  .f,\n  ...,\n  .before = Inf,\n  .versions = NULL,\n  .new_col_name = NULL,\n  .all_versions = FALSE\n)\n\n\n\nTo perform nowcasts we need to track how values get revised\nTo evaluate forecasting models, we need to test them on the data we would have seen"
+  },
+  {
+    "objectID": "slides/lecture2.html#why-this-matters",
+    "href": "slides/lecture2.html#why-this-matters",
+    "title": "EpiData Workshop 2025",
+    "section": "Why this matters",
+    "text": "Why this matters\n\nEvery week BC CDC released COVID-19 hospitalization data.\nThe following week, they revised the number upward (by ~25%) due to lagged reports.\n\n\n\nComparing preliminary to revised data often shows a decline.\nDue to backfill"
+  },
+  {
+    "objectID": "slides/lecture2.html#backfill-american-edition---nchs-covid-19-mortality",
+    "href": "slides/lecture2.html#backfill-american-edition---nchs-covid-19-mortality",
+    "title": "EpiData Workshop 2025",
+    "section": "Backfill American edition - NCHS COVID-19 mortality",
+    "text": "Backfill American edition - NCHS COVID-19 mortality"
+  },
+  {
+    "objectID": "slides/lecture2.html#the-revision-triangle",
+    "href": "slides/lecture2.html#the-revision-triangle",
+    "title": "EpiData Workshop 2025",
+    "section": "The revision triangle",
+    "text": "The revision triangle\n\n\n\nOn day \\(t\\), predict the finalized value of signal \\(y_t\\)\nWe may have a provisional value for \\(y_t\\) (subject to revision)\nMost likely, we only have provisional values for earlier dates\nWe may only have “finalized” values for \\(y_{t-s}\\), \\(s\\gg0\\)"
+  },
+  {
+    "objectID": "slides/lecture2.html#formal-analysis-of-versioning-behavior",
+    "href": "slides/lecture2.html#formal-analysis-of-versioning-behavior",
+    "title": "EpiData Workshop 2025",
+    "section": "Formal analysis of versioning behavior",
+    "text": "Formal analysis of versioning behavior\n\nLatency\n\nthe time difference between Reference Date and Initial Report Date\n\nBackfill\n\nthe characteristics of updates after initial report (typical positive)\n\n\n\n# same as before, but the NCHS data\nrevision_data &lt;- revision_summary(nchs_archive, mortality, within_latest = .05, return_only_tibble = TRUE)\nrevision_data |&gt; filter(geo_value == \"ca\", time_value %in% nchs_versions) |&gt; print(width = 120)\n\n# A tibble: 12 × 11\n   time_value geo_value n_revisions min_lag max_lag  lag_near_latest spread\n   &lt;date&gt;     &lt;chr&gt;           &lt;dbl&gt; &lt;drtn&gt;  &lt;drtn&gt;   &lt;drtn&gt;           &lt;dbl&gt;\n 1 2024-01-07 ca                 19 1 weeks 47 weeks 10 weeks           170\n 2 2024-01-14 ca                 11 1 weeks 21 weeks  6 weeks           144\n 3 2024-01-21 ca                 12 1 weeks 29 weeks  5 weeks           111\n 4 2024-01-28 ca                 13 1 weeks 23 weeks 10 weeks           113\n 5 2024-02-04 ca                 13 1 weeks 42 weeks  9 weeks           102\n 6 2024-02-11 ca                  9 1 weeks 14 weeks  5 weeks            89\n 7 2024-02-18 ca                 10 1 weeks 37 weeks 11 weeks            81\n 8 2024-02-25 ca                 10 1 weeks 53 weeks  8 weeks            74\n 9 2024-03-03 ca                  8 1 weeks 14 weeks  8 weeks            46\n10 2024-03-10 ca                 11 1 weeks 50 weeks  9 weeks            63\n11 2024-03-17 ca                  7 1 weeks 25 weeks  8 weeks            50\n12 2024-03-24 ca                  8 1 weeks 12 weeks 10 weeks            28\n   rel_spread min_value max_value median_value\n        &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;        &lt;dbl&gt;\n 1      0.859        28       198        190. \n 2      0.754        47       191        184  \n 3      0.730        41       152        148  \n 4      0.785        31       144        136. \n 5      0.685        47       149        140. \n 6      0.856        15       104         99.5\n 7      0.779        23       104         97  \n 8      0.712        30       104         97  \n 9      0.639        26        72         67  \n10      0.851        11        74         70.5\n11      0.769        15        65         60.5\n12      0.683        13        41         37"
+  },
+  {
+    "objectID": "slides/lecture2.html#revision-pattern-visualization",
+    "href": "slides/lecture2.html#revision-pattern-visualization",
+    "title": "EpiData Workshop 2025",
+    "section": "Revision pattern visualization",
+    "text": "Revision pattern visualization"
+  },
+  {
+    "objectID": "slides/lecture2.html#building-training-data-for-nowcasting",
+    "href": "slides/lecture2.html#building-training-data-for-nowcasting",
+    "title": "EpiData Workshop 2025",
+    "section": "Building training data for nowcasting",
+    "text": "Building training data for nowcasting\n\nCan’t estimate any statistical model, unless I “see” the response\nThe finalized value, is often very slow (~ 1 year for this signal)\nSo a compromise is to use something close, here I’m using 95% of the finalized value\n\n\nrevision_ca &lt;- filter(revision_data, geo_value == \"ca\")\nrevision_ca |&gt; select(geo_value, time_value, lag_near_latest) |&gt; slice_sample(n = 5)\n\n# A tibble: 5 × 3\n  geo_value time_value lag_near_latest\n  &lt;chr&gt;     &lt;date&gt;     &lt;drtn&gt;         \n1 ca        2021-07-11 16 weeks       \n2 ca        2024-03-17  8 weeks       \n3 ca        2021-04-04  9 weeks       \n4 ca        2024-03-03  8 weeks       \n5 ca        2023-03-19  6 weeks       \n\n(lag_quantiles &lt;- quantile(revision_data$lag_near_latest))\n\nTime differences in weeks\n  0%  25%  50%  75% 100% \n   1    6    8   13  156 \n\napprox_final_lag &lt;- lag_quantiles[\"75%\"]\n\n\n\nPretend that for time \\(s\\), the \\(Y_s\\) with version \\(s +\\) 13 weeks is “final”.\nAt time \\(t\\), the most recent data in our training set will be 13 weeks old."
+  },
+  {
+    "objectID": "slides/lecture2.html#what-about-features",
+    "href": "slides/lecture2.html#what-about-features",
+    "title": "EpiData Workshop 2025",
+    "section": "What about features?",
+    "text": "What about features?\nMust use features that would have been available at test time.\nMust have enough samples to ensure sensible estimation results.\n\nprovisional value(s) for time \\(t\\)\nprovisional value(s) for time \\(t-\\ell\\)\nexogenous signals that may be available\n\n\nPotential model\nPredictors are\n\nProvisional values for time \\(t-\\ell\\), \\(\\ell =\\) 1 week, 2 weeks when available\nProvisional \\(Z_{t-k}\\) for HHS/NHSN COVID-19 hospitalizations (these are daily, so different lags)\n\nExclude a potential predictor if it doesn’t have much training data available."
+  },
+  {
+    "objectID": "slides/lecture2.html#operationalizing",
+    "href": "slides/lecture2.html#operationalizing",
+    "title": "EpiData Workshop 2025",
+    "section": "Operationalizing",
+    "text": "Operationalizing\n\nFunction needs to work on multiple nowcast dates\nSometimes reporting changes, so we should adjust, not error\nIf a predictor isn’t available, we remove it from the model and proceed\nMake sure we have “enough” training data to fit a model\nThe nowcaster needs access to all versions prior to the nowcast date\nWe want to retrain at every date: epix_slide(..., .all_versions = TRUE)\nAllow for linear regression or median regression"
+  },
+  {
+    "objectID": "slides/lecture2.html#big-ugly-function",
+    "href": "slides/lecture2.html#big-ugly-function",
+    "title": "EpiData Workshop 2025",
+    "section": "Big ugly function",
+    "text": "Big ugly function\n\nGoal: eventually refactor and put in {epipredict}\n\n\nregression_nowcaster &lt;- function(archive, model_settings, return_info = FALSE) {\n  if (!inherits(archive, \"epi_archive\")) stop(\"`archive` isn't an `epi_archive`\")\n  if (n_distinct(archive$DT$geo_value) != 1L) stop(\"Expected exactly one unique `geo_value`\")\n  if (archive$time_type == \"day\") archive &lt;- thin_daily_to_weekly_archive(archive)\n  nowcast_date &lt;- archive$versions_end\n  target_time_value &lt;- nowcast_date\n  latest_edf &lt;- archive |&gt; epix_as_of(nowcast_date)\n\n  predictor_descriptions &lt;-\n    latest_edf |&gt;\n    mutate(lag_days = as.integer(nowcast_date - time_value)) |&gt;\n    select(-c(geo_value, time_value)) |&gt;\n    pivot_longer(-lag_days, names_to = \"varname\", values_to = \"value\") |&gt;\n    drop_na(value) |&gt;\n    inner_join(model_settings$predictors, by = \"varname\", unmatched = \"error\") |&gt;\n    filter(abs(lag_days) &lt;= max_abs_shift_days) |&gt;\n    arrange(varname, abs(lag_days)) |&gt;\n    group_by(varname) |&gt;\n    filter(seq_len(n()) &lt;= max_n_shifts[[1]]) |&gt;\n    ungroup() |&gt;\n    mutate(predictor_name = paste0(varname, \"_lag\", lag_days, \"_realtime\")) |&gt;\n    select(varname, lag_days, predictor_name)\n\n  predictor_edfs &lt;- predictor_descriptions |&gt;\n    pmap(function(varname, lag_days, predictor_name) get_predictor_training_data(archive, varname, lag_days, predictor_name)) |&gt;\n    lapply(na.omit) |&gt;\n    keep(~ nrow(.x) &gt;= model_settings$min_n_training_per_predictor)\n\n  if (length(predictor_edfs) == 0) stop(\"Couldn't find acceptable predictors in the latest data.\")\n\n  predictors &lt;- reduce(predictor_edfs, full_join, by = c(\"geo_value\", \"time_value\"))\n  target &lt;- latest_edf |&gt;\n    filter(time_value &lt;= max(time_value) - model_settings$days_until_target_semistable) |&gt;\n    select(geo_value, time_value, mortality_semistable = mortality)\n\n  training_and_nowcast &lt;- full_join(predictors, target, by = c(\"geo_value\", \"time_value\"))\n\n  training &lt;- training_and_nowcast |&gt;\n    drop_na() |&gt;\n    slice_max(time_value, n = model_settings$max_n_training_intersection)\n\n  nowcast_features &lt;- training_and_nowcast |&gt; filter(time_value == nowcast_date)\n\n  form &lt;- as.formula(\"mortality_semistable ~ .\")\n  fit_fun &lt;- switch(\n    model_settings$method,\n    rq = function(x) { quantreg::rq(data = x, formula = form, tau = 0.5) },\n    lm = function(x) { lm(formula = form, data = x) }\n  )\n  the_fit &lt;- training |&gt;\n    select(any_of(predictor_descriptions$predictor_name), mortality_semistable) |&gt;\n    fit_fun()\n      \n  pred &lt;- tibble(\n    geo_value = \"ca\",\n    nowcast_date = nowcast_date,\n    target_date = target_time_value,\n    prediction = unname(predict(the_fit, nowcast_features))\n  )\n\n  if (return_info) return(tibble(coefficients = list(coef(fit)), predictions = list(pred)))\n  return(pred)\n}"
+  },
+  {
+    "objectID": "slides/lecture2.html#model-settings",
+    "href": "slides/lecture2.html#model-settings",
+    "title": "EpiData Workshop 2025",
+    "section": "Model settings",
+    "text": "Model settings\nWe’ll compare 4 different configurations:\n\nUsing lm() and only mortality predictors\nUsing lm() with mortality and hospitalizations as a predictor\nUsing rq() and only mortality predictors\nUsing rq() with mortality and hospitalizations as a predictor\n\n\nreg1_settings &lt;- list(\n  predictors = tribble(\n    ~varname,    ~max_abs_shift_days, ~max_n_shifts,\n    \"mortality\",                  35,             3,\n    ),\n  min_n_training_per_predictor = 30, # or else exclude predictor\n  days_until_target_semistable = 7 * 7, # filter out unstable when training (and evaluating)\n  min_n_training_intersection = 20, # or else raise error\n  max_n_training_intersection = Inf # or else filter down rows\n)"
+  },
+  {
+    "objectID": "slides/lecture2.html#comparison-linear-regression",
+    "href": "slides/lecture2.html#comparison-linear-regression",
+    "title": "EpiData Workshop 2025",
+    "section": "Comparison: linear regression",
+    "text": "Comparison: linear regression"
+  },
+  {
+    "objectID": "slides/lecture2.html#comparison-quantile-regression",
+    "href": "slides/lecture2.html#comparison-quantile-regression",
+    "title": "EpiData Workshop 2025",
+    "section": "Comparison: quantile regression",
+    "text": "Comparison: quantile regression"
+  },
+  {
+    "objectID": "slides/lecture2.html#evaluations",
+    "href": "slides/lecture2.html#evaluations",
+    "title": "EpiData Workshop 2025",
+    "section": "Evaluations",
+    "text": "Evaluations\n\n\n\n\n\nNowcaster\nMAE\nMAPE\n\n\n\n\nBaseline\n197.43\n75.28\n\n\nLinReg\n172.03\n106.74\n\n\nLinReg + hosp\n100.49\n58.17\n\n\nQuantReg\n103.70\n48.81\n\n\nQuantReg + hosp\n93.33\n48.94"
+  },
+  {
+    "objectID": "slides/lecture2.html#aside-on-nowcasting",
+    "href": "slides/lecture2.html#aside-on-nowcasting",
+    "title": "EpiData Workshop 2025",
+    "section": "Aside on nowcasting",
+    "text": "Aside on nowcasting\n\nTo many Epis, nowcasting means estimate the instantaneous reproduction number, \\(R_t\\)\nExample: Reported COVID-19 cases in British Columbia (Jan. 2020 – Apr. 2023)\n\n\n\nMore after lunch…"
+  },
+  {
+    "objectID": "index.html#schedule",
+    "href": "index.html#schedule",
+    "title": "EpiData Workshop 2025",
+    "section": "Schedule",
+    "text": "Schedule\nIn this workshop, we plan to demonstrate how to use R to load, process, inspect, and forecast aggregate epi surveillance data. We will be presenting a few case studies to motivate the entire pipeline from signal discovery to the production of nowcasts and forecasts.\n\nLecture 1: Introduction to Panel Data\nLecture 2: Data Cleaning, Versioning, and Nowcasting\nLecture 3: Compartmental Models, Renewal Equations, and \\(R_t\\) Estimation\nLecture 4: Forecasting and Advanced Topics"
+  },
+  {
+    "objectID": "index.html#contributors-and-collaborators",
+    "href": "index.html#contributors-and-collaborators",
+    "title": "EpiData Workshop 2025",
+    "section": "Contributors and collaborators",
+    "text": "Contributors and collaborators\nInstructor: Daniel J. McDonald\nWith help from:\n\nRyan J. Tibshirani\nLogan C. Brooks\nRachel Lobay\nAlice Clima\nOlivia Liu\nPaul Gustafson\nElvis Cai"
+  },
+  {
+    "objectID": "slides/lecture1.html#outline",
+    "href": "slides/lecture1.html#outline",
+    "title": "EpiData Workshop 2025",
+    "section": "Outline",
+    "text": "Outline\n\nAbout Me\nWorkshop Overview and System Setup\nPanel Data\nVersioned Data\nEpidata Repository and API\n{epidatr} and Other Data\nVersioning in {epidatr}"
+  },
+  {
+    "objectID": "slides/lecture1.html#daniel-j.-mcdonald",
+    "href": "slides/lecture1.html#daniel-j.-mcdonald",
+    "title": "EpiData Workshop 2025",
+    "section": "Daniel J. McDonald",
+    "text": "Daniel J. McDonald"
+  },
+  {
+    "objectID": "slides/lecture1.html#about-delphi",
+    "href": "slides/lecture1.html#about-delphi",
+    "title": "EpiData Workshop 2025",
+    "section": "About Delphi",
+    "text": "About Delphi\n\nFounded in 2012 at Carnegie Mellon University, now expanded to UC Berkeley, and University of British Columbia.\nCurrently 5 faculty, ~10 PhD students, ~15 staff (mostly software engineers).\nEasy to join us from anywhere (lots of volunteers during Covid-19 pandemic).\nWe are:\n\nCDC Center of Excellence for Influenza and Covid-19 Forecasting (2019-24).\nCDC Innovation Center for Outbreak Analytics and Disease Modeling (2024-29).\n\n\nOur mission: To develop the theory and practice of epidemic detection, tracking and forecasting, and their use in decision making, both public and private."
+  },
+  {
+    "objectID": "slides/lecture1.html#what-does-delphi-do",
+    "href": "slides/lecture1.html#what-does-delphi-do",
+    "title": "EpiData Workshop 2025",
+    "section": "What does Delphi do?",
+    "text": "What does Delphi do?\n\nProcure real-time, aggregated data streams informative of infectious diseases and syndromes, in collaboration with partners in industry and government.\nExtract signals and make them widely available via the Epidata platform & API.\nDevelop and deploy algorithms for epidemic detection, tracking, forecasting.\nDevelop and maintain statistical software packages for these tasks.\nMake it all production-grade, maximally-accessible, and open-source (to serve CDC, state and local public health agencies, epi-forecasting researchers, data journalists, the public)"
+  },
+  {
+    "objectID": "slides/lecture1.html#what-we-provide",
+    "href": "slides/lecture1.html#what-we-provide",
+    "title": "EpiData Workshop 2025",
+    "section": "What we provide",
+    "text": "What we provide"
+  },
+  {
+    "objectID": "slides/lecture1.html#what-we-will-cover",
+    "href": "slides/lecture1.html#what-we-will-cover",
+    "title": "EpiData Workshop 2025",
+    "section": "What we will cover",
+    "text": "What we will cover\n\nCharacteristics of panel data in epidemiology\nTools for processing and plotting panel data\nStatistical background on nowcasting and forecasting\nTools for building nowcasting and forecasting models\nPlenty of examples throughout of real case studies"
+  },
+  {
+    "objectID": "slides/lecture1.html#goals-part-i",
+    "href": "slides/lecture1.html#goals-part-i",
+    "title": "EpiData Workshop 2025",
+    "section": "Goals part I",
+    "text": "Goals part I\n\nExpose you to a statistical way of thinking about now/forecasting\nCertain basic mindsets (e.g., the importance of empirical validation using techniques like time series cross-validation) are ubiquitous\nCertain basic modeling considerations (e.g., starting simple and building up complexity, taming variance through regularization, addressing nonstationarity with trailing training windows) are also ubiquitous"
+  },
+  {
+    "objectID": "slides/lecture1.html#goals-part-ii",
+    "href": "slides/lecture1.html#goals-part-ii",
+    "title": "EpiData Workshop 2025",
+    "section": "Goals part II",
+    "text": "Goals part II\n\nExpose you to software packages which aid processing, tracking, nowcasting, and forecasting with panel data\nThese tools are still in development and we welcome your feedback\nWe have tried hard to get the framework right; but many individual pieces themselves could still be improved\nIf these aren’t working for you, then we want to hear from you!\nWe welcome collaboration, and everything we do is open source"
+  },
+  {
+    "objectID": "slides/lecture1.html#a-disclaimer",
+    "href": "slides/lecture1.html#a-disclaimer",
+    "title": "EpiData Workshop 2025",
+    "section": "A disclaimer",
+    "text": "A disclaimer\n\nMy background is primarily in statistics and computer science\nThis obviously influences my way of thinking and my approach to nowcasting and forecasting\nI don’t have nearly as much experience with traditional epi models, but I do have opinions about the pros/cons.\nAsk me at any point if you have a question about why I’m doing things a certain way"
+  },
+  {
+    "objectID": "slides/lecture1.html#one-last-slide",
+    "href": "slides/lecture1.html#one-last-slide",
+    "title": "EpiData Workshop 2025",
+    "section": "One last slide",
+    "text": "One last slide\n\nThis workshop is supposed to be useful for YOU. Ask questions if you have them, don’t be shy\nWe may not (likely won’t?) cover everything. Hopefully the materials will be a resource for you beyond this workshop"
+  },
+  {
+    "objectID": "slides/lecture1.html#system-setup",
+    "href": "slides/lecture1.html#system-setup",
+    "title": "EpiData Workshop 2025",
+    "section": "System setup",
+    "text": "System setup"
+  },
+  {
+    "objectID": "slides/lecture1.html#panel-data-1",
+    "href": "slides/lecture1.html#panel-data-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Panel data",
+    "text": "Panel data\n\nPanel data is cross-sectional measurements of subjects over time.\nWith aggregated data, the subjects are geographic units (e.g. provinces, states).\nTime index + one or more locations/keys.\n\n\n\n# A tibble: 549 × 3\n   time_value geo_value percent_cli\n   &lt;date&gt;     &lt;chr&gt;           &lt;dbl&gt;\n 1 2020-06-01 ca               2.75\n 2 2020-06-02 ca               2.57\n 3 2020-06-03 ca               2.48\n 4 2020-06-04 ca               2.41\n 5 2020-06-05 ca               2.57\n 6 2020-06-06 ca               2.63\n 7 2020-06-07 ca               2.73\n 8 2020-06-08 ca               3.04\n 9 2020-06-09 ca               2.97\n10 2020-06-10 ca               2.99\n# ℹ 539 more rows\n\n\nThe % of outpatient doctor visits that are COVID-related in CA, between June 2020 to Dec. 2021"
+  },
+  {
+    "objectID": "slides/lecture1.html#examples-of-panel-data",
+    "href": "slides/lecture1.html#examples-of-panel-data",
+    "title": "EpiData Workshop 2025",
+    "section": "Examples of panel data",
+    "text": "Examples of panel data\nJHU CSSE COVID-19 cases per 100k\n\n\n\nWA switch to weekly reporting in 2022\nFL reports “whenever” (weekly, biweekly, three days in a row, then 4 zeros, etc.)\nAPI calculates change from cumulative, so no-report becomes a 0.\nIf state decreases total, then we see a negative."
+  },
+  {
+    "objectID": "slides/lecture1.html#examples-of-panel-data-1",
+    "href": "slides/lecture1.html#examples-of-panel-data-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Examples of panel data",
+    "text": "Examples of panel data\nConfirmed COVID-19 Hospital Admissions per 100k, 7day average\n\n\nThe \\(x\\)-axis is\nDate of report\nNot “date of event”"
+  },
+  {
+    "objectID": "slides/lecture1.html#more-disclaimers",
+    "href": "slides/lecture1.html#more-disclaimers",
+    "title": "EpiData Workshop 2025",
+    "section": "More disclaimers…",
+    "text": "More disclaimers…\n\nMost of this workshop will focus on panel data\nTypical for the tasks my group has focused on\nTypically analyze aggregate signals\nSimultaneously across geographies\nContrasts with “single geo models”\nNot working with “line list data”"
+  },
+  {
+    "objectID": "slides/lecture1.html#intro-to-versioned-data",
+    "href": "slides/lecture1.html#intro-to-versioned-data",
+    "title": "EpiData Workshop 2025",
+    "section": "Intro to versioned data",
+    "text": "Intro to versioned data\n\n\n→ Person comes to ER\n→ Admitted\n→ Has some tests\n→ Tests come back\n→ Entered into the system\n→ …\n\n\n\nEpidemic aggregates are subject to reporting delays and revisions\n\n\n\nA “Hospital admission” may not attributable to a particular condition until a few days have passed\n\n\n\nAdditionally, various mistakes lead to revisions\n\n\n\nTrack both: when the event occurred and when it was reported"
+  },
+  {
+    "objectID": "slides/lecture1.html#intro-to-versioned-data-1",
+    "href": "slides/lecture1.html#intro-to-versioned-data-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Intro to versioned data",
+    "text": "Intro to versioned data\n\nEpidemic aggregates are subject to reporting delays and revisions\n\n\n\nA “Hospital admission” may not attributable to a particular condition until a few days have passed\n\n\n\nAdditionally, various mistakes lead to revisions\n\n\n\nTrack both: when the event occurred and when it was reported"
+  },
+  {
+    "objectID": "slides/lecture1.html#versioned-data-1",
+    "href": "slides/lecture1.html#versioned-data-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Versioned data",
+    "text": "Versioned data\n\nThe event time is indicated by time_value (or reference_date)\nSecond time index indicates the data version (or reporting_date)\n\nversion = the time at which we saw a value associated to a time_value\n\n\n# A tibble: 6 × 4\n  time_value geo_value percent_cli version   \n  &lt;date&gt;     &lt;chr&gt;           &lt;dbl&gt; &lt;date&gt;    \n1 2020-06-01 ca               2.14 2020-06-06\n2 2020-06-01 ca               2.14 2020-06-08\n3 2020-06-01 ca               2.11 2020-06-09\n4 2020-06-01 ca               2.13 2020-06-10\n5 2020-06-01 ca               2.20 2020-06-11\n6 2020-06-01 ca               2.23 2020-06-12"
+  },
+  {
+    "objectID": "slides/lecture1.html#versioned-panel-data",
+    "href": "slides/lecture1.html#versioned-panel-data",
+    "title": "EpiData Workshop 2025",
+    "section": "Versioned panel data",
+    "text": "Versioned panel data\nEstimated percentage of outpatient visits due to CLI across multiple versions."
+  },
+  {
+    "objectID": "slides/lecture1.html#latency-and-revision-in-signals",
+    "href": "slides/lecture1.html#latency-and-revision-in-signals",
+    "title": "EpiData Workshop 2025",
+    "section": "Latency and revision in signals",
+    "text": "Latency and revision in signals\n\nLatency the delay between data collection and availability\n\n\n\n\nExample\n\n\nA signal based on insurance claims may take several days to appear as claims are processed\n\n\n\n\n\n\nRevision data is updated or corrected after initial publication\n\n\n\n\nExample\n\n\nCOVID-19 case reports are revised as reporting backlogs are cleared"
+  },
+  {
+    "objectID": "slides/lecture1.html#latency-and-revision-in-signals---example",
+    "href": "slides/lecture1.html#latency-and-revision-in-signals---example",
+    "title": "EpiData Workshop 2025",
+    "section": "Latency and revision in signals - Example",
+    "text": "Latency and revision in signals - Example\n\nRecall the first example of panel & versioned data we’ve seen…\n\n\nIn June 2020, this signal is typically 4 days latent\n\n\n\n# A tibble: 5 × 5\n  time_value geo_value percent_cli version    latency\n  &lt;date&gt;     &lt;chr&gt;           &lt;dbl&gt; &lt;date&gt;     &lt;drtn&gt; \n1 2020-06-01 ca               2.14 2020-06-06 5 days \n2 2020-06-02 ca               1.96 2020-06-06 4 days \n3 2020-06-03 ca               1.77 2020-06-06 3 days \n4 2020-06-04 ca               1.65 2020-06-08 4 days \n5 2020-06-05 ca               1.60 2020-06-09 4 days \n\n\n\nand subject to revision\n\n\n# A tibble: 5 × 5\n  time_value geo_value percent_cli version    latency\n  &lt;date&gt;     &lt;chr&gt;           &lt;dbl&gt; &lt;date&gt;     &lt;drtn&gt; \n1 2020-06-01 ca               2.14 2020-06-06  5 days\n2 2020-06-01 ca               2.14 2020-06-08  7 days\n3 2020-06-01 ca               2.11 2020-06-09  8 days\n4 2020-06-01 ca               2.13 2020-06-10  9 days\n5 2020-06-01 ca               2.20 2020-06-11 10 days"
+  },
+  {
+    "objectID": "slides/lecture1.html#revision-triangle-insurance-claims-wa-january-2022",
+    "href": "slides/lecture1.html#revision-triangle-insurance-claims-wa-january-2022",
+    "title": "EpiData Workshop 2025",
+    "section": "Revision triangle, Insurance Claims WA January 2022",
+    "text": "Revision triangle, Insurance Claims WA January 2022\n\n7-day trailing average to smooth day-of-week effects"
+  },
+  {
+    "objectID": "slides/lecture1.html#revisions",
+    "href": "slides/lecture1.html#revisions",
+    "title": "EpiData Workshop 2025",
+    "section": "Revisions",
+    "text": "Revisions\nMany data sources are subject to revisions:\n\n\nCase and death counts are corrected or adjusted by authorities\nMedical claims can take weeks to be submitted and processed\nSurveys are not completed promptly\n\n\n\nAn accurate revision log is crucial for researchers building nowcasts and forecasts\n\n\n\n\n\n\n\n\nObvious but crucial\n\n\nA forecast that is made today can only use data available “as of” today"
+  },
+  {
+    "objectID": "slides/lecture1.html#three-types-of-revisions",
+    "href": "slides/lecture1.html#three-types-of-revisions",
+    "title": "EpiData Workshop 2025",
+    "section": "Three types of revisions",
+    "text": "Three types of revisions\n\nSources that don’t revise (provisional and final are the same)\n\nFacebook Survey and Google symptoms\n\n\nPredictable revisions\n\nClaims data and public health reports aligned by test, hospitalization, or death date\nAlmost always revised upward as additional claims enter the pipeline\n\n\n\nRevisions that are large and erratic to predict\n\nCOVID cases and deaths\nThese are aligned by report date"
+  },
+  {
+    "objectID": "slides/lecture1.html#types-of-revisions---comparison-between-2.-and-3.",
+    "href": "slides/lecture1.html#types-of-revisions---comparison-between-2.-and-3.",
+    "title": "EpiData Workshop 2025",
+    "section": "Types of revisions - Comparison between 2. and 3.",
+    "text": "Types of revisions - Comparison between 2. and 3.\n\nRevision behavior for two indicators in the HRR containing Charlotte, NC.\nDV-CLI signal (left): regularly revised, but effects fade\nJHU CSSE cases (right) remain “as first reported” until a major correction is made on Oct. 19"
+  },
+  {
+    "objectID": "slides/lecture1.html#reporting-backlogs---example",
+    "href": "slides/lecture1.html#reporting-backlogs---example",
+    "title": "EpiData Workshop 2025",
+    "section": "Reporting backlogs - Example",
+    "text": "Reporting backlogs - Example\nBexar County, Texas, summer of 2020…\n\nLarge backlog of case reports results in a spike\nAuxilliary signals show continued decline\nReports are not be trustworthy without context"
+  },
+  {
+    "objectID": "slides/lecture1.html#what-is-the-epidata-repository",
+    "href": "slides/lecture1.html#what-is-the-epidata-repository",
+    "title": "EpiData Workshop 2025",
+    "section": "What is the Epidata repository",
+    "text": "What is the Epidata repository\nEpidata: repository of aggregated epi-surveillance time series\nSignals can be either public or restricted.\n\nCurrently contains over 5 billion records\nDuring pandemic, handled millions of API queries per day\nMany signals aren’t available elsewhere\n\n\n\n\n\n\n\nMake epi-surveillance more nimble, complete, standardized, robust, and real-time"
+  },
+  {
+    "objectID": "slides/lecture1.html#features-of-delphi-epidata",
+    "href": "slides/lecture1.html#features-of-delphi-epidata",
+    "title": "EpiData Workshop 2025",
+    "section": "Features of Delphi Epidata",
+    "text": "Features of Delphi Epidata\n\nBuilt-in support for:\n\nData revisions (“backfill”), including reporting dates and changes\nGeo levels w/ auto-aggregation (e.g. county, state, and nation) and specialized levels (e.g., DMA, sewer sheds)\nDemographic breakdown\nRepresentation for missingness and censoring\nPopulation sizes and fine-grained population density\n\nCustomized smoothing and normalization\nAccess control\nCode is Open Source.\nSignals are as accessible (w/ API, SDK) as allowed by DUAs"
+  },
+  {
+    "objectID": "slides/lecture1.html#severity-pyramid",
+    "href": "slides/lecture1.html#severity-pyramid",
+    "title": "EpiData Workshop 2025",
+    "section": "Severity pyramid",
+    "text": "Severity pyramid\n\n\nhttps://delphi.cmu.edu/epiportal/"
+  },
+  {
+    "objectID": "slides/lecture1.html#installing-epidatr",
+    "href": "slides/lecture1.html#installing-epidatr",
+    "title": "EpiData Workshop 2025",
+    "section": "Installing {epidatr}",
+    "text": "Installing {epidatr}\n(you already did this, but just for posterity…)\nInstall the CRAN version\n\n# Install the CRAN version\ninstall.packages(\"epidatr\")\n\n\nor the development version\n\n# Install the development version from the GitHub dev branch\nremotes::install_github(\"cmu-delphi/epidatr@dev\")\n\nThe CRAN listing is here."
+  },
+  {
+    "objectID": "slides/lecture1.html#python",
+    "href": "slides/lecture1.html#python",
+    "title": "EpiData Workshop 2025",
+    "section": "Python",
+    "text": "Python\nIn Python, install delphi-epidata from PyPI with\npip install delphi-epidata\n\ndelphi-epidata is soon to be replaced with epidatpy.\n# Latest dev version\npip install -e \"git+https://github.com/cmu-delphi/epidatpy.git#egg=epidatpy\"\n\n# PyPI version (not yet available)\npip install epidatpy"
+  },
+  {
+    "objectID": "slides/lecture1.html#using-epidatr-and-epidatpy",
+    "href": "slides/lecture1.html#using-epidatr-and-epidatpy",
+    "title": "EpiData Workshop 2025",
+    "section": "Using {epidatr} and {epidatpy}",
+    "text": "Using {epidatr} and {epidatpy}\n\nlibrary(epidatr)\nhhs_flu_nc &lt;- pub_covidcast(\n  source = 'hhs', \n  signals = 'confirmed_admissions_influenza_1d', \n  geo_type = 'state', \n  time_type = 'day', \n  geo_values = 'nc',\n  time_values = c(20240401, 20240405:20240414)\n)\nhead(hhs_flu_nc, n = 3)\n\n\n\n# A tibble: 3 × 15\n  geo_value signal     source geo_type time_type time_value direction issue     \n  &lt;chr&gt;     &lt;chr&gt;      &lt;chr&gt;  &lt;fct&gt;    &lt;fct&gt;     &lt;date&gt;         &lt;dbl&gt; &lt;date&gt;    \n1 nc        confirmed… hhs    state    day       2024-04-01        NA 2024-04-22\n2 nc        confirmed… hhs    state    day       2024-04-05        NA 2024-04-22\n3 nc        confirmed… hhs    state    day       2024-04-06        NA 2024-04-22\n# ℹ 7 more variables: lag &lt;dbl&gt;, missing_value &lt;dbl&gt;, missing_stderr &lt;dbl&gt;,\n#   missing_sample_size &lt;dbl&gt;, value &lt;dbl&gt;, stderr &lt;dbl&gt;, sample_size &lt;dbl&gt;\n\n\n\nPython equivalent:\nres = Epidata.covidcast('hhs', 'confirmed_admissions_influenza_1d', 'day', \n  'state', [20240401, Epidata.range(20240405, 20240414)], 'nc')"
+  },
+  {
+    "objectID": "slides/lecture1.html#api-keys",
+    "href": "slides/lecture1.html#api-keys",
+    "title": "EpiData Workshop 2025",
+    "section": "API keys",
+    "text": "API keys\n\nAnyone may access the Epidata API anonymously without providing any personal data!!\nAnonymous API access is subject to some restrictions: public datasets only; 60 requests per hour; only two parameters may have multiple selections\nAPI key grants privileged access; can be obtained by registering with us\nPrivileges of registration: no rate limit; no limit on multiple selections\nWe just want to know which signals people care about to ensure we’re providing benefit\n\n\n\n\n\n\n\n\nTip\n\n\n\nThe {epidatr} client automatically searches for the key in the DELPHI_EPIDATA_KEY environment variable.\nWe recommend storing it in your .Renviron file, which R reads by default.\nMore on setting your API key here."
+  },
+  {
+    "objectID": "slides/lecture1.html#interactive-tooling-in-r",
+    "href": "slides/lecture1.html#interactive-tooling-in-r",
+    "title": "EpiData Workshop 2025",
+    "section": "Interactive tooling in R",
+    "text": "Interactive tooling in R\n\navail_endpoints()\n\n# A tibble: 28 × 2\n   Endpoint                          Description                                \n   &lt;chr&gt;                             &lt;chr&gt;                                      \n 1 pub_covid_hosp_facility()         COVID hospitalizations by facility         \n 2 pub_covid_hosp_facility_lookup()  Helper for finding COVID hospitalization f…\n 3 pub_covid_hosp_state_timeseries() COVID hospitalizations by state            \n 4 pub_covidcast()                   Various COVID and flu signals via the COVI…\n 5 pub_covidcast_meta()              Metadata for the COVIDcast endpoint        \n 6 pub_delphi()                      Delphi's ILINet outpatient doctor visits f…\n 7 pub_dengue_nowcast()              Delphi's PAHO dengue nowcasts (North and S…\n 8 pub_ecdc_ili()                    ECDC ILI incidence (Europe)                \n 9 pub_flusurv()                     CDC FluSurv flu hospitalizations           \n10 pub_fluview()                     CDC FluView ILINet outpatient doctor visits\n11 pub_fluview_clinical()            CDC FluView flu tests from clinical labs   \n12 pub_fluview_meta()                Metadata for the FluView endpoint          \n13 pub_gft()                         Google Flu Trends flu search volume        \n14 pub_kcdc_ili()                    KCDC ILI incidence (Korea)                 \n15 pub_meta()                        Metadata for the Delphi Epidata API        \n16 pub_nidss_dengue()                NIDSS dengue cases (Taiwan)                \n17 pub_nidss_flu()                   NIDSS flu doctor visits (Taiwan)           \n18 pub_nowcast()                     Delphi's ILI Nearby nowcasts               \n19 pub_paho_dengue()                 PAHO dengue data (North and South America) \n20 pub_wiki()                        Wikipedia webpage counts by article        \n21 pvt_cdc()                         CDC total and by topic webpage visits      \n22 pvt_dengue_sensors()              PAHO dengue digital surveillance sensors (…\n23 pvt_ght()                         Google Health Trends health topics search …\n24 pvt_meta_norostat()               Metadata for the NoroSTAT endpoint         \n25 pvt_norostat()                    CDC NoroSTAT norovirus outbreaks           \n26 pvt_quidel()                      Quidel COVID-19 and influenza testing data \n27 pvt_sensors()                     Influenza and dengue digital surveillance …\n28 pvt_twitter()                     HealthTweets total and influenza-related t…"
+  },
+  {
+    "objectID": "slides/lecture1.html#fetching-data---covidcast-main-endpoint",
+    "href": "slides/lecture1.html#fetching-data---covidcast-main-endpoint",
+    "title": "EpiData Workshop 2025",
+    "section": "Fetching data - COVIDcast main endpoint",
+    "text": "Fetching data - COVIDcast main endpoint\n\njhu_us_cases &lt;- pub_covidcast(\n  source = \"jhu-csse\",                        # this endpoint contains many different sources\n  signals = \"confirmed_7dav_incidence_prop\",  # other signals: deaths, cumulative, etc.\n  geo_type = \"nation\",                        # the geographic resolution (nation, state, hrr, msa, etc.)\n  time_type = \"day\",                          # or week or year\n  geo_values = \"us\",                          # optional\n  time_values = epirange(20210101, 20210401), # optional\n  ...                                         # additional arguments\n)\n\n\n\n# A tibble: 3 × 8\n  geo_value signal             source geo_type time_value issue        lag value\n  &lt;chr&gt;     &lt;chr&gt;              &lt;chr&gt;  &lt;fct&gt;    &lt;date&gt;     &lt;date&gt;     &lt;dbl&gt; &lt;dbl&gt;\n1 us        confirmed_7dav_in… jhu-c… nation   2021-01-01 2023-03-10   798  61.9\n2 us        confirmed_7dav_in… jhu-c… nation   2021-01-02 2023-03-10   797  64.2\n3 us        confirmed_7dav_in… jhu-c… nation   2021-01-03 2023-03-10   796  67.1\n\n\nvalue is the requested signal\nThere are some other columns in the usual output that I’ve hidden"
+  },
+  {
+    "objectID": "slides/lecture1.html#get-everything-for-a-source-signal",
+    "href": "slides/lecture1.html#get-everything-for-a-source-signal",
+    "title": "EpiData Workshop 2025",
+    "section": "Get everything for a source + signal",
+    "text": "Get everything for a source + signal\n\njhu_us_cases &lt;- pub_covidcast(\n  source = \"jhu-csse\",                  # this endpoint contains many different sources\n  signals = \"confirmed_incidence_num\",  # raw cases during the entire pandemic reporting until ~ April 2024\n  geo_type = \"county\",                  # the geographic resolution (nation, state, hrr, msa, etc.)\n  time_type = \"day\",                    # lowest resolution\n  geo_values = \"*\",                     # (default) \n  time_values = \"*\",                    # (default) \n  ...                                   # additional arguments\n)\n\n\n\nThis query takes a few minutes to run, so I don’t recommend it.\nBut there is support for automatic caching,\nand using \"*\" speeds things up relative to specifying many specific ranges.\n\n\nThe result has about 3.75M rows and occupies 400Mb."
+  },
+  {
+    "objectID": "slides/lecture1.html#versioned-data-in-epidatr",
+    "href": "slides/lecture1.html#versioned-data-in-epidatr",
+    "title": "EpiData Workshop 2025",
+    "section": "Versioned data in {epidatr}",
+    "text": "Versioned data in {epidatr}\n\nTwo important, mutually exclusive parameters\n\nissues = c(mdy1, mdy2, ..., )\n\nfetches the data that the source made available on the requested dates\nDatabase stores only the diffs, so that’s typically what you get\nEven if the source republishes the entire history every time they make an update\n\nas_of = mdy\n\nfetches the all available data as it would have looked on mdy\nThink of it as winding back the clock to the date mdy\nAPI only accepts a single date here"
+  },
+  {
+    "objectID": "slides/lecture1.html#example-issues-query",
+    "href": "slides/lecture1.html#example-issues-query",
+    "title": "EpiData Workshop 2025",
+    "section": "Example issues query",
+    "text": "Example issues query\n\nI wanted to display a major reporting error.\n\n\nversions &lt;- as.Date(c(\"2021-02-15\", \"2021-02-20\", \"2021-02-25\", \"2021-03-01\", \"2023-01-01\")) \npub_covidcast(\n  \"jhu-csse\", \"deaths_7dav_incidence_num\", \n  geo_type = \"state\", \n  geo_values = \"oh\",\n  time_type = \"day\",\n  time_values = epirange(20210101,20210301),\n  issues = versions\n) |&gt;\n  select(geo_value, time_value, version = issue, deaths = value)\n\n# A tibble: 4 × 4\n  geo_value time_value version    deaths\n  &lt;chr&gt;     &lt;date&gt;     &lt;date&gt;      &lt;dbl&gt;\n1 oh        2021-02-14 2021-02-15  670. \n2 oh        2021-02-19 2021-02-20   43.1\n3 oh        2021-02-24 2021-02-25   42.3\n4 oh        2021-02-28 2021-03-01   68.7\n\n\n\n\nNot what I wanted.\nGot only the diff on each issue.\nI wanted to view the whole history on each of those dates."
+  },
+  {
+    "objectID": "slides/lecture1.html#correct-as_of-query",
+    "href": "slides/lecture1.html#correct-as_of-query",
+    "title": "EpiData Workshop 2025",
+    "section": "Correct as_of query",
+    "text": "Correct as_of query\n\nres &lt;- map(versions, # same set as before\n           .f = \\(v) { \n             pub_covidcast(\n               \"jhu-csse\", \"deaths_7dav_incidence_num\", \n               geo_type = \"state\", \n               geo_values = \"oh\",\n               time_type = \"day\",\n               time_values = epirange(20210101,20210301),\n               as_of = v \n             ) |&gt;\n               select(geo_value, time_value, deaths = value) |&gt;\n               mutate(version = v)\n           }) |&gt;\n  list_rbind()\nres |&gt; head(7)\n\n# A tibble: 7 × 4\n  geo_value time_value deaths version   \n  &lt;chr&gt;     &lt;date&gt;      &lt;dbl&gt; &lt;date&gt;    \n1 oh        2021-01-01   72.3 2021-02-15\n2 oh        2021-01-02   77.3 2021-02-15\n3 oh        2021-01-03   81   2021-02-15\n4 oh        2021-01-04   81.7 2021-02-15\n5 oh        2021-01-05   75   2021-02-15\n6 oh        2021-01-06   73.3 2021-02-15\n7 oh        2021-01-07   71.4 2021-02-15\n\n\n\n\nGot the data as it would have appeared for each of the 4 dates.\nBut as_of can only accept a scalar, not vector of dates.\nHad to “loop” over them.\nWe’ll see a more efficient way to do this later this morning."
+  },
+  {
+    "objectID": "slides/lecture1.html#now-i-can-show-you-why-i-wanted-that-query",
+    "href": "slides/lecture1.html#now-i-can-show-you-why-i-wanted-that-query",
+    "title": "EpiData Workshop 2025",
+    "section": "Now I can show you why I wanted that query",
+    "text": "Now I can show you why I wanted that query"
+  },
+  {
+    "objectID": "slides/lecture1.html#versioning-in-nowcasting-and-forecasting",
+    "href": "slides/lecture1.html#versioning-in-nowcasting-and-forecasting",
+    "title": "EpiData Workshop 2025",
+    "section": "Versioning in nowcasting and forecasting",
+    "text": "Versioning in nowcasting and forecasting\n\nRevision patterns can be used to inform understanding of current situation\nOften, predicting “today” is more about predicting the revisions than the process\nForecasting often requires adjustments for revision/reporting patterns\nBacktesting requires using data that would have been available at the time, not current data\nOnly looking at the most recent data is a huge blunder"
+  },
+  {
+    "objectID": "slides/lecture1.html#wrapup-and-worksheet-discussion",
+    "href": "slides/lecture1.html#wrapup-and-worksheet-discussion",
+    "title": "EpiData Workshop 2025",
+    "section": "Wrapup and worksheet discussion",
+    "text": "Wrapup and worksheet discussion\n\nDelphi Epidata: platform for real-time epidemic data\n\nprovides (aggregated) signals for tracking and forecasting\nsources like health records, mobility patterns, and more.\n\nEpidata API: delivers up-to-date, granular epidemiological data + historical versions.\n{epidatr}: Client package for R\nVersioned Data and Latency:\n\nas_of: One version; the specific date when the data was last updated\nissues: Multiple versions; with different as_of dates\n\n\nManages the record of revisions for transparency and accuracy in data analysis."
+  },
+  {
+    "objectID": "slides/lecture3.html#outline",
+    "href": "slides/lecture3.html#outline",
+    "title": "EpiData Workshop 2025",
+    "section": "Outline",
+    "text": "Outline\n\nCompartmental Models\nOperationalizing Compartmental Models\nWhat is \\(R_t\\)?\nEstimating \\(R_t\\)\nResults and features of {rtestim}"
+  },
+  {
+    "objectID": "slides/lecture3.html#mathematical-modelling-of-disease-epidemics-is-very-old",
+    "href": "slides/lecture3.html#mathematical-modelling-of-disease-epidemics-is-very-old",
+    "title": "EpiData Workshop 2025",
+    "section": "Mathematical modelling of disease / epidemics is very old",
+    "text": "Mathematical modelling of disease / epidemics is very old\n\nDaniel Bernoulli (1760) - studies inoculation against smallpox\nJohn Snow (1855) - cholera epidemic in London tied to a water pump\nRonald Ross (1902) - Nobel Prize in Medicine for work on malaria\nKermack and McKendrick (1927-1933) - basic epidemic (mathematical) model\n\n\n\n\nSource: Shiode, et al., “The mortality rates and the space-time patterns of John Snow’s cholera epidemic map,” (2015)"
+  },
+  {
+    "objectID": "slides/lecture3.html#sir-type-compartmental-models---stochastic-version",
+    "href": "slides/lecture3.html#sir-type-compartmental-models---stochastic-version",
+    "title": "EpiData Workshop 2025",
+    "section": "SIR-type (compartmental) models - Stochastic Version",
+    "text": "SIR-type (compartmental) models - Stochastic Version\n\n\nSuppose each of N people in a bucket at time t:\nSusceptible(t) : not sick, but could get sick\nInfected(t) : sick, can make others sick\nRemoved(t) : recovered or dead; not sick, can’t get sick\n\n\n\nDuring period \\(h\\), each \\(S\\) meets \\(kh\\) people.\nAssume \\(P( S \\textrm{ meets } I \\textrm{ and becomes } I ) = c\\).\nThen \\(P( S(t) \\rightarrow I(t+h) ) = 1 - (1 - c I(t)  / N )^{hk} \\approx kchI(t) / N\\).\nTherefore, \\(I(t+h) | S(t),\\ I(t) \\sim \\textrm{Binom}(S(t),\\ kchI(t) / N)\\).\nAssume \\(P( I(t) \\rightarrow R(t+h)) = \\gamma h,\\ \\forall t\\).\nThen \\(R(t+h) | I_t \\sim \\textrm{Binom}(I(t),\\ \\gamma h)\\)."
+  },
+  {
+    "objectID": "slides/lecture3.html#sir-type-compartmental-models---stochastic-version-1",
+    "href": "slides/lecture3.html#sir-type-compartmental-models---stochastic-version-1",
+    "title": "EpiData Workshop 2025",
+    "section": "SIR-type (compartmental) models - Stochastic Version",
+    "text": "SIR-type (compartmental) models - Stochastic Version\n\n\n\\[\\begin{aligned}\nC(t+h) & =  \\mathrm{Binom}\\left(S(t),\\ \\frac{\\beta}{N} h I(t)\\right)\\\\\nD(t+h) & =  \\mathrm{Binom}\\left(I(t),\\ \\gamma h\\right)\\\\\nS(t+h) & =  S(t) - C(t+h)\\\\\nI(t+h) & =  I(t) + C(t+h) - D(t+h)\\\\\nR(t+h) & =  R(t) + D(t+h)\n\\end{aligned}\\]\n\n\nIn the deterministic limit, \\(h\\rightarrow 0\\)\n\\[\\begin{aligned}\n\\frac{dS}{dt} & =  -\\frac{\\beta}{N} S(t)I(t)\\\\\n\\frac{dI}{dt} & =  \\frac{\\beta}{N} I(t)S(t) - \\gamma I(t)\\\\\n\\frac{dR}{dt} & =  \\gamma I(t)\n\\end{aligned}\\]\n\n\n\n\n\n\n\n\n\n\n\n\nTHE SIR model is often ambiguous between these.\nTypically, people mean the deterministic, continuous time version."
+  },
+  {
+    "objectID": "slides/lecture3.html#data-issues",
+    "href": "slides/lecture3.html#data-issues",
+    "title": "EpiData Workshop 2025",
+    "section": "Data issues",
+    "text": "Data issues\n\nIdeally we’d observe \\(S(t)\\), \\(I(t)\\), \\(R(t)\\) at all times \\(t\\)\nEasier to observe new infections, \\(I(t+h) - I(t)\\)\nRemovals by death are easier to observe than removals by recovery,\nso we mostly see \\((R(t+h) - R(t)) \\times \\textrm{(death rate)}\\)\nThe interval between measurements, say \\(\\Delta\\), is often \\(\\gg h\\)\nMeasuring \\(I(t)\\) and \\(R(t)\\) (or their rates of change) is hard\n\ntesting/reporting is sporadic and error prone\nNeed to model test error (false positives, false negatives) and who gets tested\nNeed to model lag between testing and reporting\n\nParameters (especially, \\(\\beta\\)) change during the epidemic\n\nChanging behavior, changing policy, environmental factors, vaccines, variants, …"
+  },
+  {
+    "objectID": "slides/lecture3.html#connecting-to-data",
+    "href": "slides/lecture3.html#connecting-to-data",
+    "title": "EpiData Workshop 2025",
+    "section": "Connecting to Data",
+    "text": "Connecting to Data\n\nLikelihood calculations are straightforward if we can measure \\(I_t\\), \\(R_t\\) at all times \\(0, h, 2h, \\dots, T\\)\nOr \\(I_0\\), \\(R_0\\) and all the increments \\(I_{t+h} - I_t\\), \\(R_{t+h} - R_t\\)\nStill have to optimize numerically\nLikelihood calculations already become difficult if the time between observations \\(\\Delta \\gg h\\)\n\nGenerally, \\(\\Delta \\approx\\) 1 day\nIn principle, this just defines another Markov process, with a longer interval \\(\\Delta\\) between steps, but to get the likelihood of a \\(\\Delta\\) step we have to sum over all possible paths of \\(h\\) steps adding up to it\n\nOther complications if we don’t observe all the compartments, and/or have a lot of noise in our observations\n\nWe don’t and we do."
+  },
+  {
+    "objectID": "slides/lecture3.html#connecting-to-data-1",
+    "href": "slides/lecture3.html#connecting-to-data-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Connecting to Data",
+    "text": "Connecting to Data\n\n\n\nMore tractable to avoid likelihood (Conditional least squares, simulation-based inference)\nIntrinsic issue: Initially, everything looks exponential\n\nHard to discriminate between distinct models\nIf SIR is true, easier to estimate \\(\\beta - \\gamma\\) than \\((\\beta, \\gamma)\\) or \\(\\beta/\\gamma\\)\n\nCan sometimes calibrate or fix the parameters based on other sources\n\nE.g., \\(1/\\gamma =\\) average time someone is infectious in clinical studies\n\n\n\n\n\n\n\nI have been thinking about how different people interpret data differently. And made this xkcd style graphic to illustrate this. pic.twitter.com/a8LvlmZxT7\n\n— Jens von Bergmann (@vb_jens) March 17, 2021"
+  },
+  {
+    "objectID": "slides/lecture3.html#these-models-can-fit-well-in-sample",
+    "href": "slides/lecture3.html#these-models-can-fit-well-in-sample",
+    "title": "EpiData Workshop 2025",
+    "section": "These models can fit well in-sample",
+    "text": "These models can fit well in-sample\n\nTrack observed cases closely (they should)\nCan provide nuanced policy advice on some topics\nMany questions depend on modulating \\(\\beta\\)\n\nWhat happens if we lock down?\nWhat happens if we mask?\nWhat happens if we have school online?\nVaccine passport?\n\nVaccination modeling is easier, directly removes susceptibles\n\n\nWhat about out-of-sample?"
+  },
+  {
+    "objectID": "slides/lecture3.html#what-does-this-look-like",
+    "href": "slides/lecture3.html#what-does-this-look-like",
+    "title": "EpiData Workshop 2025",
+    "section": "What does this “look like”?",
+    "text": "What does this “look like”?\n\nsim_SIR &lt;- function(TT, N = 1000, beta = .1, gamma = .01) {\n  \n  S &lt;- double(TT)\n  I &lt;- double(TT)\n  R &lt;- double(TT)\n  S[1] &lt;- N - 1\n  I[1] &lt;- 1\n  \n  for (tt in 2:TT) {\n    contagions &lt;- rbinom(1, size = S[tt - 1], prob = beta * I[tt - 1] / N)\n    removals &lt;- rbinom(1, size = I[tt - 1], prob = gamma)\n    S[tt] &lt;- S[tt - 1] - contagions\n    I[tt] &lt;- I[tt - 1] + contagions - removals\n    R[tt] &lt;- R[tt - 1] + removals\n  }\n  tibble(S = S, I = I, R = R, time = seq(TT))\n}"
+  },
+  {
+    "objectID": "slides/lecture3.html#what-does-this-look-like-1",
+    "href": "slides/lecture3.html#what-does-this-look-like-1",
+    "title": "EpiData Workshop 2025",
+    "section": "What does this “look like”?",
+    "text": "What does this “look like”?"
+  },
+  {
+    "objectID": "slides/lecture3.html#so-far-just-simulations-how-do-you-fit-one",
+    "href": "slides/lecture3.html#so-far-just-simulations-how-do-you-fit-one",
+    "title": "EpiData Workshop 2025",
+    "section": "So far, just simulations, how do you fit one?",
+    "text": "So far, just simulations, how do you fit one?\n\\[\n\\begin{aligned}\nx_{t+1} &= \\textrm{OdeSolve}(x_t) + \\epsilon_t\\\\\ny_{t+1} &= \\textrm{NegBinom}(\\textrm{mean} = g(x_t),\\ \\kappa)\n\\end{aligned}\n\\]\n\n\\(x_t\\) is all the compartments\n\\(y_t\\) are some observations (cases and/or hospitalizations and/or deaths)\nPut priors on all the parameters (they are criminally underidentified)\n\n\nTurn Bayesian Crank in Stan or similar until you’re done."
+  },
+  {
+    "objectID": "slides/lecture3.html#covidseir-model",
+    "href": "slides/lecture3.html#covidseir-model",
+    "title": "EpiData Workshop 2025",
+    "section": "{covidseir} model",
+    "text": "{covidseir} model\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nR package: https://seananderson.github.io/covidseir/index.html\nPaper link: https://doi.org/10.1371/journal.pcbi.1008274"
+  },
+  {
+    "objectID": "slides/lecture3.html#fit-it-to-bc-data-and-produce-a-forecast",
+    "href": "slides/lecture3.html#fit-it-to-bc-data-and-produce-a-forecast",
+    "title": "EpiData Workshop 2025",
+    "section": "Fit it to BC data and produce a forecast",
+    "text": "Fit it to BC data and produce a forecast\n\nsamp_frac &lt;- c(rep(0.14, 13), rep(0.21, 38), rep(0.37, nrow(early_bc) - 51))\nf_seg &lt;- with(early_bc, case_when(time_value == \"2020-03-01\" ~ 0, time_value &gt;= \"2020-06-01\" ~ 3,\n  time_value &gt;= \"2020-05-01\" ~ 2, time_value &gt; \"2020-03-01\" ~ 1))\nfit &lt;- covidseir::fit_seir(daily_cases = early_bc$cases,\n                           f_seg = f_seg, # change points in transmission\n                           samp_frac_fixed = samp_frac,  # fraction of infections that are tested\n                           iter = 500, # number of posterior samples\n                           fit_type = \"optimizing\") # for speed only"
+  },
+  {
+    "objectID": "slides/lecture3.html#using-this-or-similar-for-forecasting",
+    "href": "slides/lecture3.html#using-this-or-similar-for-forecasting",
+    "title": "EpiData Workshop 2025",
+    "section": "Using this or similar for forecasting",
+    "text": "Using this or similar for forecasting\nNeeded to make lots of assumptions about future epi parameters\n\nFuture transmission rate\nFuture case ascertainment rate\nNo new variants, or vaccinations, or influx of population\nPeople don’t lose immunity\nEtc., etc., etc.\n\n\nMore on these as forecasters a bit later.\nBetter described as scenario models."
+  },
+  {
+    "objectID": "slides/lecture3.html#r_0-basic-reproduction-number",
+    "href": "slides/lecture3.html#r_0-basic-reproduction-number",
+    "title": "EpiData Workshop 2025",
+    "section": "\\(R_0\\) basic reproduction number",
+    "text": "\\(R_0\\) basic reproduction number\nDates at least to Alfred Lotka (1920s) and others (Feller, Blackwell, etc.)\n\n\nThe expected number of secondary infections due to a primary infection\n\n\n\n\n\n\\(R_0 &lt; 1\\) ⟹ the epidemic will die out\n\n\n\n\\(R_0 &gt; 1\\) ⟹ the epidemic will grow until everyone is infected\n\n\n\n\n\n\n\n\n\n\n\n\nSource: Katelyn Jetelina, “YLE Newsletter,” 17 March 2025."
+  },
+  {
+    "objectID": "slides/lecture3.html#r_0-is-entirely-retrospective",
+    "href": "slides/lecture3.html#r_0-is-entirely-retrospective",
+    "title": "EpiData Workshop 2025",
+    "section": "\\(R_0\\) is entirely retrospective",
+    "text": "\\(R_0\\) is entirely retrospective\n\nIt’s a property of the pathogen in a fully susceptible (infinite) population\nEach outbreak is like a new sample\nTo estimate something like this from data, the “bonehead” way is to\n\nWait until the epidemic is over (no more infections circulating)\nContact trace the primary infection responsible for each secondary infection\nTake a sample average of the number caused by each primary\nPossibly repeat over many outbreaks\n\n\n\n\n\n\nSource: Guerra, et al., “The basic reproduction number (R0) of measles,” (2019).\n\n\n\n\nOf course no one actually does that\n\nLots of work on how to estimate \\(R_0\\)"
+  },
+  {
+    "objectID": "slides/lecture3.html#effective-reproduction-number",
+    "href": "slides/lecture3.html#effective-reproduction-number",
+    "title": "EpiData Workshop 2025",
+    "section": "Effective reproduction number",
+    "text": "Effective reproduction number\nSuppose \\(s\\)% of the population is susceptible\nThen, “the” effective reproduction number \\(R=sR_0\\)\nAllows you to reason about things like\n\n\nThe level of vaccine coverage necessary to prevent an outbreak from growing uncontrollably.\n\n\n\nSo, for measles, if \\(R_0\\approx 15\\), the disease will die out if immunity is\n\\[\nsR_0 \\leq 1 \\Longrightarrow 1-s \\leq 1-1/R_0 \\approx 93\\%\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#rt-instantaneous-reproduction-number",
+    "href": "slides/lecture3.html#rt-instantaneous-reproduction-number",
+    "title": "EpiData Workshop 2025",
+    "section": "\\(R(t)\\) — instantaneous reproduction number",
+    "text": "\\(R(t)\\) — instantaneous reproduction number\n\nThe effective reproduction number in the middle of an outbreak\nSome of the population is immune, others are infected, others susceptible\n\n\nThe expected number of secondary infections at time \\(t\\) caused by an earlier primary infection\n\n\n\\(f(a) \\geq 0,\\ \\forall a\\) — the rate at which an infection of age \\(a\\) produces new infections\n\\[\n\\begin{aligned}\nR_0 &= \\int_{0}^\\infty f(a)\\mathsf{d}a, \\\\\ng(a) &= \\frac{f(a)} {\\int_{0}^\\infty f(a)\\mathsf{d}a} = f(a) / R_0.\n\\end{aligned}\n\\]\n\n\nCan allow \\(g(t, a)\\), hold this fixed for now."
+  },
+  {
+    "objectID": "slides/lecture3.html#the-generation-interval-distribution-ga",
+    "href": "slides/lecture3.html#the-generation-interval-distribution-ga",
+    "title": "EpiData Workshop 2025",
+    "section": "The generation interval distribution \\(g(a)\\)",
+    "text": "The generation interval distribution \\(g(a)\\)\n\n\n\n\n\nSource: US CDC Center for Forecasting Analytics, “Behind the Model.”"
+  },
+  {
+    "objectID": "slides/lecture3.html#rt-and-r_t-renewal-equation",
+    "href": "slides/lecture3.html#rt-and-r_t-renewal-equation",
+    "title": "EpiData Workshop 2025",
+    "section": "\\(R(t)\\) and \\(R_t\\) — renewal equation",
+    "text": "\\(R(t)\\) and \\(R_t\\) — renewal equation\n\\(R(t)\\) is defined implicitly through the renewal equation\n\\[\nx(t) = R(t)\\int_0^\\infty x(t-a)g(a)\\mathsf{d}a,\n\\]\nwhere \\(x(t)\\) are infections at time \\(t\\).\n\n\nIn discrete time,\n\\[\nx_t = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a = R_t (x * \\widetilde{g}).\n\\]\n\n\n\nAnd stochasticly,\n\\[\n\\mathbb{E}\\big[x_t\\ |\\ x_1,\\ldots,x_{t-1}\\big] = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a = R_t (x * \\widetilde{g}).\n\\]\n\nMost estimators start here: \\[\n\\mathbb{E}\\big[x_t\\ |\\ x_1,\\ldots,x_{t-1}\\big] = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a.\n\\]\n\nAssume \\(\\widetilde{g}\\) is known\nModel \\(x_t\\ |\\ x_1,\\ldots,x_{t-1}\\) as Poisson or Negative Binomial\nTurn some inferential crank"
+  },
+  {
+    "objectID": "slides/lecture3.html#r_t-for-covid-19-in-the-us",
+    "href": "slides/lecture3.html#r_t-for-covid-19-in-the-us",
+    "title": "EpiData Workshop 2025",
+    "section": "\\(R_t\\) for COVID-19 in the US",
+    "text": "\\(R_t\\) for COVID-19 in the US\n\n\nSource: US CDC Center for Forecasting Analytics"
+  },
+  {
+    "objectID": "slides/lecture3.html#r_t-in-compartmental-models",
+    "href": "slides/lecture3.html#r_t-in-compartmental-models",
+    "title": "EpiData Workshop 2025",
+    "section": "\\(R_t\\) in compartmental models",
+    "text": "\\(R_t\\) in compartmental models\nThere is an equivalence between a compartmental model and the renewal equation.\n\\[\n\\begin{aligned}\nR_0 &= \\beta / \\gamma\\\\\ni_t &= R_0 S_{t-1} \\sum_{k = 1}^t \\big[\\gamma (1-\\gamma)^{k-1}\\big] i_{t-k}\n= R_t\\sum_{k = 1}^t (1-\\gamma)^{k-1} i_{t-k}\n\\end{aligned}\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#data-issues-1",
+    "href": "slides/lecture3.html#data-issues-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Data issues",
+    "text": "Data issues\n\\(x_t\\) is Infections, but we don’t ever see those\n\n\n\n\nSource: US CDC Center for Forecasting Analytics, “Behind the Model.”\n\n\n\n\n\nReplace infections with cases\nReplace generation interval with serial interval\nAssume we have the serial interval"
+  },
+  {
+    "objectID": "slides/lecture3.html#serial-interval-distribution",
+    "href": "slides/lecture3.html#serial-interval-distribution",
+    "title": "EpiData Workshop 2025",
+    "section": "Serial interval distribution",
+    "text": "Serial interval distribution"
+  },
+  {
+    "objectID": "slides/lecture3.html#standard-model-for-r_t",
+    "href": "slides/lecture3.html#standard-model-for-r_t",
+    "title": "EpiData Workshop 2025",
+    "section": "Standard model for \\(R_t\\)",
+    "text": "Standard model for \\(R_t\\)\n\\[\n\\begin{aligned}\n\\eta_t &= \\sum_{a=0}^\\infty y_{t-a}p_a,\\\\ \\\\\ny_t\\ |\\ y_1,\\ldots,y_{t-1} &\\sim \\textrm{Poisson}(R_t\\eta_t).\n\\end{aligned}\n\\]\n\nUsing \\(y\\) instead of \\(x\\) to be cases or hospitalizations or deaths, incidence\nUsing \\(p\\) for serial interval distribution (discretized)\nThe MLE for \\(R_t\\) is just \\(y_t / \\eta_t\\).\nThis has really high variance, but unbiased.\nSo everybody smooths it."
+  },
+  {
+    "objectID": "slides/lecture3.html#the-state-of-the-art",
+    "href": "slides/lecture3.html#the-state-of-the-art",
+    "title": "EpiData Workshop 2025",
+    "section": "The state of the art",
+    "text": "The state of the art\n\n\n\n{EpiEstim} (Cori, et al., 2013)\n\n\n\n\nGamma prior on \\(R_t\\), but use a trailing window\nSuper fast computationally\nSmoothness is ad hoc\n\n\n\n\n\n\n{EpiFilter} (Parag, 2020)\n\n\n\n\nState space model\nOne step smoothness: \\(R_{s+1} \\sim \\textrm{Gaussian}(R_s,\\ \\alpha R_s)\\)\nUses a discretized particle filter-type algorithm\n\n\n\n\n\n\n{EpiLPS} (Gressani, et al., 2022)\n\n\n\n\nNegative Binomial likelihood\nSmoothness via \\(\\log(R_t\\eta_t) = \\mathbf{B}_{t,:}\\beta\\)\n\\(\\mathbf{B}\\) is cubic B-spline basis, weighted Ridge penalty on \\(\\beta\\)\nMore priors, use Metropolis Adjusted Langevin Algorithm\n\n\n\n\n\n{EpiNow2} (CDC + CFA, Abbott, et al., 2023ish)\n\n\nNegative Binomial likelihood\nSmoothness via a GP prior\nAccommodates the sequence of delays from infection \\(\\longrightarrow\\) ??\nAdjusts for real-time issues like partial reporting\nBig Bayesian MCMC in Stan. Very slow."
+  },
+  {
+    "objectID": "slides/lecture3.html#our-model",
+    "href": "slides/lecture3.html#our-model",
+    "title": "EpiData Workshop 2025",
+    "section": "Our model",
+    "text": "Our model\nLet \\(\\theta_t := \\log(R_t)\\).\nUse Poisson likelihood.\n\\[\n\\begin{aligned}\n\\widehat{R} &= \\exp(\\widehat{\\theta}) &\\widehat{\\theta} &= \\mathop{\\mathrm{argmin}}_\\theta\\; \\eta^{\\mathsf{T}}\\exp(\\theta) -\n\\mathbf{y}^{\\mathsf{T}}\\theta + \\lambda\\Vert D^{(k+1)}\\theta\\Vert_1\n\\end{aligned}\n\\]\n\n\nConvex, has a global optimum\n\\(\\lambda\\) controls smoothness relative to data fidelity\n\\(\\ell_1\\) penalty produces adaptive piecewise polynomials of order \\(k+1\\)\nNear minimax optimal for functions with bounded total variation"
+  },
+  {
+    "objectID": "slides/lecture3.html#local-adaptivity-ell_1-vs.-ell_2",
+    "href": "slides/lecture3.html#local-adaptivity-ell_1-vs.-ell_2",
+    "title": "EpiData Workshop 2025",
+    "section": "Local adaptivity — \\(\\ell_1\\) vs. \\(\\ell_2\\)",
+    "text": "Local adaptivity — \\(\\ell_1\\) vs. \\(\\ell_2\\)"
+  },
+  {
+    "objectID": "slides/lecture3.html#polynomial-order-k0",
+    "href": "slides/lecture3.html#polynomial-order-k0",
+    "title": "EpiData Workshop 2025",
+    "section": "Polynomial order, \\(k=0\\)",
+    "text": "Polynomial order, \\(k=0\\)\n\n\n \\[\n\\begin{aligned}\nD^{(1)} &= \\begin{bmatrix}\n1 & -1 &  &  & & \\\\\n& 1 & -1 &  & & \\\\\n  &   &    & \\ddots && \\\\\n&   &   &  & 1 & -1\n\\end{bmatrix} \\\\ \\\\\n&\\in \\mathbb{R}^{(n-1)\\times n}\n\\end{aligned}\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#polynomial-order-k1",
+    "href": "slides/lecture3.html#polynomial-order-k1",
+    "title": "EpiData Workshop 2025",
+    "section": "Polynomial order, \\(k=1\\)",
+    "text": "Polynomial order, \\(k=1\\)\n\n\n \\[\n\\begin{aligned}\nD^{(2)} &= \\begin{bmatrix}\n1 & -2 & 1 &  & & \\\\\n& 1 & -2 & 1 & & \\\\\n  &   &    & \\ddots && \\\\\n&   &   & 1 & -2 & 1\n\\end{bmatrix} \\\\ \\\\\n&= D^{(1)}D^{(1)}\\\\ \\\\\n&\\in \\mathbb{R}^{(n-k-1)\\times n}\n\\end{aligned}\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#polynomial-order-k2",
+    "href": "slides/lecture3.html#polynomial-order-k2",
+    "title": "EpiData Workshop 2025",
+    "section": "Polynomial order, \\(k=2\\)",
+    "text": "Polynomial order, \\(k=2\\)\n\n\n \\[\n\\begin{aligned}\nD^{(3)} &= \\begin{bmatrix}\n-1 & 3 & -3 & 1  & & \\\\\n& -1 & 3 & -3 &1 & \\\\\n  &   &    & \\ddots && \\\\\n&   &  -1 & 3 & -3 & 1\n\\end{bmatrix} \\\\ \\\\\n&= D^{(1)}D^{(2)}\\\\ \\\\\n&\\in \\mathbb{R}^{(n-k-1)\\times n}\n\\end{aligned}\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#estimation-algorithm",
+    "href": "slides/lecture3.html#estimation-algorithm",
+    "title": "EpiData Workshop 2025",
+    "section": "Estimation algorithm",
+    "text": "Estimation algorithm\n\\[\n\\mathop{\\mathrm{minimize}}_\\theta\\; \\eta^{\\mathsf{T}}\\exp(\\theta) -\n\\mathbf{y}^{\\mathsf{T}}\\theta + \\lambda\\Vert D^{(k+1)}\\theta\\Vert_1\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#estimation-algorithm-1",
+    "href": "slides/lecture3.html#estimation-algorithm-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Estimation algorithm",
+    "text": "Estimation algorithm\n\\[\n\\mathop{\\mathrm{minimize}}_{\\theta,\\ {\\color{BurntOrange} \\alpha}}\\;\n\\eta^{\\mathsf{T}}\\exp(\\theta) -\n\\mathbf{y}^{\\mathsf{T}}\\theta +\n\\lambda\\Vert D^{(1)}{\\color{BurntOrange} \\alpha}\\Vert_1\\quad\n{\\color{BurntOrange} \\textrm{subject to}\\quad \\alpha = D^{(k)}\\theta}\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#estimation-algorithm-2",
+    "href": "slides/lecture3.html#estimation-algorithm-2",
+    "title": "EpiData Workshop 2025",
+    "section": "Estimation algorithm",
+    "text": "Estimation algorithm\n\\[\n\\mathop{\\mathrm{minimize}}_{\\theta,\\ \\alpha}\\;\n\\eta^{\\mathsf{T}}\\exp(\\theta) -\n\\mathbf{y}^{\\mathsf{T}}\\theta +\n\\lambda\\Vert D^{(1)} \\alpha\\Vert_1\\quad\n\\textrm{subject to}\\quad \\alpha = D^{(k)}\\theta\n\\]\n\n\n\nAlternating direction method of multipliers (ADMM)\n\\[\n\\begin{aligned}\n\\theta &\\longleftarrow \\mathop{\\mathrm{argmin}}_\\theta\\ \\eta^{\\mathsf{T}}\\exp(\\theta) -\n\\mathbf{y}^{\\mathsf{T}}\\theta +\n  \\frac{\\rho}{2}\\Vert D^{(k)}\\theta - \\alpha + u \\Vert_2^2 \\\\\n\\alpha &\\longleftarrow \\mathop{\\mathrm{argmin}}_\\alpha\\ \\lambda\\Vert D^{(1)} \\alpha \\Vert_1 +\n  \\frac{\\rho}{2}\\Vert D^{(k)}\\theta - \\alpha + u \\Vert_2^2 \\\\\nu &\\longleftarrow u + D^{(k)}\\theta - \\alpha\n\\end{aligned}\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#estimation-algorithm-3",
+    "href": "slides/lecture3.html#estimation-algorithm-3",
+    "title": "EpiData Workshop 2025",
+    "section": "Estimation algorithm",
+    "text": "Estimation algorithm\n\\[\n\\mathop{\\mathrm{minimize}}_{\\theta,\\ \\alpha}\\;\n\\eta^{\\mathsf{T}}\\exp(\\theta) -\n\\mathbf{y}^{\\mathsf{T}}\\theta +\n\\lambda\\Vert D^{(1)} \\alpha\\Vert_1\\quad\n\\textrm{subject to}\\quad \\alpha = D^{(k)}\\theta\n\\]\n\n\n\nAlternating direction method of multipliers (ADMM)\n\\[\n\\begin{aligned}\n\\theta &\\longleftarrow  {\\color{Cerulean}\\textrm{Proximal Newton / Fisher Scoring}} \\\\\n\\alpha &\\longleftarrow  {\\color{BurntOrange}\\textrm{Fused Lasso Signal Approximator}} \\\\\nu &\\longleftarrow u + D^{(k)}\\theta - \\alpha\n\\end{aligned}\n\\]\n\nSolve sequentially for \\(\\Vert (D^{\\dagger})^{\\mathsf{T}}(\\eta - y)\\Vert_\\infty = \\lambda_1 &gt; \\cdots &gt; \\lambda_M=\\epsilon \\lambda_1\\)."
+  },
+  {
+    "objectID": "slides/lecture3.html#canadian-covid-19-cases",
+    "href": "slides/lecture3.html#canadian-covid-19-cases",
+    "title": "EpiData Workshop 2025",
+    "section": "Canadian Covid-19 cases",
+    "text": "Canadian Covid-19 cases"
+  },
+  {
+    "objectID": "slides/lecture3.html#r_t-for-canadian-covid-19-cases",
+    "href": "slides/lecture3.html#r_t-for-canadian-covid-19-cases",
+    "title": "EpiData Workshop 2025",
+    "section": "\\(R_t\\) for Canadian Covid-19 cases",
+    "text": "\\(R_t\\) for Canadian Covid-19 cases"
+  },
+  {
+    "objectID": "slides/lecture3.html#reconvolved-canadian-covid-19-cases",
+    "href": "slides/lecture3.html#reconvolved-canadian-covid-19-cases",
+    "title": "EpiData Workshop 2025",
+    "section": "Reconvolved Canadian Covid-19 cases",
+    "text": "Reconvolved Canadian Covid-19 cases"
+  },
+  {
+    "objectID": "slides/lecture3.html#example-simulations-for-different-methods",
+    "href": "slides/lecture3.html#example-simulations-for-different-methods",
+    "title": "EpiData Workshop 2025",
+    "section": "Example simulations for different methods",
+    "text": "Example simulations for different methods"
+  },
+  {
+    "objectID": "slides/lecture3.html#rtestim-software",
+    "href": "slides/lecture3.html#rtestim-software",
+    "title": "EpiData Workshop 2025",
+    "section": "{rtestim} software",
+    "text": "{rtestim} software\n\n\nGuts are in C++ for speed\nLots of the usual S3 methods\nApproximate “confidence” bands\n\\(\\widehat{R}\\) is a member of a function space\nArbitrary spacing of observations\nBuilt-in cross validation\nTime-varying delay distributions"
+  },
+  {
+    "objectID": "slides/lecture3.html#rtestim-software-1",
+    "href": "slides/lecture3.html#rtestim-software-1",
+    "title": "EpiData Workshop 2025",
+    "section": "{rtestim} software",
+    "text": "{rtestim} software\n\n\n\nGuts are in C++ for speed\nLots of the usual S3 methods\nApproximate “confidence” bands\n\\(\\widehat{R}\\) is a member of a function space\nArbitrary spacing of observations\nBuilt-in cross validation\nTime-varying delay distributions\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nApproximation + Delta method gives\n\\[\n\\textrm{Var}(\\widehat{R}) = \\left(\\textrm{diag}(\\widehat{y}) +\n\\lambda D^{\\mathsf{T}}D\\right)^{\\dagger} \\left(\\frac{1}{\\eta^2}\\right)\n\\]"
+  },
+  {
+    "objectID": "slides/lecture3.html#rtestim-software-2",
+    "href": "slides/lecture3.html#rtestim-software-2",
+    "title": "EpiData Workshop 2025",
+    "section": "{rtestim} software",
+    "text": "{rtestim} software\n\n\n\nGuts are in C++ for speed\nLots of the usual S3 methods\nApproximate “confidence” bands\n\\(\\widehat{R}\\) is a member of a function space\nArbitrary spacing of observations\nBuilt-in cross validation\nTime-varying delay distributions\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nThe solution is an element of the space of discrete splines of order \\(k\\) (Tibshirani, 2020)\n\nLets us interpolate (and extrapolate) to off-observation points\nLets us handle uneven spacing"
+  },
+  {
+    "objectID": "slides/lecture3.html#rtestim-software-3",
+    "href": "slides/lecture3.html#rtestim-software-3",
+    "title": "EpiData Workshop 2025",
+    "section": "{rtestim} software",
+    "text": "{rtestim} software\n\n\n\nGuts are in C++ for speed\nLots of the usual S3 methods\nApproximate “confidence” bands\n\\(\\widehat{R}\\) is a member of a function space\nArbitrary spacing of observations\nBuilt-in cross validation\nTime-varying delay distributions"
+  },
+  {
+    "objectID": "slides/lecture3.html#rtestim-software-4",
+    "href": "slides/lecture3.html#rtestim-software-4",
+    "title": "EpiData Workshop 2025",
+    "section": "{rtestim} software",
+    "text": "{rtestim} software"
+  }
+]
