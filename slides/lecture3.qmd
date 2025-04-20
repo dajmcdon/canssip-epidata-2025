@@ -1,6 +1,6 @@
 ---
 org: "CANSSI Prairies &mdash; Epi Forecasting Workshop 2025"
-title: "Compartmental models, renewal equations, and Rt estimation"
+title: "Compartmental Models, Renewal Equations, and $R_t$ Estimation"
 subtitle: "Lecture 3"
 short-title: "Epi models"
 format: revealjs
@@ -24,26 +24,24 @@ Rt <- rto$Rt
 colnames(Rt) <- as.character(1:ncol(Rt))
 Rt <- pivot_longer(as_tibble(Rt) |> mutate(x = cancovid$date), -x) |>
   arrange(name, x)
-
-Rt |>
-  ggplot(aes(x, value, colour = as.numeric(name), group = name)) +
-  geom_line() +
-  coord_cartesian(ylim = c(0.8, 1.5), xlim = c(ymd("2021-08-01", "2022-08-31"))) +
-  scale_x_continuous(expand = expansion()) +
-  scale_y_continuous(expand = expansion()) +
-  theme_void() +
-  scale_color_distiller(palette = "Set1", direction = 1) +
-  theme(legend.position = "none")
 ```
 
+## Outline
+
+1. Compartmental Models
+1. Operationalizing Compartmental Models
+1. What is $R_t$?
+1. Estimating $R_t$
+1. Results and features of `{rtestim}`
+
+# Compartmental models {.inverse}
 
 
 ## Mathematical modelling of disease / epidemics is very old 
 
-$$
-\DeclareMathOperator{\argmin}{argmin}
-\DeclareMathOperator{\minimize}{minimize}
-$$
+\DeclareMathOperator*{\argmin}{argmin}
+\DeclareMathOperator*{\minimize}{minimize}
+
 
 * [Daniel Bernoulli (1760)]{.tertiary} - studies inoculation against smallpox
 
@@ -55,6 +53,334 @@ $$
 
 ![Source: Shiode, et al., "The mortality rates and the space-time patterns of John Snow’s cholera epidemic map," (2015)](https://media.springernature.com/full/springer-static/image/art%3A10.1186%2Fs12942-015-0011-y/MediaObjects/12942_2015_11_Fig1_HTML.gif?as=webp){height=400px fig-align="center"}
 
+
+## SIR-type (compartmental) models - Stochastic Version {.nostretch}
+
+
+::: flex
+::: w-75
+
+Suppose each of N people in a bucket at time t:
+
+[Susceptible(t)]{.secondary} : not sick, but could get sick
+
+[Infected(t)]{.secondary} : sick, can make others sick
+
+[Removed(t)]{.secondary} : recovered or dead; not sick, can't get sick
+
+ ---
+
+::: {.incremental}
+* During period $h$, each $S$ meets $kh$ people.
+* Assume $P( S \textrm{ meets } I \textrm{ and becomes } I ) = c$.
+* Then $P( S(t) \rightarrow I(t+h) ) = 1 - (1 - c I(t)  / N )^{hk} \approx kchI(t) / N$.
+* Therefore, $I(t+h) | S(t),\ I(t) \sim \textrm{Binom}(S(t),\ kchI(t) / N)$.
+* Assume $P( I(t) \rightarrow R(t+h)) = \gamma h,\ \forall t$.
+* Then $R(t+h) | I_t \sim \textrm{Binom}(I(t),\ \gamma h)$.
+:::
+
+:::
+
+::: w-25
+
+<br><br>
+
+![](gfx/sir.svg){fig-align="center"}
+
+:::
+:::
+
+
+
+
+## SIR-type (compartmental) models - Stochastic Version
+
+::: flex
+::: w-60
+
+
+\begin{aligned}
+C(t+h) & =  \mathrm{Binom}\left(S(t),\ \frac{\beta}{N} h I(t)\right)\\
+D(t+h) & =  \mathrm{Binom}\left(I(t),\ \gamma h\right)\\
+S(t+h) & =  S(t) - C(t+h)\\
+I(t+h) & =  I(t) + C(t+h) - D(t+h)\\
+R(t+h) & =  R(t) + D(t+h)
+\end{aligned}
+
+::: {.fragment}
+ ---
+
+In the deterministic limit, $h\rightarrow 0$
+
+\begin{aligned}
+\frac{dS}{dt} & =  -\frac{\beta}{N} S(t)I(t)\\
+\frac{dI}{dt} & =  \frac{\beta}{N} I(t)S(t) - \gamma I(t)\\
+\frac{dR}{dt} & =  \gamma I(t)
+\end{aligned}
+:::
+
+:::
+
+::: w-40
+
+<br><br>
+
+![](gfx/sir.svg){fig-align="center"}
+
+:::
+:::
+
+::: {.fragment .box-text .absolute top=30%}
+
+[THE]{.secondary} SIR model is often ambiguous between these.
+
+Typically, people mean the deterministic, continuous time version.
+:::
+
+
+## Data issues 
+
+- [Ideally]{.secondary} we'd observe $S(t)$, $I(t)$, $R(t)$ at all times $t$
+
+- Easier to observe new infections, $I(t+h) - I(t)$
+
+- Removals by death are easier to observe than removals by recovery,  
+  so we mostly see $(R(t+h) - R(t)) \times \textrm{(death rate)}$
+
+- The interval between measurements, say $\Delta$, is often $\gg h$
+
+- Measuring $I(t)$ and $R(t)$ (or their rates of change) is hard 
+    + testing/reporting is sporadic and error prone
+    + Need to model test error (false positives, false negatives) _and_ who gets tested
+    + Need to model lag between testing and reporting
+    
+- Parameters (especially, $\beta$) change during the epidemic
+    + Changing behavior, changing policy, environmental factors, vaccines, variants, ...
+
+
+## Connecting to Data
+
+
+- Likelihood calculations are straightforward if we can measure $I_t$, $R_t$ at all times $0, h, 2h, \dots, T$
+
+- Or $I_0$, $R_0$ and all the increments $I_{t+h} - I_t$, $R_{t+h} - R_t$
+
+- Still have to optimize numerically
+
+- Likelihood calculations already become difficult if the time between 
+  observations $\Delta \gg h$
+    + Generally, $\Delta \approx$ 1 day
+    + In principle, this just defines another Markov process, with a longer 
+    interval $\Delta$ between steps, but to get the likelihood of a $\Delta$ 
+    step we have to sum over all possible paths of $h$ steps adding up to it
+
+- Other complications if we don't observe all the compartments, and/or have a 
+  lot of noise in our observations
+    + We don't and we do.
+
+
+
+
+## Connecting to Data
+
+::: flex
+::: w-65
+
+- More tractable to avoid likelihood (Conditional least squares, simulation-based inference)
+
+- Intrinsic issue: Initially, everything  looks exponential
+    + Hard to discriminate between distinct models
+    + If SIR is true, easier to estimate $\beta - \gamma$ than $(\beta, \gamma)$ or $\beta/\gamma$
+
+- Can sometimes [calibrate]{.secondary} or fix the parameters based on other sources
+    + E.g., $1/\gamma =$ average time someone is infectious in clinical studies
+:::
+
+::: w-35
+
+<br>
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">I have been thinking about how different people interpret data differently. And made this xkcd style graphic to illustrate this. <a href="https://t.co/a8LvlmZxT7">pic.twitter.com/a8LvlmZxT7</a></p>&mdash; Jens von Bergmann (@vb_jens) <a href="https://twitter.com/vb_jens/status/1372251931444350976?ref_src=twsrc%5Etfw">March 17, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+
+:::
+
+
+:::
+
+
+## These models can fit well in-sample
+
+
+* Track observed cases closely (they should)
+
+* Can provide nuanced policy advice on some topics
+
+* Many questions depend on modulating $\beta$
+    1. What happens if we lock down?
+    2. What happens if we mask?
+    3. What happens if we have school online?
+    4. Vaccine passport?
+    
+* Vaccination modeling is easier, directly removes susceptibles
+
+::: {.fragment}
+
+[What about out-of-sample?]{.secondary}
+
+:::
+
+::: {.fragment .absolute top=20% right=30%}
+
+`r fontawesome::fa("exclamation-circle", fill="orange", height="10em")`
+
+:::
+
+# Operationalizing Compartmental Models {.inverse}
+
+## What does this "look like"?
+
+
+```{r sim-sir, echo = TRUE}
+sim_SIR <- function(TT, N = 1000, beta = .1, gamma = .01) {
+  
+  S <- double(TT)
+  I <- double(TT)
+  R <- double(TT)
+  S[1] <- N - 1
+  I[1] <- 1
+  
+  for (tt in 2:TT) {
+    contagions <- rbinom(1, size = S[tt - 1], prob = beta * I[tt - 1] / N)
+    removals <- rbinom(1, size = I[tt - 1], prob = gamma)
+    S[tt] <- S[tt - 1] - contagions
+    I[tt] <- I[tt - 1] + contagions - removals
+    R[tt] <- R[tt - 1] + removals
+  }
+  tibble(S = S, I = I, R = R, time = seq(TT))
+}
+```
+
+
+## What does this "look like"?
+
+
+```{r sim-sir-plot}
+#| fig-width: 7
+#| fig-height: 3.5
+set.seed(123456)
+beta <- c(.02, .05, .1, .15, .2)
+map(beta, \(b) sim_SIR(600, beta = b) |> mutate(beta = b)) |>
+  bind_rows() |>
+  pivot_longer(S:R, names_to = "Compartment") |>
+  mutate(Compartment = fct_relevel(Compartment, "S"), beta = factor(beta)) |>
+  ggplot(aes(time, value, color = Compartment, linetype = beta)) +
+  geom_line() + 
+  labs(y = "# in compartment", x = "Time", linetype = expression(beta)) + 
+  theme(legend.position = "right", legend.title = element_text()) +
+  scale_x_continuous(expand = expansion()) +
+  scale_y_continuous(expand = expansion()) +
+  scale_color_delphi()
+```
+
+## So far, just simulations, how do you fit one?
+
+$$
+\begin{aligned}
+x_{t+1} &= \textrm{OdeSolve}(x_t) + \epsilon_t\\
+y_{t+1} &= \textrm{NegBinom}(\textrm{mean} = g(x_t),\ \kappa)
+\end{aligned}
+$$
+
+* $x_t$ is all the compartments
+* $y_t$ are some observations (cases and/or hospitalizations and/or deaths)
+* Put priors on all the parameters (they are criminally underidentified)
+
+::: {.fragment}
+Turn Bayesian Crank in Stan or similar until you're done.
+:::
+
+## `{covidseir}` model
+
+::: {layout="[40,60]" layout-valign="center"}
+![](gfx/covidseir-ode.png)
+
+![](gfx/covidseir-dag.png)
+:::
+
+* `R` package: <https://seananderson.github.io/covidseir/index.html>
+* Paper link: <https://doi.org/10.1371/journal.pcbi.1008274>
+
+
+## Fit it to BC data and produce a forecast
+
+```{r covidseir-setup}
+can_cases_deaths <- read_rds(here::here("_data", "can_cases_deaths.rds"))
+can_prov <- can_cases_deaths |>
+  rename(geo_value = region) |>
+  as_epi_df(as_of = "2024-04-13", other_keys = "hr") |>
+  complete(time_value = full_seq(time_value, period = 1), fill = list(cases = 0, deaths = 0)) |>
+  sum_groups_epi_df(c(cases, deaths), group_cols = "geo_value")
+early_bc <- can_prov |>
+  filter(geo_value == "BC", between(time_value, ymd("2020-03-01"), ymd("2020-09-01")))
+```
+
+```{r covidseir-fit}
+#| echo: true
+#| results: hide
+samp_frac <- c(rep(0.14, 13), rep(0.21, 38), rep(0.37, nrow(early_bc) - 51))
+f_seg <- with(early_bc, case_when(time_value == "2020-03-01" ~ 0, time_value >= "2020-06-01" ~ 3,
+  time_value >= "2020-05-01" ~ 2, time_value > "2020-03-01" ~ 1))
+fit <- covidseir::fit_seir(daily_cases = early_bc$cases,
+                           f_seg = f_seg, # change points in transmission
+                           samp_frac_fixed = samp_frac,  # fraction of infections that are tested
+                           iter = 500, # number of posterior samples
+                           fit_type = "optimizing") # for speed only
+```
+
+```{r covid-seir-proj}
+days_project <- 45
+day_start_reduction <- 5
+proj <- covidseir::project_seir(
+  fit,
+  iter = 1:50,
+  forecast_days = days_project,
+  f_fixed_start = max(fit$days) + day_start_reduction,
+  f_multi = rep(0.67, days_project - day_start_reduction + 1),
+  f_multi_seg = 3 # which f segment to use
+)
+tidy_proj <- covidseir::tidy_seir(proj, resample_y_rep = 30)
+tidy_proj <- mutate(tidy_proj, time_value = ymd("2020-03-01") + day - 1)
+```
+
+```{r covid-seir-plot}
+#| fig-width: 7
+ggplot(tidy_proj, aes(time_value)) +
+  geom_ribbon(aes(ymin = y_rep_0.05, ymax = y_rep_0.95), fill = primary, alpha = .3) +
+  geom_ribbon(aes(ymin = y_rep_0.25, ymax = y_rep_0.75), fill = primary, alpha = .5) +
+  geom_line(aes(y = y_rep_0.50), color = primary) +
+  geom_point(data = early_bc, aes(y = cases), color = secondary) +
+  scale_x_date(expand = expansion(), date_labels = "%b %Y") +
+  scale_y_continuous(expand = expansion(c(0, 0.05))) +
+  geom_vline(xintercept = max(early_bc$time_value), color = secondary, alpha = .5) +
+  labs(y = "Reported cases", x = "Date")
+```
+
+## Using this or similar for forecasting
+
+Needed to make lots of assumptions about future epi parameters
+
+* Future transmission rate
+* Future case ascertainment rate
+* No new variants, or vaccinations, or influx of population
+* People don't lose immunity
+* Etc., etc., etc.
+
+. . .
+
+More on these as [forecasters]{.secondary} a bit later.
+
+Better described as [scenario models]{.tertiary}.
+
+# What is $R_t$? {.inverse}
 
 ## $R_0$ basic reproduction number
 
@@ -105,7 +431,7 @@ Dates at least to [Alfred Lotka (1920s)]{.tertiary} and others (Feller, Blackwel
 
 ::: {.fragment .box-text .absolute top=50 left=100}
 
-![Source: Guerra, et al., "The basic reproduction number (R0) of measles," (2019).](https://www.thelancet.com/cms/10.1016/S1473-3099(17)30307-9/asset/daf522aa-ab16-4df8-ab69-212fb115a975/main.assets/gr4_lrg.jpg){height=500}
+![Source: Guerra, et al., "The basic reproduction number (R0) of measles," (2019).](gfx/guerra-measles.jpg){height=500}
 
 :::
 
@@ -229,6 +555,42 @@ $$
 <iframe data-src="https://www.cdc.gov/cfa-modeling-and-forecasting/rt-estimates/state-rt-timeseries/chart-covid.html#covid-United%20States" height=700 width=1400></iframe>
 
 [Source: US CDC Center for Forecasting Analytics]{.grey style="font-size:0.7em;"}
+
+## $R_t$ in compartmental models
+
+There is an equivalence between a compartmental model and the renewal equation.
+
+$$
+\begin{aligned}
+R_0 &= \beta / \gamma\\
+i_t &= R_0 S_{t-1} \sum_{k = 1}^t \big[\gamma (1-\gamma)^{k-1}\big] i_{t-k}
+= R_t\sum_{k = 1}^t (1-\gamma)^{k-1} i_{t-k}
+\end{aligned}
+$$
+
+```{r show-sir-Rt}
+#| fig-width: 10
+set.seed(123)
+sir_sim <- sim_SIR(100, beta = 0.2)
+sir_sim <- mutate(sir_sim, it = lag(S) - S, Rt = lag(S) * 0.2) |>
+  pivot_longer(c(S, I, R, Rt, it)) |>
+  mutate(type = case_when(
+    name %in% c("S", "I", "R") ~ "compartmental model",
+    name == "Rt" ~ "Rt",
+    name == "it" ~ "incident infections"
+  ))
+xint <- filter(sir_sim, name == "Rt") |> mutate(end = (value - 1)^2) |>
+  filter(end == min(end, na.rm = TRUE)) |> pull(time)
+sir_sim |>
+  ggplot(aes(time, value, color = name)) +
+  geom_line() +
+  geom_vline(xintercept = max(xint), alpha = 0.5) +
+  facet_wrap(~type, nrow = 1, scales = "free_y") +
+  scale_color_delphi() +
+  scale_y_continuous(expand = expansion(c(0, 0.05)), name = "") +
+  scale_x_continuous(expand = expansion(), name = "") +
+  theme(legend.position = "right")
+```
 
 # Estimating $R_t$ {.inverse}
 
@@ -553,7 +915,7 @@ $$
 
 Solve sequentially for $\Vert (D^{\dagger})^{\mathsf{T}}(\eta - y)\Vert_\infty = \lambda_1 > \cdots > \lambda_M=\epsilon \lambda_1$. 
 
-# Results and features {.inverse}
+# Results and features of [{rtestim}]{.monotype} {.inverse}
 
 ## Canadian Covid-19 cases
 
@@ -910,47 +1272,3 @@ ggplot(can_tvar_ci, aes(x = Date)) +
   theme(legend.position = "bottom")
 ```
 
-## Summary and collaborators
-
-::: flex
-
-::: w-40
-[Contributions]{.secondary}
-
-* Framework for $R_t$ estimation
-* Naturally imposes smoothness
-* Fast, extensible, easy to use
-* Has "confidence" bands
-
-[Future work]{.secondary}
-
-* Allow Negative Binomial likelihood
-* Forecast
-* Mixed smoothness behaviours
-* Figure out CV for convolution
-* Better confidence bands
-* Use relationship with growth rate
-
-:::
-
-::: {.w-60 .fragment}
-
-[Collaborators and funding]{.secondary}
-
-::: {layout-nrow=1}
-
-![](gfx/olivia.jpg){height=2000px}
-
-![](gfx/elvis.jpeg){height=200px}
-
-![](gfx/paul.jpg){height=200px}
-
-:::
-
-
-![](https://www.nserc-crsng.gc.ca/img/logos/img-logo2-en.png){width=300 fig-align=center}
-
-![](https://alliancecan.ca/themes/custom/site_theme/logo.svg){fig-align=center}
-
-:::
-:::

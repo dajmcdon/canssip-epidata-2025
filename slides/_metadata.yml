@@ -29,6 +29,7 @@ format:
     code-overflow: wrap
     code-block-height: 800px
     lang: en-CA
+    mermaid-format: svg
     footer: "{{< meta short-title >}} --- {{< meta repo-address >}}"
 
 execute:

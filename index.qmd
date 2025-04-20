@@ -7,17 +7,21 @@ toc: false
 
 ::: {.g-col-12 .g-col-lg-6 .px-5}
 
-![](assets/img/cover-art.svg){fig-align="center"}
+### CANSSI Prairies Workshop:
+### Processing and Forecasting with Epidemic Surveillance Data
 
+![](assets/img/cover-art.svg){width="600px" fig-align="center"}
+
+---
 
 ::: {layout-ncol=4}
-![](assets/img/delphi.jpg)
+![](assets/img/delphi.jpg){width=125}
 
-![](assets/img/cmu.png)
+![](assets/img/cmu.png){width=125}
 
-![](assets/img/berkeley.jpg)
+![](assets/img/berkeley.jpg){width=125}
 
-![](assets/img/ubc.jpg)
+![](assets/img/ubc.jpg){width=125}
 :::
 
 
@@ -27,23 +31,30 @@ toc: false
 
 ## Schedule
 
-In this 2-day workshop, we plan to demonstrate how to use R to load, process, 
+In this workshop, we plan to demonstrate how to use R to load, process, 
 inspect, and forecast aggregate epi surveillance data. We will be presenting a 
 few case studies to motivate the entire pipeline from signal discovery to the 
 production of nowcasts and forecasts. 
 
-1. [Lecture 1](slides/lecture1.qmd)
-1. [Lecture 2](slides/lecture2.qmd)
-1. [Lecture 3](slides/lecture3.qmd)
-1. [Lecture 4](slides/lecture4.qmd)
+1. [Lecture 1](slides/lecture1.qmd): Introduction to Panel Data
+1. [Lecture 2](slides/lecture2.qmd): Data Cleaning, Versioning, and Nowcasting
+1. [Lecture 3](slides/lecture3.qmd): Compartmental Models, Renewal Equations, and $R_t$ Estimation
+1. [Lecture 4](slides/lecture4.qmd): Forecasting and Advanced Topics
 
-## Instructors
+## Contributors and collaborators
 
+Instructor: [Daniel J. McDonald](https://dajmcdon.github.io/)
+
+
+With help from:
+
+* Ryan J. Tibshirani
 * Logan C. Brooks
 * Rachel Lobay
-* Daniel J. McDonald
-* Ryan J. Tibshirani
-
+* Alice Clima
+* Olivia Liu
+* Paul Gustafson
+* Elvis Cai
 
 
 :::

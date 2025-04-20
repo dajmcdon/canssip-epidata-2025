@@ -3,7 +3,10 @@ project:
   lib-dir: site_libs
   render:
     - index.qmd
-    - slides/*.qmd
+    - slides/lecture1.qmd
+    - slides/lecture2.qmd
+    - slides/lecture3.qmd
+    - slides/lecture4.qmd
 
 execute:
   freeze: auto
@@ -11,18 +14,20 @@ execute:
 editor: source
 
 website:
-  title: "InsightNet EpiData Workshop 2024"
+  title: "EpiData Workshop 2025"
   page-footer:
     left: "This work by the [Delphi Research Group](https://delphi.cmu.edu) is licensed under the [MIT license](LICENSE.md)."
-    right: "Supported in part by the [CSTE](https://www.cste.org) and the [CDC](https://www.cdc.gov)."
+    right: "Supported in part by [NSERC](https://www.nserc-crsng.gc.ca), the [CSTE](https://www.cste.org), and the [CDC](https://www.cdc.gov)."
   navbar:
     pinned: false
-    title: "<i class='bi bi-graph-down'></i> InsightNet Workshop 2024"
+    title: "<i class='bi bi-graph-down'></i> EpiData Workshop 2025"
     right:
+      - text: DJM
+        url: https://dajmcdon.github.io/
       - text: Delphi
         url: https://delphi.cmu.edu/
       - text: GitHub
-        url: https://github.com/cmu-delphi/insightnet-workshop-2024
+        url: https://github.com/dajmcdon/epidata-workshop-2025
         icon: github
 
 

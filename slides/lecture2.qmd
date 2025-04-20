@@ -1,6 +1,6 @@
 ---
 org: "CANSSI Prairies &mdash; Epi Forecasting Workshop 2025"
-title: "Data Cleaning, Versioning, Nowcasting with [{epiprocess}]{.monotype}"
+title: "Data Cleaning, Versioning, and Nowcasting"
 subtitle: "Lecture 2"
 short-title: "Nowcasting"
 format: revealjs
@@ -108,7 +108,7 @@ case_rates_df <- cases_df |>
 
 ![](gfx/epiverse_packages_flow.jpg)
 
-# Warmup: Examining Snapshots
+# Warmup: Examining Snapshots {.inverse}
   
 
 ## `epi_df`: snapshot of a data set
@@ -656,7 +656,7 @@ corrections_df |>
   scale_color_delphi()
 ```
 
-# Tracking Revisions
+# Tracking Revisions {.inverse}
 
 ## `epi_archive`: Collection of `epi_df`s
 
@@ -946,7 +946,7 @@ Exclude a potential predictor if it doesn't have much training data available.
 
 
 
-# Nowcasting with Regression
+# Nowcasting with Regression {.inverse}
 
 
 ## Operationalizing
