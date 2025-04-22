@@ -1,11 +1,12 @@
-# Setup Instructions for Insight Net Workshop 2024
+# Setup Instructions for CANSSI Prairies Workshop 2025
 
 
-Welcome to the Insight Net Workshop 2024 Github Repository. We’ve made
-it easy for you to get started with this project, and we’re happy to
-help! Please take your time and follow the steps below. If you encounter
-any issues or need extra help, feel free to reach out–our volunteers are
-available to assist during setup and throughout the workshop.
+Welcome to the GitHub Repository for the CANSSI Prairies 2025 Workshop
+on Epi Surveillance. We’ve tried to make it easy for you to get started
+with this project, and we’re happy to help! Please take your time and
+follow the steps below. If you encounter any issues or need extra help,
+feel free to reach out–our volunteers are available to assist during
+setup and throughout the workshop.
 
 ## 0. System requirements
 
@@ -25,8 +26,8 @@ file.
 
 ### Steps:
 
-1.  On the [InsightNet Workshop 2024 GitHub
-    repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+1.  On the [CANSSI Prairies 2025 Workshop GitHub
+    repository](https://github.com/dajmcdon/canssip-epidata-2025).
 2.  Click the green <kbd>\<\> Code ▾</kbd> button located at the top
     right of this repository.
 3.  In the dropdown menu, select **Download ZIP**.
@@ -34,7 +35,7 @@ file.
     machine.
 5.  Open the extracted folder, and you’re all set!
 
-You can now open the `insightnet-workshop-2024.Rproj` file and start
+You can now open the `epidata-workshop-2025.Rproj` file and start
 working with them.
 
 ## 1. Clone or fork the repository (advanced options)
@@ -45,12 +46,10 @@ latest changes and contribute to the project directly.
 
 ### Steps for cloning the repo:
 
-<!-- You'll get a local copy of the repository. -->
-
 The RStudio way:
 
-1.  On the [InsightNet Workshop 2024 GitHub
-    repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+1.  On the [CANSSI Prairies 2025 Workshop GitHub
+    repository](https://github.com/dajmcdon/canssip-epidata-2025).
 2.  Click the green <kbd>\<\> Code ▾</kbd> button located at the top
     right of this repository.
 3.  Then in RStudio, choose “New project” \> “Version Control” \> “Git”
@@ -60,16 +59,15 @@ The RStudio way:
 
 The Command Line way:
 
-1.  On the [InsightNet Workshop 2024 GitHub
-    repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+1.  On the [CANSSI Prairies 2025 Workshop GitHub
+    repository](https://github.com/dajmcdon/canssip-epidata-2025).
 2.  Click the green <kbd>\<\> Code ▾</kbd> button located at the top
     right of this repository.
 3.  Open a terminal or command prompt on your computer.
 4.  Navigate to the folder where you want to store the project.
-5.  Run
-    `git clone https://github.com/cmu-delphi/insightnet-workshop-2024.git`
+5.  Run `git clone https://github.com/dajmcdon/canssip-epidata-2025.git`
 6.  Once cloning is complete, navigate into the project folder:
-    `cd insightnet-workshop-2024`
+    `cd canssip-epidata-2025`
 
 ### Steps for forking the repo (requires a personal GitHub account):
 
@@ -81,32 +79,29 @@ The Command Line way:
 
 ## 2. Install required `R` packages
 
-We will use a <span class="tertiary">lot</span> of packages. We’ve tried
-to make it so you can get them all at once (with the right versions)
+We will use a <span class="tertiary">lot</span> of packages. Hopefully
+you only need the ones listed below.
 
 🤞 We hope this works… 🤞
 
 In RStudio:
 
 ``` r
-install.packages("pak") # good for installing from non-CRAN sources
-pak::pkg_install("cmu-delphi/InsightNetFcast24", dependencies = TRUE)
-InsightNetFcast24::verify_setup()
+install.packages("remotes")
+install.packages("tidyverse")
+install.packages("tidymodels")
+install.packages("glmnet")
+remotes::install_github("cmu-delphi/epidatr")
+remotes::install_github("cmu-delphi/epidatasets")
+remotes::install_github("cmu-delphi/epiprocess@dev")
+remotes::install_github("cmu-delphi/epipredict@dev")
+remotes::install_github("dajmcdon/rtestim")
 ```
 
-Hopefully, you see:
-
-    ✔ You should be good to go!
-
-Ask for help if you see something like:
-
-    Error in `verify_setup()`:
-    ! The following packages do not have the correct version:
-    ℹ Installed: epipredict 0.2.0.
-    ℹ Required: epipredict == 0.1.0.
+Ask for help if you get stuck.
 
 ## ✋ Getting help from our volunteers
 
 If you encounter any issues or would like assistance with setting things
-up, don’t hesitate to reach out. We have a fantastic group of volunteers
-available who can help guide you through the process.
+up, don’t hesitate to reach out. We’re happy to help guide you through
+the process.

@@ -3,6 +3,7 @@ project:
   lib-dir: site_libs
   render:
     - index.qmd
+    - worksheet/index.qmd
     - slides/lecture1.qmd
     - slides/lecture2.qmd
     - slides/lecture3.qmd

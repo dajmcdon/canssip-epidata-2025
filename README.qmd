@@ -1,9 +1,11 @@
 ---
-title: "Setup Instructions for Insight Net Workshop 2024"
+title: "Setup Instructions for CANSSI Prairies Workshop 2025"
+subtitle: "Processing and Forecasting with Epidemic Surveillance Data"
 format: gfm
 ---
 
-Welcome to the Insight Net Workshop 2024 Github Repository. We've made it easy 
+Welcome to the GitHub Repository for the CANSSI Prairies 2025 Workshop on Epi 
+Surveillance. We've tried to make it easy 
 for you to get started with this project, and we're happy to help! Please take 
 your time and follow the steps below. If you encounter any issues or need extra 
 help, feel free to reach out--our volunteers are available to assist during 
@@ -23,13 +25,13 @@ If you're new to GitHub or prefer not to use command-line tools, the easiest way
 to get started is by downloading the repository as a ZIP file.
 
 ### Steps:
-1. On the [InsightNet Workshop 2024 GitHub repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+1. On the [CANSSI Prairies 2025 Workshop GitHub repository](https://github.com/dajmcdon/canssip-epidata-2025).
 2. Click the green <kbd><> Code ▾</kbd> button located at the top right of this repository.
 3. In the dropdown menu, select **Download ZIP**.
 4. Once downloaded, extract the ZIP file to a folder on your local machine.
 5. Open the extracted folder, and you’re all set!
 
-You can now open the `insightnet-workshop-2024.Rproj` file and start working 
+You can now open the `epidata-workshop-2025.Rproj` file and start working 
 with them.
 
 
@@ -41,11 +43,10 @@ contribute to the project directly.
 
 
 ### Steps for cloning the repo:
-<!-- You'll get a local copy of the repository. -->
 
 The RStudio way:
 
-1. On the [InsightNet Workshop 2024 GitHub repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+1. On the [CANSSI Prairies 2025 Workshop GitHub repository](https://github.com/dajmcdon/canssip-epidata-2025).
 1. Click the green <kbd><> Code ▾</kbd> button located at the top right of this repository.
 1. Then in RStudio, choose "New project" > "Version Control" > "Git" and paste the address.
 1. Choose a location on your machine where you want the files to be.
@@ -53,12 +54,12 @@ The RStudio way:
 
 The Command Line way:
 
-1. On the [InsightNet Workshop 2024 GitHub repository](https://github.com/cmu-delphi/insightnet-workshop-2024).
+1. On the [CANSSI Prairies 2025 Workshop GitHub repository](https://github.com/dajmcdon/canssip-epidata-2025).
 1. Click the green <kbd><> Code ▾</kbd> button located at the top right of this repository.
 1. Open a terminal or command prompt on your computer.
 1. Navigate to the folder where you want to store the project.
-1. Run `git clone https://github.com/cmu-delphi/insightnet-workshop-2024.git`
-1. Once cloning is complete, navigate into the project folder: `cd insightnet-workshop-2024`
+1. Run `git clone https://github.com/dajmcdon/canssip-epidata-2025.git`
+1. Once cloning is complete, navigate into the project folder: `cd canssip-epidata-2025`
 
 
 ### Steps for forking the repo (requires a personal GitHub account):
@@ -68,8 +69,8 @@ You'll just be working from your own remote copy rather our version of the mater
 
 ## 2. Install required `R` packages
 
-We will use a [lot]{.tertiary} of packages. We've tried to make it so you can
-get them all at once (with the right versions)
+We will use a [lot]{.tertiary} of packages. Hopefully you only need the ones
+listed below.
 
 🤞 We hope this works... 🤞
 
@@ -78,35 +79,22 @@ In RStudio:
 
 ```{r}
 #| eval: false
-install.packages("pak") # good for installing from non-CRAN sources
-pak::pkg_install("cmu-delphi/InsightNetFcast24", dependencies = TRUE)
-InsightNetFcast24::verify_setup()
+install.packages("remotes")
+install.packages("tidyverse")
+install.packages("tidymodels")
+install.packages("glmnet")
+remotes::install_github("cmu-delphi/epidatr")
+remotes::install_github("cmu-delphi/epidatasets")
+remotes::install_github("cmu-delphi/epiprocess@dev")
+remotes::install_github("cmu-delphi/epipredict@dev")
+remotes::install_github("dajmcdon/rtestim")
 ```
 
-Hopefully, you see:
-```{r}
-#| message: true
-#| echo: false
-cli::cli_alert_success("You should be good to go!")
-```
 
-Ask for help if you see something like:
-```{r}
-#| error: true
-#| echo: false
-verify_setup <- function() {
-  cli::cli_abort(c(
-    "The following packages do not have the correct version:",
-    "i" = "Installed: {.pkg epipredict 0.2.0}.",
-    "i" = "Required: {.pkg epipredict == 0.1.5}."
-  ))
-}
-verify_setup()
-```
+Ask for help if you get stuck.
 
 
 ## ✋ Getting help from our volunteers
 
 If you encounter any issues or would like assistance with setting things up, 
-don't hesitate to reach out. We have a fantastic group of volunteers available 
-who can help guide you through the process.
+don't hesitate to reach out. We're happy to help guide you through the process.

@@ -1,0 +1,149 @@
+---
+title: "Processing and Forecasting with Epidemic Surveillance Data"
+subtitle: "CANSSI Prairies Workshop 2025"
+author: "CANSSI Prairies -- Epi modelling workshop"
+date: "April 25, 2025"
+toc: true
+format:
+  html:
+    page-layout: article
+---
+
+The goal of this worksheet is to practice some of the techniques
+discussed during the lectures. The plan is to take a "phased" approach,
+with 15-30 minutes of work after each of the four lectures. But the
+idea is to roughly continue on the same problem.
+
+## Computer setup
+
+The following are packages needed for this worksheet. With luck, you
+would need only a few more (perhaps none!) to build all the slides
+in this workshop. But I make no guarantees.
+
+```{r package-install}
+#| eval: false
+install.packages("remotes")
+install.packages("tidyverse")
+install.packages("tidymodels")
+install.packages("glmnet")
+remotes::install_github("cmu-delphi/epidatr")
+remotes::install_github("cmu-delphi/epidatasets")
+remotes::install_github("cmu-delphi/epiprocess@dev")
+remotes::install_github("cmu-delphi/epipredict@dev")
+remotes::install_github("dajmcdon/rtestim")
+```
+
+Note that both `{epiprocess}` and `{epipredict}` are set to install from the 
+development branch rather than from the main branch. So this is the most up-to-date
+version, but it is also potentially unstable.
+
+The best place for package documentation is typically the website rather than 
+the `R` help files. So some useful links are here:
+
+* <https://cmu-delphi.github.io/epidatr>
+* <https://cmu-delphi.github.io/epiprocess>
+* <https://cmu-delphi.github.io/epipredict>
+* <https://tidyverse.org>
+* <https://tidymodels.org>
+* <https://dajmcdon.github.io/rtestim>
+
+
+## Lecture 1: Introduction to Panel Data in Epidemiology
+
+Let's examine two different sources of versioned panel data. 
+
+### Source 1: Respiratory Virus Detection Surveillance System
+
+Navigate to the Dashboard maintained by the Public Health Agency of Canada:
+<https://health-infobase.canada.ca/respiratory-virus-detections/>. Let's focus
+on Figure 4.
+
+1. When was it last updated?
+2. What is the reference date for the most recent data?
+3. What geographic regions are available for different data streams?
+4. Are the revisions tracked?
+
+### Source 2: Delphi Epi Portal
+
+1. Browse the table.
+2. What sorts of signals are available?
+3. For what regions?
+4. Select a signal with at least state-level geographic coverage that is "Ongoing" (For example, "Covid-Related Doctor Visits")
+5. Are revisions tracked?
+6. What sort of latency does it have?
+
+### Extra credit
+
+1. Download this season's RVDSS data. This is most easily done by following the 
+instructions at <https://github.com/dajmcdon/rvdss-canada>. (My team scrapes the
+data weekly. Just use the `R` code at the bottom of the README to "Read in data for a single season")
+1. Download the signal from the Delphi Epidata API that you chose above using `{epidatr}`.
+1. Explore and examine both signals using graphics or summary statistics. 
+
+## Lecture 2: Data Cleaning, Versioning, and Nowcasting
+
+1. If you didn't get a chance earlier, download this season's RVDSS data.
+1. Filter to only those rows with `geo_type != "province"`. (This is a bit of a
+misnomer, we're keeping some provinces and some regions.)
+1. Convert it to an `epi_archive` with `as_epi_archive()`.
+1. Examine the revision behaviour for one of the signals. The best way is with a plot. 
+(Unfortunately, `revision_summary()` won't work for the moment.)
+1. Is there much backfill? Latency?
+1. Use `epix_as_of_current()` to get the most recent snapshot.
+1. Let's look at just `flu_pct_positive`. Calculate the average correlation across
+geographies at lag 7 and lag 14. 
+1. Calculate the correlation between `flu_pct_positive` and `sarscov2_pct_positive` 
+over time and plot the result.
+
+If there's still time, try to calculate the growth rate for `flu_pct_positive`.
+
+## Lecture 3: 
+
+Here's a modified version of the SIR simulation function that returns only
+the new infections:
+
+```{r}
+#| eval: false
+sim_SIR <- function(TT, N = 1000, beta = .1, gamma = .01) {
+  S <- double(TT)
+  I <- double(TT)
+  R <- double(TT)
+  S[1] <- N - 1
+  I[1] <- 1
+  i <- double(TT)
+  i[1] <- 1
+  for (tt in 2:TT) {
+    contagions <- rbinom(1, size = S[tt - 1], prob = beta * I[tt - 1] / N)
+    removals <- rbinom(1, size = I[tt - 1], prob = gamma)
+    S[tt] <- S[tt - 1] - contagions
+    I[tt] <- I[tt - 1] + contagions - removals
+    R[tt] <- R[tt - 1] + removals
+    i[tt] <- contagions
+  }
+  tibble(infections = i, time = seq(TT))
+}
+```
+
+1. Continuing with the RVDSS data (most recent snapshot), make a plot of 
+`flu_positive_tests` for your favourite region.
+1. Adjust the parameters `N`, `beta`, and `gamma` to calibrate an SIR model
+that fits the data closely.
+1. Use `{rtestim}` to estimate $R_t$ for your favourite region.
+
+## Lecture 4: Forecasting and Advanced Topics
+
+
+1. Continuing with the RVDSS data (most recent snapshot), use `arx_forecaster()`
+to produce forecasts 1, 2, and 3 weeks after of the most recent data for 
+`flu_pct_positive`.
+1. You can plot them as follows (for example):
+```{r}
+#| eval: false
+h1 <- arx_forecaster(rvdss, ..., args_list = arx_args_list(ahead = 7))
+autoplot(h1)
+```
+3. Adjust the arguments however you like. You can add other predictors, adjust
+lags, change forecasting engines, etc.
+
+If you have time, try "Building a forecaster from scratch" this is more difficult
+to plot, but you can borrow the code from the lecture slides.

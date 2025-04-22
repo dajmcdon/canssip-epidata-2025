@@ -43,6 +43,8 @@ production of nowcasts and forecasts.
 1. [Lecture 3](slides/lecture3.qmd): Compartmental Models, Renewal Equations, and $R_t$ Estimation
 1. [Lecture 4](slides/lecture4.qmd): Forecasting and Advanced Topics
 
+[Worksheet](worksheet/index.qmd)
+
 ## Contributors and collaborators
 
 Instructor: [Daniel J. McDonald](https://dajmcdon.github.io/)
