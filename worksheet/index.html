@@ -6,8 +6,10 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="CANSSI Prairies – Epi modelling workshop">
+<meta name="dcterms.date" content="2025-04-25">
 
-<title>EpiData Workshop 2025</title>
+<title>Processing and Forecasting with Epidemic Surveillance Data – EpiData Workshop 2025</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -20,25 +22,59 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<script src="site_libs/quarto-html/quarto.js"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-fdb53cfa07b627ffb3f8f1ec5d7d6157.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-fdb53cfa07b627ffb3f8f1ec5d7d6157.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -99,14 +135,14 @@ window.Quarto = {
 
 </head>
 
-<body class="nav-fixed fullcontent">
+<body class="nav-fixed">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../index.html">
     <span class="navbar-title"><i class="bi bi-graph-down"></i> EpiData Workshop 2025</span>
     </a>
   </div>
@@ -137,83 +173,183 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-layout-custom page-navbar">
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#computer-setup" id="toc-computer-setup" class="nav-link active" data-scroll-target="#computer-setup">Computer setup</a></li>
+  <li><a href="#lecture-1-introduction-to-panel-data-in-epidemiology" id="toc-lecture-1-introduction-to-panel-data-in-epidemiology" class="nav-link" data-scroll-target="#lecture-1-introduction-to-panel-data-in-epidemiology">Lecture 1: Introduction to Panel Data in Epidemiology</a>
+  <ul class="collapse">
+  <li><a href="#source-1-respiratory-virus-detection-surveillance-system" id="toc-source-1-respiratory-virus-detection-surveillance-system" class="nav-link" data-scroll-target="#source-1-respiratory-virus-detection-surveillance-system">Source 1: Respiratory Virus Detection Surveillance System</a></li>
+  <li><a href="#source-2-delphi-epi-portal" id="toc-source-2-delphi-epi-portal" class="nav-link" data-scroll-target="#source-2-delphi-epi-portal">Source 2: Delphi Epi Portal</a></li>
+  <li><a href="#extra-credit" id="toc-extra-credit" class="nav-link" data-scroll-target="#extra-credit">Extra credit</a></li>
+  </ul></li>
+  <li><a href="#lecture-2-data-cleaning-versioning-and-nowcasting" id="toc-lecture-2-data-cleaning-versioning-and-nowcasting" class="nav-link" data-scroll-target="#lecture-2-data-cleaning-versioning-and-nowcasting">Lecture 2: Data Cleaning, Versioning, and Nowcasting</a></li>
+  <li><a href="#lecture-3" id="toc-lecture-3" class="nav-link" data-scroll-target="#lecture-3">Lecture 3:</a></li>
+  <li><a href="#lecture-4-forecasting-and-advanced-topics" id="toc-lecture-4-forecasting-and-advanced-topics" class="nav-link" data-scroll-target="#lecture-4-forecasting-and-advanced-topics">Lecture 4: Forecasting and Advanced Topics</a></li>
+  </ul>
+</nav>
+    </div>
 <!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Processing and Forecasting with Epidemic Surveillance Data</h1>
+<p class="subtitle lead">CANSSI Prairies Workshop 2025</p>
+</div>
 
 
 
+<div class="quarto-title-meta">
 
-<div class="grid">
-<div class="g-col-12 g-col-lg-6 px-5">
-<section id="canssi-prairies-workshop" class="level3">
-<h3 data-anchor-id="canssi-prairies-workshop">CANSSI Prairies Workshop:</h3>
-</section>
-<section id="processing-and-forecasting-with-epidemic-surveillance-data" class="level3">
-<h3 data-anchor-id="processing-and-forecasting-with-epidemic-surveillance-data">Processing and Forecasting with Epidemic Surveillance Data</h3>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="assets/img/cover-art.svg" class="img-fluid quarto-figure quarto-figure-center figure-img" width="600"></p>
-</figure>
-</div>
-<hr>
-<div>
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>CANSSI Prairies – Epi modelling workshop </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">April 25, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
 
+
+</header>
+
+
+<p>The goal of this worksheet is to practice some of the techniques discussed during the lectures. The plan is to take a “phased” approach, with 15-30 minutes of work after each of the four lectures. But the idea is to roughly continue on the same problem.</p>
+<section id="computer-setup" class="level2">
+<h2 class="anchored" data-anchor-id="computer-setup">Computer setup</h2>
+<p>The following are packages needed for this worksheet. With luck, you would need only a few more (perhaps none!) to build all the slides in this workshop. But I make no guarantees.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">"remotes"</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">"tidyverse"</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">"tidymodels"</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">"glmnet"</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epidatr"</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epidatasets"</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epiprocess@dev"</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epipredict@dev"</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"dajmcdon/rtestim"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="quarto-layout-panel" data-layout-ncol="5">
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 20.0%;justify-content: center;">
-<p><img src="assets/img/delphi.jpg" class="img-fluid" width="125"></p>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 20.0%;justify-content: center;">
-<p><img src="assets/img/cmu.png" class="img-fluid" width="125"></p>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 20.0%;justify-content: center;">
-<p><img src="assets/img/berkeley.jpg" class="img-fluid" width="125"></p>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 20.0%;justify-content: center;">
-<p><img src="assets/img/ubc.jpg" class="img-fluid" width="125"></p>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 20.0%;justify-content: center;">
-<p><img src="assets/img/canssi-logo.svg" class="img-fluid" width="125"></p>
-</div>
-</div>
-</div>
-</section>
-</div>
-<div class="g-col-12 g-col-lg-6 px-5">
-<section id="schedule" class="level2">
-<h2 data-anchor-id="schedule">Schedule</h2>
-<p>In this workshop, we plan to demonstrate how to use R to load, process, inspect, and forecast aggregate epi surveillance data. We will be presenting a few case studies to motivate the entire pipeline from signal discovery to the production of nowcasts and forecasts.</p>
-<ol type="1">
-<li><a href="./slides/lecture1.html">Lecture 1</a>: Introduction to Panel Data</li>
-<li><a href="./slides/lecture2.html">Lecture 2</a>: Data Cleaning, Versioning, and Nowcasting</li>
-<li><a href="./slides/lecture3.html">Lecture 3</a>: Compartmental Models, Renewal Equations, and <span class="math inline">\(R_t\)</span> Estimation</li>
-<li><a href="./slides/lecture4.html">Lecture 4</a>: Forecasting and Advanced Topics</li>
-</ol>
-<p><a href="./worksheet/index.html">Worksheet</a></p>
-</section>
-<section id="contributors-and-collaborators" class="level2">
-<h2 data-anchor-id="contributors-and-collaborators">Contributors and collaborators</h2>
-<p>Instructor: <a href="https://dajmcdon.github.io/">Daniel J. McDonald</a></p>
-<p>With help from:</p>
+<p>Note that both <code>{epiprocess}</code> and <code>{epipredict}</code> are set to install from the development branch rather than from the main branch. So this is the most up-to-date version, but it is also potentially unstable.</p>
+<p>The best place for package documentation is typically the website rather than the <code>R</code> help files. So some useful links are here:</p>
 <ul>
-<li>Ryan J. Tibshirani</li>
-<li>Logan C. Brooks</li>
-<li>Rachel Lobay</li>
-<li>Alice Clima</li>
-<li>Olivia Liu</li>
-<li>Paul Gustafson</li>
-<li>Elvis Cai</li>
+<li><a href="https://cmu-delphi.github.io/epidatr" class="uri">https://cmu-delphi.github.io/epidatr</a></li>
+<li><a href="https://cmu-delphi.github.io/epiprocess" class="uri">https://cmu-delphi.github.io/epiprocess</a></li>
+<li><a href="https://cmu-delphi.github.io/epipredict" class="uri">https://cmu-delphi.github.io/epipredict</a></li>
+<li><a href="https://tidyverse.org" class="uri">https://tidyverse.org</a></li>
+<li><a href="https://tidymodels.org" class="uri">https://tidymodels.org</a></li>
+<li><a href="https://dajmcdon.github.io/rtestim" class="uri">https://dajmcdon.github.io/rtestim</a></li>
 </ul>
 </section>
+<section id="lecture-1-introduction-to-panel-data-in-epidemiology" class="level2">
+<h2 class="anchored" data-anchor-id="lecture-1-introduction-to-panel-data-in-epidemiology">Lecture 1: Introduction to Panel Data in Epidemiology</h2>
+<p>Let’s examine two different sources of versioned panel data.</p>
+<section id="source-1-respiratory-virus-detection-surveillance-system" class="level3">
+<h3 class="anchored" data-anchor-id="source-1-respiratory-virus-detection-surveillance-system">Source 1: Respiratory Virus Detection Surveillance System</h3>
+<p>Navigate to the Dashboard maintained by the Public Health Agency of Canada: <a href="https://health-infobase.canada.ca/respiratory-virus-detections/" class="uri">https://health-infobase.canada.ca/respiratory-virus-detections/</a>. Let’s focus on Figure 4.</p>
+<ol type="1">
+<li>When was it last updated?</li>
+<li>What is the reference date for the most recent data?</li>
+<li>What geographic regions are available for different data streams?</li>
+<li>Are the revisions tracked?</li>
+</ol>
+</section>
+<section id="source-2-delphi-epi-portal" class="level3">
+<h3 class="anchored" data-anchor-id="source-2-delphi-epi-portal">Source 2: Delphi Epi Portal</h3>
+<ol type="1">
+<li>Browse the table.</li>
+<li>What sorts of signals are available?</li>
+<li>For what regions?</li>
+<li>Select a signal with at least state-level geographic coverage that is “Ongoing” (For example, “Covid-Related Doctor Visits”)</li>
+<li>Are revisions tracked?</li>
+<li>What sort of latency does it have?</li>
+</ol>
+</section>
+<section id="extra-credit" class="level3">
+<h3 class="anchored" data-anchor-id="extra-credit">Extra credit</h3>
+<ol type="1">
+<li>Download this season’s RVDSS data. This is most easily done by following the instructions at <a href="https://github.com/dajmcdon/rvdss-canada" class="uri">https://github.com/dajmcdon/rvdss-canada</a>. (My team scrapes the data weekly. Just use the <code>R</code> code at the bottom of the README to “Read in data for a single season”)</li>
+<li>Download the signal from the Delphi Epidata API that you chose above using <code>{epidatr}</code>.</li>
+<li>Explore and examine both signals using graphics or summary statistics.</li>
+</ol>
+</section>
+</section>
+<section id="lecture-2-data-cleaning-versioning-and-nowcasting" class="level2">
+<h2 class="anchored" data-anchor-id="lecture-2-data-cleaning-versioning-and-nowcasting">Lecture 2: Data Cleaning, Versioning, and Nowcasting</h2>
+<ol type="1">
+<li>If you didn’t get a chance earlier, download this season’s RVDSS data.</li>
+<li>Filter to only those rows with <code>geo_type != "province"</code>. (This is a bit of a misnomer, we’re keeping some provinces and some regions.)</li>
+<li>Convert it to an <code>epi_archive</code> with <code>as_epi_archive()</code>.</li>
+<li>Examine the revision behaviour for one of the signals. The best way is with a plot. (Unfortunately, <code>revision_summary()</code> won’t work for the moment.)</li>
+<li>Is there much backfill? Latency?</li>
+<li>Use <code>epix_as_of_current()</code> to get the most recent snapshot.</li>
+<li>Let’s look at just <code>flu_pct_positive</code>. Calculate the average correlation across geographies at lag 7 and lag 14.</li>
+<li>Calculate the correlation between <code>flu_pct_positive</code> and <code>sarscov2_pct_positive</code> over time and plot the result.</li>
+</ol>
+<p>If there’s still time, try to calculate the growth rate for <code>flu_pct_positive</code>.</p>
+</section>
+<section id="lecture-3" class="level2">
+<h2 class="anchored" data-anchor-id="lecture-3">Lecture 3:</h2>
+<p>Here’s a modified version of the SIR simulation function that returns only the new infections:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>sim_SIR <span class="ot">&lt;-</span> <span class="cf">function</span>(TT, <span class="at">N =</span> <span class="dv">1000</span>, <span class="at">beta =</span> .<span class="dv">1</span>, <span class="at">gamma =</span> .<span class="dv">01</span>) {</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  S <span class="ot">&lt;-</span> <span class="fu">double</span>(TT)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  I <span class="ot">&lt;-</span> <span class="fu">double</span>(TT)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  R <span class="ot">&lt;-</span> <span class="fu">double</span>(TT)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  S[<span class="dv">1</span>] <span class="ot">&lt;-</span> N <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  I[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  i <span class="ot">&lt;-</span> <span class="fu">double</span>(TT)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  i[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (tt <span class="cf">in</span> <span class="dv">2</span><span class="sc">:</span>TT) {</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    contagions <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(<span class="dv">1</span>, <span class="at">size =</span> S[tt <span class="sc">-</span> <span class="dv">1</span>], <span class="at">prob =</span> beta <span class="sc">*</span> I[tt <span class="sc">-</span> <span class="dv">1</span>] <span class="sc">/</span> N)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    removals <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(<span class="dv">1</span>, <span class="at">size =</span> I[tt <span class="sc">-</span> <span class="dv">1</span>], <span class="at">prob =</span> gamma)</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    S[tt] <span class="ot">&lt;-</span> S[tt <span class="sc">-</span> <span class="dv">1</span>] <span class="sc">-</span> contagions</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    I[tt] <span class="ot">&lt;-</span> I[tt <span class="sc">-</span> <span class="dv">1</span>] <span class="sc">+</span> contagions <span class="sc">-</span> removals</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    R[tt] <span class="ot">&lt;-</span> R[tt <span class="sc">-</span> <span class="dv">1</span>] <span class="sc">+</span> removals</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    i[tt] <span class="ot">&lt;-</span> contagions</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(<span class="at">infections =</span> i, <span class="at">time =</span> <span class="fu">seq</span>(TT))</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<ol type="1">
+<li>Continuing with the RVDSS data (most recent snapshot), make a plot of <code>flu_positive_tests</code> for your favourite region.</li>
+<li>Adjust the parameters <code>N</code>, <code>beta</code>, and <code>gamma</code> to calibrate an SIR model that fits the data closely.</li>
+<li>Use <code>{rtestim}</code> to estimate <span class="math inline">\(R_t\)</span> for your favourite region.</li>
+</ol>
+</section>
+<section id="lecture-4-forecasting-and-advanced-topics" class="level2">
+<h2 class="anchored" data-anchor-id="lecture-4-forecasting-and-advanced-topics">Lecture 4: Forecasting and Advanced Topics</h2>
+<ol type="1">
+<li>Continuing with the RVDSS data (most recent snapshot), use <code>arx_forecaster()</code> to produce forecasts 1, 2, and 3 weeks after of the most recent data for <code>flu_pct_positive</code>.</li>
+<li>You can plot them as follows (for example):</li>
+</ol>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>h1 <span class="ot">&lt;-</span> <span class="fu">arx_forecaster</span>(rvdss, ..., <span class="at">args_list =</span> <span class="fu">arx_args_list</span>(<span class="at">ahead =</span> <span class="dv">7</span>))</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">autoplot</span>(h1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<ol start="3" type="1">
+<li>Adjust the arguments however you like. You can add other predictors, adjust lags, change forecasting engines, etc.</li>
+</ol>
+<p>If you have time, try “Building a forecaster from scratch” this is more difficult to plot, but you can borrow the code from the lecture slides.</p>
 
 
+</section>
 
-
+</main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

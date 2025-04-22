@@ -4,21 +4,168 @@
     "href": "slides/lecture4.html#outline",
     "title": "EpiData Workshop 2025",
     "section": "Outline",
-    "text": "Outline\n\nFundamentals of Forecasting\n{epipredict}\nCustomizing arx_forecaster()\nAdvanced Customizations\nBuild a Forecaster from Scratch\nAdvanced Topics"
+    "text": "Outline\n\nFundamentals of Forecasting\nEvaluation\nA Workflow for Forecasting\nAdvanced Customizations\nBuild a Forecaster from Scratch\nAdvanced Topics"
+  },
+  {
+    "objectID": "slides/lecture4.html#forecasting-is-not-magic",
+    "href": "slides/lecture4.html#forecasting-is-not-magic",
+    "title": "EpiData Workshop 2025",
+    "section": "Forecasting is not magic",
+    "text": "Forecasting is not magic\n\nForecasts are generally comprised of two parts: trend and seasonality\nMethods for detecting and projecting trends are not magic; in general they’re not qualitatively that different from what you can do with your eyeballs\nThat said, assimilating information from exogenous features (ideally, leading indicators) can lead highly nontrivial gains, beyond the eyeballs\nRemember … good data is just as (more?) important as a good model!\nSeasonality can help short-term forecasts. Long-term forecasts, absent of strong seasonality, are generally not very tractable"
+  },
+  {
+    "objectID": "slides/lecture4.html#basics-of-linear-regression",
+    "href": "slides/lecture4.html#basics-of-linear-regression",
+    "title": "EpiData Workshop 2025",
+    "section": "Basics of linear regression",
+    "text": "Basics of linear regression\n\nAssume we observe a predictor \\(x_i\\) and an outcome \\(y_i\\) for \\(i = 1, \\dots, n\\).\nLinear regression supposes\n\n\\[\\mathbb{E}[y_i\\ \\vert\\ x_i] \\doteq \\beta_0 + \\beta_1 x_i,\\quad i=1,\\dots,n.\\]\n\nIn R, run lm(y ~ x), where y is the vector of responses and x the vector of predictors.\n\n\n\nGiven \\(p\\) different predictors\n\n\\[\n\\begin{aligned}\n\\mathbb{E}[y_i\\ \\vert\\ \\mathbf{x}_i] &\\doteq \\beta_0 + \\beta_1 x_{i1} + \\dots + \\beta_p x_{ip}\\\\\n&= \\mathbf{x}^\\mathsf{T}_i\\beta &i=1,\\dots,n.\n\\end{aligned}\n\\]"
+  },
+  {
+    "objectID": "slides/lecture4.html#linear-regression-with-lagged-predictor",
+    "href": "slides/lecture4.html#linear-regression-with-lagged-predictor",
+    "title": "EpiData Workshop 2025",
+    "section": "Linear regression with lagged predictor",
+    "text": "Linear regression with lagged predictor\n\nIn time series, outcomes and predictors are usually indexed by time \\(t\\).\n\n\n\nGoal: predict future \\(y\\), given present \\(x\\).\n\n\n\n\nModel: linear regression with lagged predictor\n\n\\[\\mathbb{E}[y_t\\ \\vert\\ x_{t-k}] \\doteq \\beta + \\beta_0 x_{t-k}\\]\n\n\n\nEquivalent way to write the model:\n\n\\[\\mathbb{E}[y_{t+k}\\ \\vert\\ x_t] \\doteq \\beta + \\beta_0 x_t\\]"
+  },
+  {
+    "objectID": "slides/lecture4.html#autoregressive-exogenous-input-arx-model",
+    "href": "slides/lecture4.html#autoregressive-exogenous-input-arx-model",
+    "title": "EpiData Workshop 2025",
+    "section": "Autoregressive exogenous input (ARX) model",
+    "text": "Autoregressive exogenous input (ARX) model\n\nPredict the outcome via a linear combination of its (own) lags and exogenous predictors\n\n\\[\\mathbb{E}[y_{t+h}\\ \\vert\\ \\mathbf{y}_{\\leq t}, \\mathbf{x}_{\\leq t}] \\doteq\n\\phi + \\sum_{i=0}^p \\phi_i y_{t-i} + \\sum_{j=0}^q \\beta_j x_{t-j}\\]\n\nNotice: we don’t need to include all contiguous lags, and we could estimate e.g.,\n\n\\[\\mathbb{E}[y_{t+h}\\ \\vert\\ \\mathbf{y}_{\\leq t}, \\mathbf{x}_{\\leq t}] \\doteq  \\phi +\n\\phi_0 y_{t} + \\phi_1 y_{t-7} + \\phi_2 y_{t-14} +\n\\beta_0 x_{t} + \\beta_1 x_{t-7} + \\beta_2 x_{t-14}\\]"
+  },
+  {
+    "objectID": "slides/lecture4.html#popular-forecasting-frameworks",
+    "href": "slides/lecture4.html#popular-forecasting-frameworks",
+    "title": "EpiData Workshop 2025",
+    "section": "Popular forecasting frameworks",
+    "text": "Popular forecasting frameworks\n\nAutoregressive integrated model average (ARIMA) models\nExponential smoothing with trend and seasonality (ETS)\nProphet forecaster\nDeepAR (neural network)\n\nFirst two here are classic and standard, second two are more recent.\nNone are particularly well-suited for epi forecasting out-of-the-box (ask me about them if you’re curious)\nI’ll briefly mention ARIMA as it’s closest to the setup so far."
+  },
+  {
+    "objectID": "slides/lecture4.html#dissecting-arima",
+    "href": "slides/lecture4.html#dissecting-arima",
+    "title": "EpiData Workshop 2025",
+    "section": "Dissecting ARIMA",
+    "text": "Dissecting ARIMA\n\nAR\n\nautoregressive\n\n\ninclude lags of response as features\n\nMA\n\nmoving average\n\n\ninclude lags of noise terms\n\n\ncorrelated noise model\n\nI\n\nintegrated\n\n\nmodel and forecast differences between successive observations rather than levels"
+  },
+  {
+    "objectID": "slides/lecture4.html#arima-vs-arx",
+    "href": "slides/lecture4.html#arima-vs-arx",
+    "title": "EpiData Workshop 2025",
+    "section": "ARIMA vs ARX",
+    "text": "ARIMA vs ARX\nThe way lags are handled\n\nIn what you’ve seen, we can include arbitrary lags\nCould use a different engine (regularized linear, or general functional form)\nTraditional AR models require lags to be contiguous (e.g., all of 0–14, instead of 0, 7, 14)\n\nThe way multi-step forecasts are made\n\nIn what you’ve seen, we model h-step ahead directly\nTraditional AR models only do 1-step ahead prediction, and iterate this to get forecasts at longer horizons"
+  },
+  {
+    "objectID": "slides/lecture4.html#arima-vs-arx-1",
+    "href": "slides/lecture4.html#arima-vs-arx-1",
+    "title": "EpiData Workshop 2025",
+    "section": "ARIMA vs ARX",
+    "text": "ARIMA vs ARX\nThe way nonstationarity is handled\n\nIn what you’ve seen, we address nonstationarity via trailing training windows (or observation weights more generally)\nTraditional ARIMA models use the I component for this: remove linear or quadratic trends by differences, add them back in at prediction time\n\nThe way exogenous features are included\n\nIn what you’ve seen, they appear directly as an exogenous predictor\nTraditional ARIMA models (software, such as {fable}) includes them in a different manner; they are effectively subject to the same lags as the AR and MA terms"
+  },
+  {
+    "objectID": "slides/lecture4.html#supplementary-time-series-resources",
+    "href": "slides/lecture4.html#supplementary-time-series-resources",
+    "title": "EpiData Workshop 2025",
+    "section": "Supplementary time series resources",
+    "text": "Supplementary time series resources\n\nHyndman and Athanasopoulos, Forecasting: Principles and Practice\nRyan Tibshirani’s course notes, Introduction to Time Series"
+  },
+  {
+    "objectID": "slides/lecture4.html#error-metrics",
+    "href": "slides/lecture4.html#error-metrics",
+    "title": "EpiData Workshop 2025",
+    "section": "Error metrics",
+    "text": "Error metrics\n\nAssume we have predictions \\(\\hat y_{t}\\) for the unseen observations \\(\\tilde y_{t}\\) over times \\(t = 1, \\dots, N\\).\n\nFour commonly used error metrics for point forecasts:\n\nmean squared error (MSE)\nmean absolute error (MAE)\nmean absolute percentage error (MAPE)\nmean absolute scaled error (MASE)\n\nInterval metrics:\n\ncoverage\ninterval score\nweighted interval score"
+  },
+  {
+    "objectID": "slides/lecture4.html#error-metrics-mse-and-mae",
+    "href": "slides/lecture4.html#error-metrics-mse-and-mae",
+    "title": "EpiData Workshop 2025",
+    "section": "Error metrics: MSE and MAE",
+    "text": "Error metrics: MSE and MAE\n\\[\\textrm{MSE} = \\frac{1}{N} \\sum_{t=1}^N (\\tilde y_{t}- \\hat y_{t})^2\\] \\[\\textrm{MAE} = \\frac{1}{N} \\sum_{t=1}^N |\\tilde y_{t}- \\hat y_{t}|\\]\n\nMAE gives less importance to extreme errors than MSE.\nMSE is not on the same scale as the data (squared units), use RMSE instead.\nDrawback: both metrics are scale-dependent, so they are not universally interpretable.\n(For example, if \\(y\\) captures height, MSE and MAE will vary depending on whether we measure in feet or meters.)"
+  },
+  {
+    "objectID": "slides/lecture4.html#error-metrics-mape",
+    "href": "slides/lecture4.html#error-metrics-mape",
+    "title": "EpiData Workshop 2025",
+    "section": "Error metrics: MAPE",
+    "text": "Error metrics: MAPE\nFixing scale-dependence:\n\\[\\textrm{MAPE} = 100 \\times \\frac{1}{N} \\sum_{t=1}^N\n\\left|\\frac{\\tilde y_{t}- \\hat y_{t}}{\\tilde y_{t}}\\right|\\]\nDrawbacks\n\nErratic behavior when \\(\\tilde y_{t}\\) is close to zero\nAssumes the unit of measurement has a meaningful zero\n(e.g. using Fahrenheit or Celsius to measure temperature will lead to different MAPE)"
+  },
+  {
+    "objectID": "slides/lecture4.html#error-metrics-mase",
+    "href": "slides/lecture4.html#error-metrics-mase",
+    "title": "EpiData Workshop 2025",
+    "section": "Error metrics: MASE",
+    "text": "Error metrics: MASE\n\\[\\textrm{MASE} = 100 \\times \\frac{\\frac{1}{N} \\sum_{t=1}^N\n|\\tilde y_{t}- \\hat y_{t}|}\n{\\frac{1}{N-1} \\sum_{t=2}^N\n|\\tilde y_{t}- y_{t-1}|}\\]\nAdvantages\n\nuniversally interpretable (not scale dependent)\navoids the zero-pitfall (unless the first difference is 0… )\n\nHeuristic description: normalize the error of our forecasts by that of a naive method which always predicts the last observation."
+  },
+  {
+    "objectID": "slides/lecture4.html#comparing-mae-mse-mape-and-mase",
+    "href": "slides/lecture4.html#comparing-mae-mse-mape-and-mase",
+    "title": "EpiData Workshop 2025",
+    "section": "Comparing MAE, MSE, MAPE and MASE",
+    "text": "Comparing MAE, MSE, MAPE and MASE\n\n\n\n\n\n\n\nMAE\nRMSE\nMAPE\nMASE\n\n\n\n\nyhat1\n2.873\n4.024\n43.140\n66.100\n\n\nyhat2\n5.382\n9.689\n36.083\n123.817"
+  },
+  {
+    "objectID": "slides/lecture4.html#interval-metrics-1",
+    "href": "slides/lecture4.html#interval-metrics-1",
+    "title": "EpiData Workshop 2025",
+    "section": "Interval metrics",
+    "text": "Interval metrics\nGiven a set of predictive intervals \\((l_t^{\\alpha_1}, u_t^{\\alpha_1}), \\dots, (l_t^{\\alpha_K}, u_t^{\\alpha_K}),\\quad t=1,\\dots,N\\)\nCoverage\n\\[\\textrm{Coverage}(\\alpha) = \\frac{1}{N} \\sum_{t=1}^N \\mathbf{1}(l_t^{\\alpha} \\leq \\tilde y_{t} \\leq u_t^\\alpha)\\]\nInterval Score\n\\[\\textrm{IS}(\\alpha) = \\frac{1}{N} \\sum_{t=1}^N \\alpha|u_t^\\alpha - l_t^\\alpha| + 2(l_t^\\alpha - \\tilde y_t)_+ + 2(\\tilde y_t - u_t^\\alpha)_+\\]\nWeighted Interval Score\n\\[\\textrm{WIS} = \\sum_{k=1}^K\\textrm{IS}(\\alpha_k)\\]"
+  },
+  {
+    "objectID": "slides/lecture4.html#defining-the-error-metrics-in-r",
+    "href": "slides/lecture4.html#defining-the-error-metrics-in-r",
+    "title": "EpiData Workshop 2025",
+    "section": "Defining the error metrics in R",
+    "text": "Defining the error metrics in R\n\nMSE &lt;- function(obs, pred) mean((obs - pred)^2)\n\nMAE &lt;- function(obs, pred) mean(abs(obs - pred))\n\nMAPE &lt;- function(obs, pred) 100 * mean(abs(obs - pred) / obs)\n\nMASE &lt;- function(obs, pred) 100 * MAE(obs, pred) / mean(abs(diff(obs)), na.rm = TRUE)\n\nCoverage &lt;- function(obs, ql, qu) mean(obs &gt;= ql & obs &lt;= qu)\n\nIS &lt;- function(obs, ql, qu, alpha) alpha * mean(abs(qu - ql)) + 2 * pmax(ql - obs, obs - qu)"
+  },
+  {
+    "objectID": "slides/lecture4.html#estimating-the-prediction-error",
+    "href": "slides/lecture4.html#estimating-the-prediction-error",
+    "title": "EpiData Workshop 2025",
+    "section": "Estimating the prediction error",
+    "text": "Estimating the prediction error\nGiven an error metric, we want to estimate the prediction error under that metric.\nMethods we’ll discuss briefly\n\nTraining error\nSplit-sample error\nTime series cross-validation error"
+  },
+  {
+    "objectID": "slides/lecture4.html#training-error",
+    "href": "slides/lecture4.html#training-error",
+    "title": "EpiData Workshop 2025",
+    "section": "Training error",
+    "text": "Training error\n\nThe easiest but worst estimate of the prediction error\nThe training error is\n\ngenerally too optimistic as an estimate of prediction error\nmore optimistic the more complex the model!\n\n\nTraining MSE\n\\[\\text{TrainMSE} = \\frac{1}{N-h} \\sum_{t = 1}^{N-h} (\\hat y_{t+h|N} - y_{t+h})^2\\]"
+  },
+  {
+    "objectID": "slides/lecture4.html#split-sample-error",
+    "href": "slides/lecture4.html#split-sample-error",
+    "title": "EpiData Workshop 2025",
+    "section": "Split-sample error",
+    "text": "Split-sample error\nTo compute the split-sample error\n\nSplit data into training (up to time \\(t_0\\)), and test set (after \\(t_0\\))\nEstimate the model to the training data only\nMake predictions for the test set\nCompute the error metric on the test set only\n\n\n\n\nImportant\n\n\nSplit-sample estimates of prediction error don’t mimic real forecasting.\nWe would refit with new data.\nTherefore, split-sample is pessimistic if the relation between outcome and predictors changes over time."
+  },
+  {
+    "objectID": "slides/lecture4.html#split-sample-mse",
+    "href": "slides/lecture4.html#split-sample-mse",
+    "title": "EpiData Workshop 2025",
+    "section": "Split-sample MSE",
+    "text": "Split-sample MSE\n\nWant \\(h\\)-step ahead predictions\nat time \\(t\\), forecast for \\(t+h\\).\n\nThen, the split-sample MSE is\n\\[\\text{SplitMSE} = \\frac{1}{N-h-t_0} \\sum_{t = t_0}^{N-h} (\\hat y_{t+h|t_0} - y_{t+h})^2\\]\n\n\\(\\hat y_{t+h|t_0}\\) is a prediction for \\(y\\) at time \\(t+h\\)\nthat was made with a model that was estimated on data up to time \\(t_0\\)."
+  },
+  {
+    "objectID": "slides/lecture4.html#time-series-cross-validation-cv",
+    "href": "slides/lecture4.html#time-series-cross-validation-cv",
+    "title": "EpiData Workshop 2025",
+    "section": "Time series cross-validation (CV)",
+    "text": "Time series cross-validation (CV)\n\\(h\\)-step ahead predictions\nRe-estimate once new data are available\nTo get \\(h\\)-step ahead predictions, for each time \\(t = t_0, t_0+1, \\dots\\),\n\nEstimate the model using data up to time \\(t\\)\nMake a prediction for \\(t+h\\)\nRecord the prediction error\n\n\\[\\textrm{CVMSE} = \\frac{1}{N-h-t_0} \\sum_{t = t_0}^{N-h} (\\hat y_{t+h|t} - y_{t+h})^2\\]\n\n\\(\\hat y_{t+h|t}\\) is the forecast for \\(y\\) at time \\(t+h\\)\nthat was made with data available up to time \\(t\\)."
   },
   {
     "objectID": "slides/lecture4.html#care-with-your-data",
     "href": "slides/lecture4.html#care-with-your-data",
     "title": "EpiData Workshop 2025",
     "section": "Care with your data",
-    "text": "Care with your data\n\nData splitting\n\nSome data you see. You can use it to create your model: Training data.\nSome data you don’t see. It may arrive later, or you may hold it out to validate your process.\n\nOnly training data can be used to create your model.\n\nMuch more subtle than it sounds.\nEverything about your model must flow from this\n\nChoosing the model: AR vs ARX, number of lags to use\nEstimates of model parameters\nHow much regularization to use\nAny transformations you make of your data\n\n\n\nWe’ve emphasized most of this already.\nBut that point about transformations is VERY important. And often overlooked."
+    "text": "Care with your data\n\nData splitting\n\nSome data you see. You can use it to create your model: Training data.\nSome data you don’t see. It may arrive later, or you may hold it out to validate your process.\n\n\n\n\nOnly training data can be used to create your model.\n\nMuch more subtle than it sounds.\nEverything about your model must flow from this\n\nChoosing the model: Compartmental vs Time Series, exogenous predictors\nEstimates of model parameters\nHow much regularization to use\nAny transformations you make of your data\n\n\n\n\n\nBut that point about transformations is VERY important. And often overlooked."
   },
   {
     "objectID": "slides/lecture4.html#preprocessing-correctly",
     "href": "slides/lecture4.html#preprocessing-correctly",
     "title": "EpiData Workshop 2025",
     "section": "Preprocessing correctly",
-    "text": "Preprocessing correctly\n\nA standard proprecessing routine is to scale() each of the predictors.\nThis requires calculating the mean and standard deviation on the training data.\nAnd using those values when you make predictions\nThis is hard to do with standard R operations.\n\n\nchicago_ell &lt;- modeldata::Chicago |&gt;\n  select(ridership, temp, humidity, percip) |&gt;\n  mutate(across(everything(), scale))\n\n\nlm(ridership ~ ., data = chicago_ell)\n\nWe didn’t save the means and variances.\nWe need them to process the test data.\nWe would also need to invert (postprocess) the predictions.\nFor example: undoing scaling to predict deaths not deaths per 100K population"
+    "text": "Preprocessing correctly\n\nA standard proprecessing routine is to scale() each of the predictors.\nThis requires calculating the mean and standard deviation on the training data.\nAnd using those values when you make predictions\nThis is hard to do with standard R operations.\n\n\ndata(Chicago, package = \"modeldata\") \nChicago &lt;- select(Chicago, c(ridership, temp, humidity, percip))\n\nchicago_train &lt;- Chicago |&gt;\n  slice_head(prop = .8) |&gt;\n  mutate(across(everything(), scale))\nmod &lt;- lm(ridership ~ ., data = chicago_train)\n\nchicago_test &lt;- Chicago |&gt;\n  slice_tail(prop = .2) |&gt;\n  mutate(across(everything(), scale))\npreds &lt;- predict(mod, chicago_test)\n\n\n\nScaled the test set with their own means and variances.\nShould have used sample statistics from the training set\nWe didn’t save the means and variances from the training set.\nWe would also need to invert (postprocess) preds to get them in the original units\n\nThis is all wrong"
   },
   {
     "objectID": "slides/lecture4.html#tidymodels",
@@ -28,25 +175,25 @@
     "text": "{tidymodels}\n\nThe {tidymodels} suite of packages is intended to handle this situation correctly.\nIt’s written by programmers at Posit (the people behind {tidyverse})\nIt doesn’t work for panel data.\nThat’s what we need for Epidemiological Time Series\nWe’ve been working with their team to develop this functionality."
   },
   {
-    "objectID": "slides/lecture4.html#anatomy-of-a-forecaster",
-    "href": "slides/lecture4.html#anatomy-of-a-forecaster",
+    "objectID": "slides/lecture4.html#anatomy-of-a-forecaster-framework",
+    "href": "slides/lecture4.html#anatomy-of-a-forecaster-framework",
     "title": "EpiData Workshop 2025",
-    "section": "Anatomy of a forecaster",
-    "text": "Anatomy of a forecaster\n\nWe should build up modular components\nBe able to add/remove layers of complexity sequentially, not all at once\nWe should be able to make preprocessing independent of the model fitting\nWe should be able to postprocess the predictions\n\n\n\nPreprocessor: do things to the data before model training\nTrainer: train a model on data, resulting in a fitted model object\nPredictor: make predictions, using a fitted model object\nPostprocessor: do things to the predictions before returning"
+    "section": "Anatomy of a forecaster framework",
+    "text": "Anatomy of a forecaster framework\n\n\nWe should build up modular components\nBe able to add/remove layers of complexity sequentially, not all at once\nWe should be able to make processing independent of the model\nFitting should also be independent (glm() vs lm() vs glmnet())\nWe should be able to postprocess the predictions\nThe framework shouldn’t contaminate test data with training data (data leakage)\nWe should be able to access intermediate portions"
   },
   {
-    "objectID": "slides/lecture4.html#what-epipredict-provides-i",
-    "href": "slides/lecture4.html#what-epipredict-provides-i",
+    "objectID": "slides/lecture4.html#what-epipredict-provides",
+    "href": "slides/lecture4.html#what-epipredict-provides",
     "title": "EpiData Workshop 2025",
-    "section": "What {epipredict} provides (i)",
-    "text": "What {epipredict} provides (i)\nBasic and easy to use “canned” forecasters:\n\nBaseline flat forecaster\nAutoregressive forecaster (ARX)\nAutoregressive classifier\nCDC FluSight flatline forecaster\n\nThese are supposed to work easily\n\nHandle lots of cases we’ve already seen\n\nWe’ll start here"
+    "section": "What {epipredict} provides",
+    "text": "What {epipredict} provides\nBasic and easy to use “canned” forecasters:\n\nBaseline flat forecaster\nAutoregressive forecaster (ARX)\nAutoregressive classifier (also “ARX”)\nCDC FluSight flatline forecaster\nClimatological forecaster\n\n\nThese are supposed to work easily\n\nHandle lots of cases we’ve already seen\n\nWe’ll start here"
   },
   {
-    "objectID": "slides/lecture4.html#what-epipredict-provides-ii",
-    "href": "slides/lecture4.html#what-epipredict-provides-ii",
+    "objectID": "slides/lecture4.html#what-epipredict-provides-1",
+    "href": "slides/lecture4.html#what-epipredict-provides-1",
     "title": "EpiData Workshop 2025",
-    "section": "What {epipredict} provides (ii)",
-    "text": "What {epipredict} provides (ii)\n\nA framework for creating custom forecasters out of modular components.\nThis is highly customizable, extends {tidymodels} to panel data\nGood for building a new forecaster from scratch\nWe’ll do an example at the end\nThere are four types of components:\n\nPreprocessor: do things to the data before model training\nTrainer: train a model on data, resulting in a fitted model object\nPredictor: make predictions, using a fitted model object\nPostprocessor: do things to the predictions before returning"
+    "section": "What {epipredict} provides",
+    "text": "What {epipredict} provides\n\nA framework for creating custom forecasters out of modular components.\nThis is highly customizable, extends {tidymodels} to panel data\nGood for building a new forecaster from scratch\nWe’ll do an example at the end\n\nThere are four of components:\n\nPreprocessor: do things to the data before model training\nTrainer: train a model on data, resulting in a fitted model object\nPredictor: make predictions, using a fitted model object\nPostprocessor: do things to the predictions before returning"
   },
   {
     "objectID": "slides/lecture4.html#examples-of-pre-processing",
@@ -60,7 +207,7 @@
     "href": "slides/lecture4.html#fit-arx_forecaster-on-training-set",
     "title": "EpiData Workshop 2025",
     "section": "Fit arx_forecaster() on training set",
-    "text": "Fit arx_forecaster() on training set\n\nARX(1) model for COVID deaths: \\(\\quad \\hat y_{t+28} = \\hat\\phi + \\hat\\phi_0 y_{t} + \\hat\\beta_0 x_{t}\\)\nOnly focus on California (for now)\nUsing {epipredict}\n\n\n# split into train and test \nca &lt;- cases_deaths |&gt; filter(geo_value == \"ca\")\nt0_date &lt;- as.Date('2021-04-01')\ntrain &lt;- ca |&gt; filter(time_value &lt;= t0_date)\ntest &lt;- ca |&gt; filter(time_value &gt; t0_date)\n\n# fit ARX\nepi_arx &lt;- arx_forecaster(\n  epi_data = train |&gt; as_epi_df(), \n  outcome = \"deaths\", \n  predictors = c(\"cases\", \"deaths\"),\n  trainer = linear_reg(),\n  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n)"
+    "text": "Fit arx_forecaster() on training set\n\nARX(1) model for COVID Deaths per 100K (7 day average): \\(\\quad \\mathbb{E}[y_{t+28} | y_t,\\ x_t] \\doteq \\phi + \\phi_0 y_{t} + \\beta_0 x_{t}\\)\nOnly focus on California (for now)\n\n\nt0_date &lt;- as.Date('2021-04-01')\ntrain &lt;- ca |&gt; filter(time_value &lt;= t0_date)\ntest &lt;- ca |&gt; filter(time_value &gt; t0_date)\n\nca_arx &lt;- arx_forecaster(\n  epi_data = train |&gt; as_epi_df(), \n  outcome = \"deaths\", \n  predictors = c(\"cases\", \"deaths\"),\n  trainer = linear_reg(),\n  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n)"
   },
   {
     "objectID": "slides/lecture4.html#arx_forecaster-output",
@@ -74,133 +221,98 @@
     "href": "slides/lecture4.html#arx_forecaster-output-1",
     "title": "EpiData Workshop 2025",
     "section": "arx_forecaster() output",
-    "text": "arx_forecaster() output\n\nepi_arx \n## ══ A basic forecaster of type ARX Forecaster ═══════════════════════════════════\n## \n## This forecaster was fit on 2025-04-13 07:46:50.\n## \n## Training data was an &lt;epi_df&gt; with:\n## • Geography: state,\n## • Time type: day,\n## • Using data up-to-date as of: 2025-04-13 07:46:06.\n## • With the last data available on 2021-04-01\n## \n## ── Predictions ─────────────────────────────────────────────────────────────────\n## \n## A total of 1 prediction is available for\n## • 1 unique geographic region,\n## • At forecast date: 2021-04-01,\n## • For target date: 2021-04-29,\n##"
+    "text": "arx_forecaster() output\n\nca_arx"
   },
   {
     "objectID": "slides/lecture4.html#extract-fitted-object",
     "href": "slides/lecture4.html#extract-fitted-object",
     "title": "EpiData Workshop 2025",
     "section": "Extract fitted object",
-    "text": "Extract fitted object\n\n\n## \n## ══ Epi Workflow [trained] ══════════════════════════════════════════════════════\n## Preprocessor: Recipe\n## Model: linear_reg()\n## Postprocessor: Frosting\n## \n## ── Preprocessor ────────────────────────────────────────────────────────────────\n## \n## 7 Recipe steps.\n## 1. step_epi_lag()\n## 2. step_epi_lag()\n## 3. step_epi_ahead()\n## 4. step_naomit()\n## 5. step_naomit()\n## 6. step_training_window()\n## 7. check_enough_data()\n## \n## ── Model ───────────────────────────────────────────────────────────────────────\n## \n## Call:\n## stats::lm(formula = ..y ~ ., data = data)\n## \n## Coefficients:\n##  (Intercept)   lag_0_cases  lag_0_deaths  \n##     0.075387      0.009953      0.201329\n## \n## ── Postprocessor ───────────────────────────────────────────────────────────────\n## \n## 5 Frosting layers.\n## 1. layer_predict()\n## 2. layer_residual_quantiles()\n## 3. layer_add_forecast_date()\n## 4. layer_add_target_date()\n## 5. layer_threshold()\n##"
-  },
-  {
-    "objectID": "slides/lecture4.html#epi_workflow",
-    "href": "slides/lecture4.html#epi_workflow",
-    "title": "EpiData Workshop 2025",
-    "section": "$epi_workflow",
-    "text": "$epi_workflow\nContains information on\n\nPre-processing steps automatically performed by arx_forecaster (e.g. compute lags of the predictors)\nFitted model\nPost-processing steps automatically performed by arx_forecaster (e.g. compute quantiles)"
+    "text": "Extract fitted object\n\nca_arx$epi_workflow\n\n\n══ Epi Workflow [trained] ══════════════════════════════════════════════════════\nPreprocessor: Recipe\nModel: linear_reg()\nPostprocessor: Frosting\n\n── Preprocessor ────────────────────────────────────────────────────────────────\n\n7 Recipe steps.\n1. step_epi_lag()\n2. step_epi_lag()\n3. step_epi_ahead()\n4. step_naomit()\n5. step_naomit()\n6. step_training_window()\n7. check_enough_data()\n\n── Model ───────────────────────────────────────────────────────────────────────\n\nCall:\nstats::lm(formula = ..y ~ ., data = data)\n\nCoefficients:\n (Intercept)   lag_0_cases  lag_0_deaths  \n   21.181007      0.008929      0.321781  \n\n── Postprocessor ───────────────────────────────────────────────────────────────\n\n5 Frosting layers.\n1. layer_predict()\n2. layer_residual_quantiles()\n3. layer_add_forecast_date()\n4. layer_add_target_date()\n5. layer_threshold()"
   },
   {
     "objectID": "slides/lecture4.html#extract-predictions",
     "href": "slides/lecture4.html#extract-predictions",
     "title": "EpiData Workshop 2025",
     "section": "Extract predictions",
-    "text": "Extract predictions\n\nepi_arx$predictions\n\n# A tibble: 1 × 5\n  geo_value .pred .pred_distn forecast_date target_date\n  &lt;chr&gt;     &lt;dbl&gt;   &lt;qtls(3)&gt; &lt;date&gt;        &lt;date&gt;     \n1 ca        0.218     [0.218] 2021-04-01    2021-04-29 \n\n\n\n\n\nNote\n\n\n\n.pred_distn is actually a “distribution”, parameterized by its quantiles\narx_forecaster estimates the quantiles in a different way than lm"
+    "text": "Extract predictions\n\nca_arx$predictions\n\n# A tibble: 1 × 5\n  geo_value .pred .pred_distn forecast_date target_date\n  &lt;chr&gt;     &lt;dbl&gt;   &lt;qtls(3)&gt; &lt;date&gt;        &lt;date&gt;     \n1 ca         105.       [105] 2021-04-01    2021-04-29 \n\n\n\n\n\n\nNote\n\n\n\n.pred_distn is actually a “distribution”, parameterized by its quantiles\narx_forecaster estimates the quantiles in a different way than lm\n\n\n\n\n\n\n\nca_arx$predictions |&gt; pivot_quantiles_wider(.pred_distn)\n\n# A tibble: 1 × 7\n  geo_value .pred forecast_date target_date `0.1` `0.5` `0.9`\n  &lt;chr&gt;     &lt;dbl&gt; &lt;date&gt;        &lt;date&gt;      &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;\n1 ca         105. 2021-04-01    2021-04-29   29.4  105.  180."
   },
   {
-    "objectID": "slides/lecture4.html#extract-predictions-1",
-    "href": "slides/lecture4.html#extract-predictions-1",
+    "objectID": "slides/lecture4.html#plot-predictions",
+    "href": "slides/lecture4.html#plot-predictions",
     "title": "EpiData Workshop 2025",
-    "section": "Extract predictions",
-    "text": "Extract predictions\nWe can extract the distribution into a “long” epi_df\n\nepi_arx$predictions |&gt;\n  pivot_quantiles_longer(.pred_distn)\n\n# A tibble: 3 × 6\n  geo_value .pred forecast_date target_date .pred_distn_value\n  &lt;chr&gt;     &lt;dbl&gt; &lt;date&gt;        &lt;date&gt;                  &lt;dbl&gt;\n1 ca        0.218 2021-04-01    2021-04-29              0.137\n2 ca        0.218 2021-04-01    2021-04-29              0.218\n3 ca        0.218 2021-04-01    2021-04-29              0.300\n# ℹ 1 more variable: .pred_distn_quantile_level &lt;dbl&gt;\n\n\nor into a “wide” epi_df\n\nepi_arx$predictions |&gt;\n  pivot_quantiles_wider(.pred_distn)\n\n# A tibble: 1 × 7\n  geo_value .pred forecast_date target_date `0.1` `0.5` `0.9`\n  &lt;chr&gt;     &lt;dbl&gt; &lt;date&gt;        &lt;date&gt;      &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;\n1 ca        0.218 2021-04-01    2021-04-29  0.137 0.218 0.300"
+    "section": "Plot predictions",
+    "text": "Plot predictions\n\nca_arx |&gt; autoplot() +\n  scale_y_continuous(expand = expansion(c(0, 0.05))) +\n  geom_vline(xintercept = ca_arx$predictions$forecast_date[1], alpha = .5, color = secondary)"
   },
   {
-    "objectID": "slides/lecture4.html#predict-with-fitted-arx-split-sample",
-    "href": "slides/lecture4.html#predict-with-fitted-arx-split-sample",
+    "objectID": "slides/lecture4.html#split-sample-forecasting",
+    "href": "slides/lecture4.html#split-sample-forecasting",
     "title": "EpiData Workshop 2025",
-    "section": "Predict with fitted ARX (split-sample)",
-    "text": "Predict with fitted ARX (split-sample)\n\narx_forecaster fits a model to the training set, and outputs only one prediction (for time \\(t_0+h\\)).\nTo get predictions for the test set:\n\n\npredict(epi_arx$epi_workflow, test)\n\nAn `epi_df` object, 707 x 6 with metadata:\n* geo_type  = state\n* time_type = day\n* as_of     = 2025-04-13 07:46:06.137479\n\n# A tibble: 707 × 6\n   geo_value time_value .pred .pred_distn forecast_date target_date\n   &lt;chr&gt;     &lt;date&gt;     &lt;dbl&gt;   &lt;qtls(3)&gt; &lt;date&gt;        &lt;date&gt;     \n 1 ca        2021-04-02 0.213     [0.213] 2021-04-01    2021-04-29 \n 2 ca        2021-04-03 0.202     [0.202] 2021-04-01    2021-04-29 \n 3 ca        2021-04-04 0.197     [0.197] 2021-04-01    2021-04-29 \n 4 ca        2021-04-05 0.201     [0.201] 2021-04-01    2021-04-29 \n 5 ca        2021-04-06 0.199     [0.199] 2021-04-01    2021-04-29 \n 6 ca        2021-04-07 0.195     [0.195] 2021-04-01    2021-04-29 \n 7 ca        2021-04-08 0.195     [0.195] 2021-04-01    2021-04-29 \n 8 ca        2021-04-09 0.196     [0.196] 2021-04-01    2021-04-29 \n 9 ca        2021-04-10 0.208     [0.208] 2021-04-01    2021-04-29 \n10 ca        2021-04-11 0.213     [0.213] 2021-04-01    2021-04-29 \n# ℹ 697 more rows"
+    "section": "Split sample forecasting",
+    "text": "Split sample forecasting\n\narx_forecaster() estimates a model on the training set\nOutputs only the prediction for time \\(t_0+h\\)\nTo get predictions for the test set:\n\n\npredict(ca_arx$epi_workflow, test)\n\nAn `epi_df` object, 706 x 6 with metadata:\n* geo_type  = state\n* time_type = day\n* as_of     = 2025-04-21 14:26:40.214048\n\n# A tibble: 706 × 6\n   geo_value time_value .pred .pred_distn forecast_date target_date\n   &lt;chr&gt;     &lt;date&gt;     &lt;dbl&gt;   &lt;qtls(3)&gt; &lt;date&gt;        &lt;date&gt;     \n 1 ca        2021-04-02 113.        [113] 2021-04-01    2021-04-29 \n 2 ca        2021-04-03  64.3      [64.3] 2021-04-01    2021-04-29 \n 3 ca        2021-04-04  50.9      [50.9] 2021-04-01    2021-04-29 \n 4 ca        2021-04-05  61.2      [61.2] 2021-04-01    2021-04-29 \n 5 ca        2021-04-06  71.9      [71.9] 2021-04-01    2021-04-29 \n 6 ca        2021-04-07  78.1      [78.1] 2021-04-01    2021-04-29 \n 7 ca        2021-04-08  89.2      [89.2] 2021-04-01    2021-04-29 \n 8 ca        2021-04-09 124.        [124] 2021-04-01    2021-04-29 \n 9 ca        2021-04-10 101.        [101] 2021-04-01    2021-04-29 \n10 ca        2021-04-11  64.7      [64.7] 2021-04-01    2021-04-29 \n# ℹ 696 more rows"
   },
   {
-    "objectID": "slides/lecture4.html#predict-with-arx-when-re-fitting",
-    "href": "slides/lecture4.html#predict-with-arx-when-re-fitting",
+    "objectID": "slides/lecture4.html#time-series-prediction-with-arx-with-re-fitting",
+    "href": "slides/lecture4.html#time-series-prediction-with-arx-with-re-fitting",
     "title": "EpiData Workshop 2025",
-    "section": "Predict with ARX (when re-fitting)",
-    "text": "Predict with ARX (when re-fitting)\n\nIn practice, if we want to re-train the forecasters as new data arrive, we fit and predict combining arx_forecaster with epix_slide\nFrom now on, we will only used versioned data, and make predictions once a week"
+    "section": "Time series prediction with ARX (with re-fitting)",
+    "text": "Time series prediction with ARX (with re-fitting)\n\n\nTo re-train the forecaster as new data arrives\nCombine arx_forecaster() with epi_slide()\nBut that isn’t version aware\nTo REALLY mimic what forecasts would have looked like\nSlide on an epi_archive with epix_slide()\nThis is the only justifiable way to evaluate forecasting models\nThis is the only justifiable way to evaluate forecasting models\nFrom now on, we will only used versioned data\nFor illustration and speed, we’ll make predictions once a week (daily data)"
   },
   {
     "objectID": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window",
     "href": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window",
     "title": "EpiData Workshop 2025",
     "section": "Predict with ARX (re-fitting on trailing window)",
-    "text": "Predict with ARX (re-fitting on trailing window)\n\nh &lt;- 28         # horizon\nw &lt;- 120 + h    # trailing window length\n\n# Specify the forecast dates\nfc_time_values &lt;- seq(from = t0_date, to = as.Date(\"2023-02-09\"), by = \"1 week\")\n\n# Slide the arx_forecaster over the epi_archive\npred_arx &lt;- ca_archive |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"cases\", \"deaths\"), \n                   trainer = linear_reg(),\n                   args_list = arx_args_list(lags = 0, ahead = h, quantile_levels = c(0.1, 0.9))\n  )$predictions |&gt;\n    pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+    "text": "Predict with ARX (re-fitting on trailing window)\n\nfc_time_values &lt;- seq(from = t0_date, to = as.Date(\"2023-02-09\"), by = \"1 week\")\nh &lt;- 28         # horizon\nw &lt;- 120 + h    # trailing window length \n\npred_arx &lt;- ca_archive |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"cases\", \"deaths\"), \n                   trainer = linear_reg(),\n                   args_list = arx_args_list(lags = 0, ahead = h, quantile_levels = c(0.1, 0.9))\n  ) |&gt; pluck(\"predictions\") |&gt; pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#regression-on-a-trailing-window",
+    "href": "slides/lecture4.html#regression-on-a-trailing-window",
+    "title": "EpiData Workshop 2025",
+    "section": "Regression on a trailing window",
+    "text": "Regression on a trailing window\nFit the model on a window of data of length \\(w\\)\n\nstarting at \\(t-w\\) and ending at \\(t\\).\n\nAdvantage:\n\nif the predictor-outcome relation changes over time,\ntraining the forecaster on only recent data better captures the recent relationship\npotentially more relevant for near-term forecasts\n\n\n\nWindow length \\(w\\) considerations:\n\nif \\(w\\) is too big, the model can’t adapt to the recent predictors-outcome relation\nif \\(w\\) is too small, the fitted model may be too volatile (trained on too little data)"
   },
   {
     "objectID": "slides/lecture4.html#predict-with-arx",
     "href": "slides/lecture4.html#predict-with-arx",
     "title": "EpiData Workshop 2025",
     "section": "Predict with ARX",
-    "text": "Predict with ARX\n\n\n\nNote (window length)\n\n\nWe set \\(w = 120 + h\\) to match the window size of the ARX model we fitted manually.\nWhen considering a window from \\(t-w\\) to \\(t\\), we had access to all outcomes in that window, and to all predictors between \\(t-w-h\\) and \\(t-h\\).\n(That’s because we lagged \\(x\\) before applying the window.)\nSo we were “cheating” by saying that the trailing window had length \\(w=120\\), as its actual size was \\(120+h\\)!\n\n\n\n\n\n\nNote (all past)\n\n\nThe method fitting on all past data up to the forecasting date can be implemented by setting:\n.before = Inf in epix_slide()."
+    "text": "Predict with ARX\n\n\n\nNote (window length)\n\n\n\nSetting \\(w = 120 + h\\) actually only uses \\(N=120\\) observations\nIt filters to data within the window, then performs leads/lags\nTo make this explicit, for a horizon \\(h\\), we need to “back” \\(h\\) days to see which predictors align with it\n\n\n\n\n\n\n\nNote (all past)\n\n\nTo fitting on all past data up to the forecasting date use\nepix_slide(...,.before = Inf)"
   },
   {
     "objectID": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window-1",
     "href": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window-1",
     "title": "EpiData Workshop 2025",
     "section": "Predict with ARX (re-fitting on trailing window)",
-    "text": "Predict with ARX (re-fitting on trailing window)\n\n\npred_arx \n\n# A tibble: 98 × 8\n   version    geo_value  .pred forecast_date target_date  `0.1`  `0.5` `0.9`\n * &lt;date&gt;     &lt;chr&gt;      &lt;dbl&gt; &lt;date&gt;        &lt;date&gt;       &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl&gt;\n 1 2021-04-01 ca        0.396  2021-03-31    2021-04-28  0.192  0.396  0.599\n 2 2021-04-08 ca        0.395  2021-04-07    2021-05-05  0.197  0.395  0.594\n 3 2021-04-15 ca        0.403  2021-04-14    2021-05-12  0.211  0.403  0.595\n 4 2021-04-22 ca        0.312  2021-04-21    2021-05-19  0.142  0.312  0.482\n 5 2021-04-29 ca        0.261  2021-04-28    2021-05-26  0.0879 0.261  0.433\n 6 2021-05-06 ca        0.209  2021-05-05    2021-06-02  0.0238 0.209  0.394\n 7 2021-05-13 ca        0.158  2021-05-12    2021-06-09  0      0.158  0.345\n 8 2021-05-20 ca        0.118  2021-05-19    2021-06-16  0      0.118  0.296\n 9 2021-05-27 ca        0.0775 2021-05-26    2021-06-23  0      0.0775 0.239\n10 2021-06-03 ca        0.0552 2021-06-02    2021-06-30  0      0.0552 0.137\n# ℹ 88 more rows"
+    "text": "Predict with ARX (re-fitting on trailing window)\n\npred_arx \n\n# A tibble: 98 × 8\n   version    geo_value  .pred forecast_date target_date  `0.1`  `0.5` `0.9`\n * &lt;date&gt;     &lt;chr&gt;      &lt;dbl&gt; &lt;date&gt;        &lt;date&gt;       &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl&gt;\n 1 2021-04-01 ca        0.396  2021-03-31    2021-04-28  0.192  0.396  0.599\n 2 2021-04-08 ca        0.395  2021-04-07    2021-05-05  0.197  0.395  0.594\n 3 2021-04-15 ca        0.403  2021-04-14    2021-05-12  0.211  0.403  0.595\n 4 2021-04-22 ca        0.312  2021-04-21    2021-05-19  0.142  0.312  0.482\n 5 2021-04-29 ca        0.261  2021-04-28    2021-05-26  0.0879 0.261  0.433\n 6 2021-05-06 ca        0.209  2021-05-05    2021-06-02  0.0238 0.209  0.394\n 7 2021-05-13 ca        0.158  2021-05-12    2021-06-09  0      0.158  0.345\n 8 2021-05-20 ca        0.118  2021-05-19    2021-06-16  0      0.118  0.296\n 9 2021-05-27 ca        0.0775 2021-05-26    2021-06-23  0      0.0775 0.239\n10 2021-06-03 ca        0.0552 2021-06-02    2021-06-30  0      0.0552 0.137\n# ℹ 88 more rows"
   },
   {
     "objectID": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window-2",
     "href": "slides/lecture4.html#predict-with-arx-re-fitting-on-trailing-window-2",
     "title": "EpiData Workshop 2025",
     "section": "Predict with ARX (re-fitting on trailing window)",
-    "text": "Predict with ARX (re-fitting on trailing window)\n\n\n\n        MAE     MASE  Coverage\n 0.07889637 264.5207 0.4285714"
+    "text": "Predict with ARX (re-fitting on trailing window)\n\n\n\n\n\n\nMAE\nMASE\nCoverage 80\n\n\n\n\n0.08\n218.86\n0.43"
   },
   {
     "objectID": "slides/lecture4.html#customizing-arx_forecaster",
     "href": "slides/lecture4.html#customizing-arx_forecaster",
     "title": "EpiData Workshop 2025",
     "section": "Customizing arx_forecaster()",
-    "text": "Customizing arx_forecaster()\n\narx_forecaster(\n  epi_data = train, \n  outcome = \"deaths\", \n  predictors = c(\"cases\", \"deaths\"),\n  trainer = linear_reg() |&gt; set_engine(\"lm\"),\n  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n)\n\n\n\nModify predictors to add/drop predictors\n\ne.g. drop deaths for regression with a lagged predictor, or drop cases to get AR model\ndefault: predictors = outcome"
+    "text": "Customizing arx_forecaster()\n\narx_forecaster(\n  epi_data = train, \n  outcome = \"deaths\", \n  predictors = c(\"cases\", \"deaths\"),\n  trainer = linear_reg(),\n  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n)\n\n\n\narx_args_list(\n  lags = c(0L, 7L, 14L),\n  ahead = 7L,\n  n_training = Inf,\n  forecast_date = NULL,\n  target_date = NULL,\n  adjust_latency = c(\"none\", \"extend_ahead\", \"extend_lags\", \"locf\"),\n  warn_latency = TRUE,\n  quantile_levels = c(0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95),\n  symmetrize = TRUE,\n  nonneg = TRUE,\n  quantile_by_key = character(0L),\n  check_enough_data_n = NULL,\n  check_enough_data_epi_keys = NULL,\n  ...\n)"
+  },
+  {
+    "objectID": "slides/lecture4.html#doctor-visits-instead-of-cases-in-predictor-set",
+    "href": "slides/lecture4.html#doctor-visits-instead-of-cases-in-predictor-set",
+    "title": "EpiData Workshop 2025",
+    "section": "Doctor visits instead of cases in predictor set",
+    "text": "Doctor visits instead of cases in predictor set\n\n\n\n\n\n\nMAE\nMASE\nCoverage 80\n\n\n\n\n0.06\n169.72\n0.52"
   },
   {
     "objectID": "slides/lecture4.html#customizing-arx_forecaster-1",
     "href": "slides/lecture4.html#customizing-arx_forecaster-1",
     "title": "EpiData Workshop 2025",
     "section": "Customizing arx_forecaster()",
-    "text": "Customizing arx_forecaster()\n\narx_forecaster(\n  epi_data = train, \n  outcome = \"deaths\", \n  predictors = c(\"cases\", \"deaths\"),\n  trainer = linear_reg(),\n  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n)\n\n\nModify arx_args_list to change lags, horizon, quantile levels, …\n\n\n\narx_args_list(\n  lags = c(0L, 7L, 14L),\n  ahead = 7L,\n  n_training = Inf,\n  forecast_date = NULL,\n  target_date = NULL,\n  adjust_latency = c(\"none\", \"extend_ahead\", \"extend_lags\", \"locf\"),\n  warn_latency = TRUE,\n  quantile_levels = c(0.05, 0.95),\n  symmetrize = TRUE,\n  nonneg = TRUE,\n  quantile_by_key = character(0L),\n  check_enough_data_n = NULL,\n  check_enough_data_epi_keys = NULL,\n  ...\n)"
-  },
-  {
-    "objectID": "slides/lecture4.html#customizing-arx_forecaster-2",
-    "href": "slides/lecture4.html#customizing-arx_forecaster-2",
-    "title": "EpiData Workshop 2025",
-    "section": "Customizing arx_forecaster()",
-    "text": "Customizing arx_forecaster()\nChange predictors: doctor visits instead of cases\n\ndv_archive &lt;- pub_covidcast(\n  source = \"doctor-visits\",\n  signals = \"smoothed_adj_cli\",\n  time_type = \"day\",\n  geo_type = \"state\",\n  time_values = epirange(20200401, 20230401),\n  geo_values = \"*\",\n  issues = epirange(20200401, 20230401)) |&gt;\n  select(geo_value, time_value, version = issue, doctor_visits = value) |&gt;\n  arrange(geo_value, time_value) |&gt;\n  as_epi_archive(compactify = FALSE)"
-  },
-  {
-    "objectID": "slides/lecture4.html#customizing-arx_forecaster-3",
-    "href": "slides/lecture4.html#customizing-arx_forecaster-3",
-    "title": "EpiData Workshop 2025",
-    "section": "Customizing arx_forecaster()",
-    "text": "Customizing arx_forecaster()\nChange predictors: doctor visits instead of cases\n\npred_arx_hosp &lt;- ca_archive_dv |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"deaths\", \"doctor_visits\"), \n                   trainer = linear_reg(),\n                   args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n  )$predictions |&gt;\n    pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
-  },
-  {
-    "objectID": "slides/lecture4.html#predictions-doctor-visits-instead-of-cases-in-predictor-set",
-    "href": "slides/lecture4.html#predictions-doctor-visits-instead-of-cases-in-predictor-set",
-    "title": "EpiData Workshop 2025",
-    "section": "Predictions (doctor visits instead of cases in predictor set)",
-    "text": "Predictions (doctor visits instead of cases in predictor set)\n\n\n\n        MAE     MASE  Coverage\n 0.06040473 202.5227 0.5510204"
-  },
-  {
-    "objectID": "slides/lecture4.html#customizing-arx_forecaster-4",
-    "href": "slides/lecture4.html#customizing-arx_forecaster-4",
-    "title": "EpiData Workshop 2025",
-    "section": "Customizing arx_forecaster()",
-    "text": "Customizing arx_forecaster()\nAdd more lags\n\npred_arx_more_lags &lt;- ca_archive_dv |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"deaths\", \"doctor_visits\"), \n                   trainer = linear_reg(),\n                   args_list = arx_args_list(\n                     lags = c(0, 7, 14), \n                     ahead = 28, quantile_levels = c(0.1, 0.9)\n                   )\n  )$predictions |&gt;\n    pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
-  },
-  {
-    "objectID": "slides/lecture4.html#predictions-more-lags",
-    "href": "slides/lecture4.html#predictions-more-lags",
-    "title": "EpiData Workshop 2025",
-    "section": "Predictions (more lags)",
-    "text": "Predictions (more lags)\n\n\n\n      MAE     MASE  Coverage\n 0.077735 260.6269 0.3367347"
-  },
-  {
-    "objectID": "slides/lecture4.html#customizing-arx_forecaster-5",
-    "href": "slides/lecture4.html#customizing-arx_forecaster-5",
-    "title": "EpiData Workshop 2025",
-    "section": "Customizing arx_forecaster()",
-    "text": "Customizing arx_forecaster()\nMultiple horizons\n\nforecast_times &lt;- seq(from = t0_date, to = as.Date(\"2023-02-23\"), by = \"1 month\")\npred_h_days_ahead &lt;- function(epi_archive, ahead = 7) {\n  epi_archive |&gt;\n    epix_slide(\n      ~ arx_forecaster(epi_data = .x,\n                       outcome = \"deaths\", \n                       predictors = c(\"deaths\", \"doctor_visits\"), \n                       trainer = linear_reg() |&gt; set_engine(\"lm\"),\n                       args_list = arx_args_list(\n                         lags = 0,  \n                         ahead = ahead,\n                         quantile_levels = c(0.1, 0.9))\n      )$predictions |&gt; \n        pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = forecast_times\n  )\n}\nh &lt;- c(7, 14, 21, 28)\nforecasts &lt;- bind_rows(map(h, ~ pred_h_days_ahead(ca_archive_dv, ahead = .x)))"
+    "text": "Customizing arx_forecaster()\nMultiple horizons\n\nh &lt;- c(7, 14, 21, 28)\nforecast_times &lt;- seq(from = t0_date, to = as.Date(\"2023-02-23\"), by = \"1 month\")\npred_h_days_ahead &lt;- function(epi_archive, ahead = 7) {\n  epi_archive |&gt;\n    epix_slide(~ arx_forecaster(epi_data = .x,\n                                outcome = \"deaths\", \n                                predictors = c(\"deaths\", \"doctor_visits\"), \n                                trainer = linear_reg(),\n                                args_list = arx_args_list(lags = 0, ahead = ahead, quantile_levels = c(0.1, 0.9))\n    )|&gt; pluck(\"predictions\") |&gt; pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = forecast_times\n  )\n}\nforecasts &lt;- bind_rows(map(h, ~ pred_h_days_ahead(ca_archive_dv, ahead = .x)))"
   },
   {
     "objectID": "slides/lecture4.html#predictions-multiple-horizons",
@@ -221,112 +333,63 @@
     "href": "slides/lecture4.html#changing-trainer-1",
     "title": "EpiData Workshop 2025",
     "section": "Changing trainer",
-    "text": "Changing trainer\n\npred_arx_rf &lt;- ca_archive_dv |&gt;\n  epix_slide(\n    ~ arx_forecaster(epi_data = .x,\n                     outcome = \"deaths\", \n                     predictors = c(\"deaths\", \"doctor_visits\"), \n                     trainer = parsnip::rand_forest(mode = \"regression\"), # defaults to ranger\n                     args_list = arx_args_list(\n                       lags = 0,\n                       ahead = 28,\n                       quantile_levels = c(0.1, 0.9))\n                     )$predictions |&gt;\n        pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+    "text": "Changing trainer\n\npred_arx_rf &lt;- ca_archive_dv |&gt;\n  epix_slide(\n    ~ arx_forecaster(epi_data = .x,\n                     outcome = \"deaths\", \n                     predictors = c(\"deaths\", \"doctor_visits\"), \n                     trainer = parsnip::rand_forest(mode = \"regression\"), # defaults to ranger\n                     args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n    ) |&gt; pluck(\"predictions\") |&gt; pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
   },
   {
     "objectID": "slides/lecture4.html#predictions-trained-using-random-forest",
     "href": "slides/lecture4.html#predictions-trained-using-random-forest",
     "title": "EpiData Workshop 2025",
     "section": "Predictions (trained using random forest)",
-    "text": "Predictions (trained using random forest)\n\n\n\n        MAE     MASE  Coverage\n 0.08085227 271.0784 0.1122449"
-  },
-  {
-    "objectID": "slides/lecture4.html#warning",
-    "href": "slides/lecture4.html#warning",
-    "title": "EpiData Workshop 2025",
-    "section": "Warning!",
-    "text": "Warning!\n\nRandom forests has really poor coverage here.\nThe reason is the way intervals are calculated.\nCan change engine to get better coverage:\n\nspecify engine = \"grf_quantiles\" in the rand_forest call"
+    "text": "Predictions (trained using random forest)\n\n\n\n\n\n\nMAE\nMASE\nCoverage 80\n\n\n\n\n0.08\n226.43\n0.09\n\n\n\n\n\n\n\nRandom forests has really poor coverage here.\nThe reason is the way intervals are calculated.\nCan change engine to get better coverage:\n\nspecify parsnip::rand_forest(mode = \"regression\", engine = \"grf_quantiles\")"
   },
   {
     "objectID": "slides/lecture4.html#predictions-from-a-random-forest-with-grf_quantiles",
     "href": "slides/lecture4.html#predictions-from-a-random-forest-with-grf_quantiles",
     "title": "EpiData Workshop 2025",
-    "section": "Predictions from a random forest with grf_quantiles",
-    "text": "Predictions from a random forest with grf_quantiles\n\n\n\n        MAE     MASE  Coverage\n 0.08840922 296.4151 0.3979592"
+    "section": "Predictions from a random forest with grf_quantiles()",
+    "text": "Predictions from a random forest with grf_quantiles()\n\n\n\n\n\n\nMAE\nMASE\nCoverage 80\n\n\n\n\n0.09\n248.24\n0.39"
   },
   {
-    "objectID": "slides/lecture4.html#geo-pooling",
-    "href": "slides/lecture4.html#geo-pooling",
+    "objectID": "slides/lecture4.html#what-are-these-intervals",
+    "href": "slides/lecture4.html#what-are-these-intervals",
     "title": "EpiData Workshop 2025",
-    "section": "Geo-pooling",
-    "text": "Geo-pooling\n\nWhen we observe data over time from multiple locations (e.g. states or counties).\n\n\n\nWe could\n\nEstimate coefficients separately for each location (as we have done so far), or\nFit one model using all locations together at each time point (geo-pooling).\nEstimated coefficients will not be location specific.\n\n\n\n\nWe will now pool data from all US states to make predictions."
-  },
-  {
-    "objectID": "slides/lecture4.html#geo-pooling-1",
-    "href": "slides/lecture4.html#geo-pooling-1",
-    "title": "EpiData Workshop 2025",
-    "section": "Geo-pooling",
-    "text": "Geo-pooling\n\npred_arx_geo_pool &lt;- usa_archive_dv |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"deaths\", \"doctor_visits\"), \n                   args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))\n  )$predictions |&gt;\n    pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)\n\nNote: geo-pooling is the default in epipredict"
-  },
-  {
-    "objectID": "slides/lecture4.html#predictions-geo-pooling-h28",
-    "href": "slides/lecture4.html#predictions-geo-pooling-h28",
-    "title": "EpiData Workshop 2025",
-    "section": "Predictions (geo-pooling, \\(h=28\\))",
-    "text": "Predictions (geo-pooling, \\(h=28\\))\n\n\n\n         MAE     MASE  Coverage\nCA 0.1342220 450.0143 0.8673469\nMA 0.1200344 296.9929 0.8041237\nNY 0.1328566 327.4008 0.8556701\nTX 0.1601115 343.0498 0.8350515"
-  },
-  {
-    "objectID": "slides/lecture4.html#predict-without-geo-pooling",
-    "href": "slides/lecture4.html#predict-without-geo-pooling",
-    "title": "EpiData Workshop 2025",
-    "section": "Predict without geo-pooling",
-    "text": "Predict without geo-pooling\n\npred_arx_no_geo_pool &lt;- function(archive, ahead = 28, lags = 0){\n  archive |&gt;\n    epix_slide(\n      ~ group_by(.x, geo_value) |&gt; \n        group_map(.keep = TRUE, function(group_data, group_key) {\n          arx_forecaster(epi_data = group_data,\n                         outcome = \"deaths\", \n                         predictors = c(\"deaths\", \"doctor_visits\"), \n                         trainer = linear_reg() |&gt; set_engine(\"lm\"),\n                         args_list = arx_args_list(\n                           lags = lags,\n                           ahead = ahead,\n                           quantile_levels = c(0.1, 0.9))\n                         )$predictions |&gt;\n            pivot_quantiles_wider(.pred_distn)\n        }) |&gt;\n        list_rbind(),\n    .before = w, \n    .versions = fc_time_values\n    )}\n\npred_no_geo_pool_28 &lt;- pred_arx_no_geo_pool(usa_archive_dv$DT |&gt; \n                                              filter(geo_value %in% c(\"ca\", \"ma\", \"ny\", \"tx\")) |&gt; \n                                              as_epi_archive())"
-  },
-  {
-    "objectID": "slides/lecture4.html#predictions-without-geo-pooling-h28",
-    "href": "slides/lecture4.html#predictions-without-geo-pooling-h28",
-    "title": "EpiData Workshop 2025",
-    "section": "Predictions (without geo-pooling, \\(h=28\\))",
-    "text": "Predictions (without geo-pooling, \\(h=28\\))\n\n\n\n          MAE     MASE  Coverage\nCA 0.06040473 202.5227 0.5510204\nMA 0.33532528 823.3607 0.3367347\nNY 0.21072571 516.3337 0.5408163\nTX 0.14144058 306.2029 0.4285714"
-  },
-  {
-    "objectID": "slides/lecture4.html#geo-pooling-or-not",
-    "href": "slides/lecture4.html#geo-pooling-or-not",
-    "title": "EpiData Workshop 2025",
-    "section": "Geo-pooling or not?",
-    "text": "Geo-pooling or not?\n\nGeo-pooled predictions tend to be more stable\nGenerally with wider intervals (and better coverage)\nMeanwhile, predictions from state-wise models tend to be more volatile\n\nThe extent to which this occurs differs based on the horizon.\nPreviously we studied \\(h=28\\). What happens for \\(h=7\\)?"
-  },
-  {
-    "objectID": "slides/lecture4.html#predictions-geo-pooling-h-7",
-    "href": "slides/lecture4.html#predictions-geo-pooling-h-7",
-    "title": "EpiData Workshop 2025",
-    "section": "Predictions (geo-pooling, \\(h = 7\\))",
-    "text": "Predictions (geo-pooling, \\(h = 7\\))\n\n\n\n          MAE     MASE  Coverage\nCA 0.09676644 320.9851 0.9081633\nMA 0.09278403 234.9664 0.8350515\nNY 0.09029822 222.3488 0.9381443\nTX 0.11307616 239.1528 0.8659794"
-  },
-  {
-    "objectID": "slides/lecture4.html#predictions-without-geo-pooling-h7",
-    "href": "slides/lecture4.html#predictions-without-geo-pooling-h7",
-    "title": "EpiData Workshop 2025",
-    "section": "Predictions (without geo-pooling, \\(h=7\\))",
-    "text": "Predictions (without geo-pooling, \\(h=7\\))\n\n\n\n          MAE     MASE  Coverage\nCA 0.03971988 131.7553 0.6734694\nMA 0.06579422 168.3530 0.5714286\nNY 0.05005395 124.5359 0.6836735\nTX 0.05756194 122.0824 0.7040816"
-  },
-  {
-    "objectID": "slides/lecture4.html#what-are-these-arx-intervals",
-    "href": "slides/lecture4.html#what-are-these-arx-intervals",
-    "title": "EpiData Workshop 2025",
-    "section": "What are these ARX intervals?",
-    "text": "What are these ARX intervals?\n\n{epipredict} takes quantiles of training residuals to form its prediction intervals\nIn comparison to traditional (parametric) intervals from lm(), this is more flexible\nIt can in principle adapt to asymmetric or heavy-tailed error distributions\n\n\nTaking quantiles of training residuals can be problematic if the model is overfit.\n\nQuantile regression provides an alternative, wherein we estimate these quantiles directly\nTechnically, grf_quantiles was using Quantile Loss with Random Forests"
+    "section": "What are these intervals?",
+    "text": "What are these intervals?\n\n{epipredict} takes quantiles of training residuals to form its prediction intervals\nIn comparison to traditional (parametric) intervals from lm(), this is more flexible\nIt can in principle adapt to asymmetric or heavy-tailed error distributions\n\n\nTaking quantiles of training residuals can be problematic if the model is overfit.\n\nQuantile regression provides an alternative, wherein we estimate these quantiles directly\nTechnically, grf_quantiles() was using Quantile Loss with Random Forests"
   },
   {
     "objectID": "slides/lecture4.html#quantile-regression",
     "href": "slides/lecture4.html#quantile-regression",
     "title": "EpiData Workshop 2025",
     "section": "Quantile regression",
-    "text": "Quantile regression\nNow we directly target conditional quantiles of the outcome over time.\nEstimating tail quantiles requires more data, so\n\nunsuitable for settings with small training set (e.g. trailing window on one state)\ncan benefit by combination with geo-pooling (much more data to train on)\n\n\nlibrary(quantreg)\n\npred_qr_geo_pool &lt;- usa_archive_dv |&gt;\n  epix_slide(\n    ~ arx_forecaster(epi_data = .x,\n                     outcome = \"deaths\", \n                     predictors = c(\"deaths\", \"doctor_visits\"), \n                     trainer = quantile_reg(),\n                     args_list = arx_args_list(\n                       lags = 0, \n                       ahead = 28,\n                       quantile_levels = c(0.1, 0.9))\n                     )$predictions |&gt;\n        pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)"
+    "text": "Quantile regression\nNow we directly target conditional quantiles of the outcome over time.\nEstimating tail quantiles requires more data, so\n\nunsuitable for settings with small training set (e.g. trailing window on one state)\ncan benefit by combination with geo-pooling (much more data to train on)"
   },
   {
-    "objectID": "slides/lecture4.html#predictions-geo-pooling-quantile-regression-h28",
-    "href": "slides/lecture4.html#predictions-geo-pooling-quantile-regression-h28",
+    "objectID": "slides/lecture4.html#geo-pooling",
+    "href": "slides/lecture4.html#geo-pooling",
     "title": "EpiData Workshop 2025",
-    "section": "Predictions (geo-pooling + quantile regression, \\(h=28\\))",
-    "text": "Predictions (geo-pooling + quantile regression, \\(h=28\\))\n\n\n\n         MAE     MASE  Coverage\nCA 0.1447173 485.2027 0.8877551\nMA 0.1214715 300.5488 0.7216495\nNY 0.1384252 341.1235 0.7525773\nTX 0.1604103 343.6901 0.7835052"
+    "section": "Geo-pooling",
+    "text": "Geo-pooling\n\nWhen we observe data over time from multiple locations (e.g. states or counties).\n\n\n\nWe could\n\nEstimate coefficients separately for each location (as we have done so far), or\nFit one model using all locations together at each time point (geo-pooling).\nEstimated coefficients will not be location specific.\n\n\n\n\nWe will now pool data from all US states to make predictions.\nAlso switch to using (linear) quantile regression (medians and intervals) quantreg::rq()"
   },
   {
-    "objectID": "slides/lecture4.html#predictions-geo-pooling-linear-regression-h28",
-    "href": "slides/lecture4.html#predictions-geo-pooling-linear-regression-h28",
+    "objectID": "slides/lecture4.html#geo-pooling-1",
+    "href": "slides/lecture4.html#geo-pooling-1",
     "title": "EpiData Workshop 2025",
-    "section": "Predictions (geo-pooling + linear regression, \\(h=28\\))",
-    "text": "Predictions (geo-pooling + linear regression, \\(h=28\\))\n\n\n\n         MAE     MASE  Coverage\nCA 0.1342220 450.0143 0.8673469\nMA 0.1200344 296.9929 0.8041237\nNY 0.1328566 327.4008 0.8556701\nTX 0.1601115 343.0498 0.8350515"
+    "section": "Geo-pooling",
+    "text": "Geo-pooling\n\npred_arx_geo_pool &lt;- usa_archive_dv |&gt; epix_slide(\n  ~ arx_forecaster(epi_data = .x,\n                   outcome = \"deaths\", \n                   predictors = c(\"deaths\", \"doctor_visits\"), \n                   trainer = quantile_reg(),\n                   args_list = arx_args_list(ahead = 28, quantile_levels = c(0.1, 0.9))\n  ) |&gt; pluck(\"predictions\") |&gt; pivot_quantiles_wider(.pred_distn),\n  .before = w, \n  .versions = fc_time_values\n)\n\nNote: geo-pooling is the default in epipredict"
+  },
+  {
+    "objectID": "slides/lecture4.html#predictions-geo-pooling-h28",
+    "href": "slides/lecture4.html#predictions-geo-pooling-h28",
+    "title": "EpiData Workshop 2025",
+    "section": "Predictions (geo-pooling, \\(h=28\\))",
+    "text": "Predictions (geo-pooling, \\(h=28\\))"
+  },
+  {
+    "objectID": "slides/lecture4.html#geo-pooling-or-not",
+    "href": "slides/lecture4.html#geo-pooling-or-not",
+    "title": "EpiData Workshop 2025",
+    "section": "Geo-pooling or not?",
+    "text": "Geo-pooling or not?\n\nGeo-pooled predictions tend to be more stable\nGenerally with wider intervals (and better coverage)\nMeanwhile, predictions from state-specific models tend to be more volatile\n\nThe extent to which this occurs differs based on the horizon."
   },
   {
     "objectID": "slides/lecture4.html#build-a-forecaster-from-scratch-1",
@@ -336,74 +399,39 @@
     "text": "Build a forecaster from scratch\n\nSo far, we performed manual pre-processing,\nand then relied on a canned forecaster\nto automatically perform more pre-processing, training, predicting, and post-processing.\n\n\n\n\nWhat if we want more direct control on each single step?"
   },
   {
-    "objectID": "slides/lecture4.html#under-the-hood-of-arx_forecaster",
-    "href": "slides/lecture4.html#under-the-hood-of-arx_forecaster",
+    "objectID": "slides/lecture4.html#under-the-hood-of-arx_forecaster-roughly",
+    "href": "slides/lecture4.html#under-the-hood-of-arx_forecaster-roughly",
     "title": "EpiData Workshop 2025",
-    "section": "Under the hood of arx_forecaster()",
-    "text": "Under the hood of arx_forecaster()\n\n# A preprocessing \"recipe\" that turns raw data into features / response\nrec &lt;- epi_recipe(ca) |&gt;\n  step_epi_lag(cases, lag = c(0, 7, 14)) |&gt;\n  step_epi_lag(deaths, lag = c(0, 7, 14)) |&gt;\n  step_epi_ahead(deaths, ahead = 28) |&gt;\n  step_epi_naomit()\n\n# Training engine\neng &lt;- quantile_reg(quantile_levels = c(.1, .5, .9))\n\n# A post-processing routine describing what to do to the predictions\nfrost &lt;- frosting() |&gt;\n  layer_predict() |&gt;\n  layer_threshold(.pred, lower = 0) |&gt; # predictions / intervals should be non-negative\n  layer_add_target_date() |&gt;\n  layer_add_forecast_date()\n\n# Bundle up the preprocessor, training engine, and postprocessor\n# We use quantile regression\newf &lt;- epi_workflow(rec, eng, frost)\n\n# Fit it to data (we could fit this to ANY data that has the same format)\ntrained_ewf &lt;- fit(ewf, data = ca)\n\n# Make predictions from the end of our training data\n# we could have made predictions using the same model on ANY test data\nfcasts &lt;- forecast(trained_ewf)"
+    "section": "Under the hood of arx_forecaster() (roughly)",
+    "text": "Under the hood of arx_forecaster() (roughly)\n\n# A preprocessing \"recipe\" that turns raw data into features / response\nrec &lt;- epi_recipe(ca) |&gt;\n  step_epi_lag(cases, lag = c(0, 7, 14)) |&gt;\n  step_epi_lag(deaths, lag = c(0, 7, 14)) |&gt;\n  step_epi_ahead(deaths, ahead = 28) |&gt;\n  step_epi_naomit()\n\n# Training engine\neng &lt;- quantile_reg(quantile_levels = c(.1, .5, .9))\n\n# A post-processing routine describing what to do to the predictions\nfrost &lt;- frosting() |&gt;\n  layer_predict() |&gt;\n  layer_threshold(.pred, lower = 0) |&gt; # predictions / intervals should be non-negative\n  layer_add_target_date() |&gt;\n  layer_add_forecast_date()\n\n# Bundle up the preprocessor, training engine, and postprocessor\n# We use quantile regression\newf &lt;- epi_workflow(rec, eng, frost)\n\n# Fit it to data (we could fit this to ANY data that has the same format)\ntrained_ewf &lt;- fit(ewf, data = ca)\n\n# Make predictions from the end of our training data\n# we could have made predictions using the same model on ANY test data\nfcasts &lt;- forecast(trained_ewf)"
   },
   {
-    "objectID": "slides/lecture4.html#predicting-influenza-hospitalizations",
-    "href": "slides/lecture4.html#predicting-influenza-hospitalizations",
+    "objectID": "slides/lecture4.html#predicting-influenza-test-positivity",
+    "href": "slides/lecture4.html#predicting-influenza-test-positivity",
     "title": "EpiData Workshop 2025",
-    "section": "Predicting influenza hospitalizations",
-    "text": "Predicting influenza hospitalizations\n\nCurrent task: predict influenza hospitalizations for all states + DC + PR.\nForecasts submitted to CDC Flusight Forecast Hub\n\nSpecifically:\n\nFrom November 20, 2024 until May 31, 2025\nEvery Wednesday at 11pm EDT\nPredict 0, 1, 2, 3 epiweeks ahead\nPoint forecast + 23 quantiles\nResponse is NHSN Weekly Hospitalizations\n\nFrom here on, the emphasis is “how” to make these adjustments. Ran out of time to evaluate!"
+    "section": "Predicting influenza test positivity",
+    "text": "Predicting influenza test positivity\n\nPredict test positivity for 3 pathogens (flu, RSV, covid)\n6 regions (ON, BC, QC, Prairies, Atlantic, Territories) + National\nWorked with UGuelph to build AI4Casting Hub\n\n\n\nFrom November 25, 2024 until May 31, 2025\nEvery Saturday by 11pm EDT\nPredict -1, 0, 1, 2, 3 epiweeks ahead\nPoint forecast + 7 quantiles\nResponse is RVDSS % Test Positivity from PHAC\n\n\n\nThanks to Christine Chuong (UBC MSc Student)\nBuilt and ran this forecaster\nScraped RVDSS data, updates every week: https://github.com/dajmcdon/rvdss-canada/"
   },
   {
-    "objectID": "slides/lecture4.html#aside-data-issues",
-    "href": "slides/lecture4.html#aside-data-issues",
+    "objectID": "slides/lecture4.html#almost-our-production-forecaster",
+    "href": "slides/lecture4.html#almost-our-production-forecaster",
     "title": "EpiData Workshop 2025",
-    "section": "Aside: data issues",
-    "text": "Aside: data issues\n\nHospital reporting was down for a period over the summer.\nThe current data doesn’t seem to match the historical data very well."
+    "section": "Almost our production forecaster",
+    "text": "Almost our production forecaster\n\nprod_forecaster &lt;- function(epidata, ahead) {\n  Logit &lt;- function(x, a = 0.01) log((x + a) / (1 - x + a))\n  Sigmd &lt;- function(y, a = 0.01) (exp(y) * (1 + a) - a) / (1 + exp(y))\n\n  quantile_levels &lt;- c(0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975)\n  forecast_date &lt;- attr(epidata, \"metadata\")$as_of\n  target_date &lt;- forecast_date + ahead - 7\n  r &lt;- epi_recipe(epidata) |&gt;\n    step_adjust_latency(recipes::all_outcomes(), fixed_forecast_date = forecast_date, method = \"extend_ahead\") |&gt;\n    recipes::step_mutate(flu_pct_positive =  Logit(flu_pct_positive / 100)) |&gt;\n    step_epi_lag(flu_pct_positive, lag = c(0, 7, 14)) |&gt;\n    step_epi_ahead(flu_pct_positive, ahead = ahead) |&gt;\n    step_climate(flu_pct_positive, forecast_ahead = ahead / 7, time_type = \"epiweek\", window_size = 3L) |&gt;\n    step_training_window(n_recent = 12) |&gt;\n    step_epi_naomit()\n  \n  e &lt;- quantile_reg(quantile_levels = c(0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975))\n  f &lt;- frosting() |&gt; layer_predict() |&gt; \n    layer_quantile_distn(quantile_levels = quantile_levels) %&gt;% \n    layer_point_from_distn() |&gt;\n    layer_add_forecast_date(forecast_date = forecast_date) |&gt;\n    layer_add_target_date()\n  \n  ewf &lt;- epi_workflow(r, e, f)\n  trained_ewf &lt;- ewf |&gt; fit(epidata)\n  \n  preds &lt;- forecast(trained_ewf) |&gt;\n    pivot_quantiles_wider(.pred_distn) |&gt;\n    mutate(across(c(.pred, `0.025`:`0.975`), ~ Sigmd(.x) * 100)) |&gt;\n    select(-time_value)\n\n  preds\n}"
   },
   {
-    "objectID": "slides/lecture4.html#we-dont-know-if-we-trust-the-data-yet-enough",
-    "href": "slides/lecture4.html#we-dont-know-if-we-trust-the-data-yet-enough",
+    "objectID": "slides/lecture4.html#make-the-forecasts-for-all-dates-this-season",
+    "href": "slides/lecture4.html#make-the-forecasts-for-all-dates-this-season",
     "title": "EpiData Workshop 2025",
-    "section": "We don’t know if we trust the data yet enough",
-    "text": "We don’t know if we trust the data yet enough\n\nIt may get revised significantly\nLet’s do something super simple, until we’re more confident\n\n\nClimatological forecaster\n\nFor a given epiweek, predict the historical quantiles\n\n\nMake adjustments to address the fact that we have some new data\n\n\nPrivledge the history\n\n\nThink like the weather: “what is the typical weather in February in Georgia, that’s our forecast”"
-  },
-  {
-    "objectID": "slides/lecture4.html#climatological-forecaster",
-    "href": "slides/lecture4.html#climatological-forecaster",
-    "title": "EpiData Workshop 2025",
-    "section": "Climatological forecaster",
-    "text": "Climatological forecaster\n\nclimatological_model &lt;- function(epi_data, forecast_date, ahead, window_size = 3, geo_agg = FALSE) {\n  forecast_week &lt;- epiweek(forecast_date)\n  last_date_data &lt;- max(epi_data$time_value)\n  probs &lt;- c(.1, .5, .9)\n  filtered &lt;- epi_data |&gt; \n    filter(\n      (season != \"2020/21\") & (season != \"2021/22\"), # drop weird years\n      # keep data either within the window, or within the past window weeks\n      (abs(forecast_week + ahead - epiweek) &lt;= window_size) |\n        (last_date_data - time_value &lt;= window_size * 7)\n    )\n  if (geo_agg) {\n    filtered &lt;- filtered |&gt;\n      left_join(state_census |&gt; select(geo_value = abbr, pop), by = \"geo_value\") |&gt;\n      mutate(nhsn = nhsn / pop * 1e5) %&gt;%\n      select(geo_value, epiweek, epiyear, season, season_week, nhsn, pop)\n  } else {\n    filtered &lt;- filtered |&gt; group_by(geo_value)\n  }\n  naive_preds &lt;- filtered |&gt; reframe(enframe(\n    quantile(nhsn, probs = probs, na.rm = TRUE, type = 8), name = \"quantile\"\n  )) |&gt;\n    mutate(\n      forecast_date = forecast_date,\n      target_end_date = forecast_date + ahead * 7,\n      quantile = as.numeric(sub(\"%\", \"\", quantile)) / 100,\n      value = pmax(0, value)\n    )\n  if (geo_agg) {\n    naive_preds &lt;- naive_preds |&gt;\n      expand_grid(filtered |&gt; distinct(geo_value, pop)) |&gt;\n      mutate(value = value * pop / 1e5) |&gt;\n      select(-pop) |&gt;\n      select(geo_value, forecast_date, target_end_date, quantile, value) |&gt;\n      arrange(geo_value, forecast_date, target_end_date)\n  }\n  naive_preds |&gt; ungroup() |&gt; mutate(value = pmax(0, value))\n}"
-  },
-  {
-    "objectID": "slides/lecture4.html#climate-predictions-for-this-week",
-    "href": "slides/lecture4.html#climate-predictions-for-this-week",
-    "title": "EpiData Workshop 2025",
-    "section": "Climate predictions for this week",
-    "text": "Climate predictions for this week"
-  },
-  {
-    "objectID": "slides/lecture4.html#almost-our-production-forecaster-data-munging",
-    "href": "slides/lecture4.html#almost-our-production-forecaster-data-munging",
-    "title": "EpiData Workshop 2025",
-    "section": "Almost our production forecaster (data munging)",
-    "text": "Almost our production forecaster (data munging)\n\nclimate &lt;- climatological_feature(climate_data |&gt; select(nhsn, epiweek, season, geo_value))\nnssp &lt;- pub_covidcast( # time_value is first day of the epiweek\n  source = \"nssp\",\n  signal = \"pct_ed_visits_influenza\",\n  time_type = \"week\",\n  geo_type = \"state\",\n  geo_values = \"*\"\n) |&gt;\n  select(geo_value, time_value, nssp = value)\n\nflu_data &lt;- hhs_v_nhsn |&gt;\n  select(time_value, geo_value, hhs = new_source) |&gt;\n  left_join(nssp |&gt; mutate(time_value = time_value + 6), by = join_by(geo_value, time_value))\n\nn_geos &lt;- n_distinct(flu_data$geo_value)\nmax_time_value &lt;- max(flu_data$time_value)\nempty_data &lt;- tibble(\n  time_value = rep(max_time_value + days(1:3 * 7), each = n_geos),\n  geo_value = rep(unique(flu_data$geo_value), times = 3),\n  nssp = NA, hhs = NA\n)\n\nflu_data &lt;- flu_data |&gt;\n  filter(month(time_value) %in% 8:12, year(time_value) %nin% c(2020, 2021)) |&gt;\n  add_row(empty_data) |&gt;\n  mutate(epiweek = epiweek(time_value)) |&gt;\n  left_join(climate, by = join_by(geo_value, epiweek)) |&gt;\n  select(!epiweek) |&gt;\n  filter(geo_value %nin% c(\"as\", \"vi\", \"gu\", \"mp\", \"usa\")) |&gt;\n  arrange(geo_value, time_value) |&gt;\n  as_epi_df()"
-  },
-  {
-    "objectID": "slides/lecture4.html#almost-our-production-forecaster-workflow",
-    "href": "slides/lecture4.html#almost-our-production-forecaster-workflow",
-    "title": "EpiData Workshop 2025",
-    "section": "Almost our production forecaster (workflow)",
-    "text": "Almost our production forecaster (workflow)\n\nr &lt;- epi_recipe(flu_data) |&gt;\n  step_population_scaling(\n    hhs, nssp,\n    df = epidatasets::state_census,\n    df_pop_col = \"pop\",\n    create_new = FALSE,\n    rate_rescaling = 1e5,\n    by = c(\"geo_value\" = \"abbr\")) |&gt;\n  recipes::step_mutate(hhs = hhs^(1/4), nssp = nssp^(1/4), climate_pred = climate_pred^(1/4)) |&gt;\n  step_epi_lag(hhs, lag = c(0, 7, 14)) |&gt;\n  step_epi_lag(nssp, lag = c(0, 7, 14)) |&gt;\n  step_epi_ahead(hhs, ahead = 21) |&gt;\n  step_epi_ahead(climate_pred, ahead = 21, role = \"predictor\") |&gt;\n  step_epi_naomit()\n\ne &lt;- quantile_reg(quantile_levels = c(0.1, 0.25, 0.5, 0.75, 0.9)) \n\nf &lt;- frosting() |&gt;\n  layer_predict() |&gt;\n  layer_threshold(.pred, lower = 0)\newf &lt;- epi_workflow(r, e, f)\ntrained_ewf &lt;- ewf |&gt; fit(flu_data)\n\npreds &lt;- forecast(trained_ewf) |&gt;\n  left_join(epidatasets::state_census |&gt; select(pop, abbr), join_by(geo_value == abbr)) |&gt;\n  mutate(\n    .pred = .pred^4 * pop / 1e5,\n    forecast_date = time_value + days(7),\n    target_date = forecast_date + days(14),\n    time_value = NULL,\n    pop = NULL\n  )"
-  },
-  {
-    "objectID": "slides/lecture4.html#plot-our-forecasts",
-    "href": "slides/lecture4.html#plot-our-forecasts",
-    "title": "EpiData Workshop 2025",
-    "section": "Plot our forecasts",
-    "text": "Plot our forecasts"
+    "section": "Make the forecasts for all dates this season",
+    "text": "Make the forecasts for all dates this season\n\naheads &lt;- 1:4 * 7\nfcast_dates &lt;- seq(ymd(\"2024-11-23\"), ymd(\"2025-04-12\"), by = \"1 week\")\nrvdss_forecasts &lt;- function(archive, .ahead) {\n  epix_slide(archive, ~ prod_forecaster(.x, .ahead), .versions = fcast_dates)\n}\nall_forecasts &lt;- bind_rows(map(aheads, ~ rvdss_forecasts(rvdss_data, .ahead = .x)))"
   },
   {
     "objectID": "slides/lecture4.html#ensembling",
     "href": "slides/lecture4.html#ensembling",
     "title": "EpiData Workshop 2025",
     "section": "Ensembling",
-    "text": "Ensembling\nInstead of choosing one model, we can combine the predictions from multiple base models. Ensemble types:\n\nuntrained: combine base models, agnostic to past performance\ntrained: weight base models, accounting for past performance\n\nSimplest untrained method: simple average of base model forecasts\n\\[\n\\hat{y}^{\\text{avg}}_{t+h|t} = \\frac{1}{p} \\sum_{j=1}^p \\hat{y}^j_{t+h|t}\n\\]\nA more robust option: simple median of base model forecasts\n\\[\n\\hat{y}^{\\text{med}}_{t+h|t} = \\mathrm{median}\\Big\\{ \\hat{y}^j_{t+h|t} : j = 1,\\dots,p \\Big\\}\n\\]"
+    "text": "Ensembling\nInstead of choosing one model, we can combine the predictions from multiple base models.\n\nuntrained: combine base models, agnostic to past performance\ntrained: weight base models, accounting for past performance\n\nSimplest untrained method: simple average of base model forecasts\n\\[\n\\hat{y}^{\\text{avg}}_{t+h|t} = \\frac{1}{p} \\sum_{j=1}^p \\hat{y}^j_{t+h|t}\n\\]\nA more robust option: simple median of base model forecasts\n\\[\n\\hat{y}^{\\text{med}}_{t+h|t} = \\mathrm{median}\\Big\\{ \\hat{y}^j_{t+h|t} : j = 1,\\dots,p \\Big\\}\n\\]"
   },
   {
     "objectID": "slides/lecture4.html#example-from-the-covid-19-forecast-hub",
@@ -417,42 +445,35 @@
     "href": "slides/lecture4.html#two-key-goals-of-ensembling",
     "title": "EpiData Workshop 2025",
     "section": "Two key goals of ensembling",
-    "text": "Two key goals of ensembling\n1 Compete-with-best: ensemble should have accuracy competitive with best individual constituent model\n\nRobustness-over-all: ensemble should have greater robustness than any individual constituent model\n\nTypically these are hard to accomplish simultaneously, and untrained methods excel at point 2, whereas trained methods can achieve point 1"
+    "text": "Two key goals of ensembling\n\n1. Compete-with-best:\nensemble should have accuracy competitive with best individual constituent model\n\n2. Robustness-over-all:\nensemble should have greater robustness than any individual constituent model\n\n\nTypically these are hard to accomplish simultaneously,\n\nuntrained methods excel at point 2,\ntrained methods can achieve point 1"
   },
   {
-    "objectID": "slides/lecture4.html#linear-stacking",
-    "href": "slides/lecture4.html#linear-stacking",
+    "objectID": "slides/lecture4.html#linear-stacking-trained-ensemble",
+    "href": "slides/lecture4.html#linear-stacking-trained-ensemble",
     "title": "EpiData Workshop 2025",
-    "section": "Linear stacking",
-    "text": "Linear stacking\nOne of the simplest trained ensemble methods is to directly fit a weighted combination of base forecasts to optimize accuracy (MSE, MAE, etc.), often called linear stacking: e.g., to form the forecast at time \\(t\\), we solve\n\\[\\begin{alignat*}{2}\n&\\min_{w \\in \\R^p} && \\hspace{-6pt} \\sum_{s=t_0+1}^t \\bigg( y_s - \\sum_{j=1}^p\nw_j \\cdot \\hat{y}^j_{s|s-h} \\bigg)^2 \\\\   \n&\\st \\quad && \\sum_{j=1}^p w_j = 1, \\;\\;\\text{and} \\;\\; w_j \\geq 0, \\;\nj=1,\\dots,p   \n\\end{alignat*}\\]\nthen use\n\\[\n\\hat{y}^{\\text{stack}}_{t+h|t} = \\sum_{j=1}^p \\hat{w}^t_j \\cdot\n\\hat{y}^j_{t+h|t}\n\\]\nNote that the stacking optimization problem uses forward-looking predictions (as in time series cross-validation)"
+    "section": "Linear stacking (trained ensemble)",
+    "text": "Linear stacking (trained ensemble)\n\ndirectly fit a weighted combination of base forecasts to optimize accuracy (MSE, MAE, etc.),\noften called linear stacking: e.g., to form the forecast at time \\(t\\), we solve\n\n\\[\n\\begin{aligned}\n&\\mathop{\\mathrm{minimize}}_{w \\in \\mathbb{R}^p} \\sum_{s=t_0+1}^t \\bigg( y_s - \\sum_{j=1}^p\nw_j \\cdot \\hat{y}^j_{s|s-h} \\bigg)^2 \\\\   \n&\\text{subject to} \\quad \\sum_{j=1}^p w_j = 1, \\;\\;\\text{and} \\;\\; w_j \\geq 0, \\;\nj=1,\\dots,p\n\\end{aligned}\n\\]\nthen use\n\\[\n\\hat{y}^{\\text{stack}}_{t+h|t} = \\sum_{j=1}^p \\hat{w}^t_j \\cdot\n\\hat{y}^j_{t+h|t}\n\\]\n\nThe stacking optimization problem uses forward-looking predictions\n(as in time series cross-validation)"
   },
   {
     "objectID": "slides/lecture4.html#recalibration",
     "href": "slides/lecture4.html#recalibration",
     "title": "EpiData Workshop 2025",
     "section": "Recalibration",
-    "text": "Recalibration\n\nWe have seen that prediction intervals often have empirical coverage &lt;&lt; nominal coverage, e.g., our 80% predictive intervals in practice cover \\(\\approx\\) 60% of the time\nRecalibration methods aim at adjusting the intervals so that nominal coverage \\(\\approx\\) empirical coverage"
+    "text": "Recalibration\n\nPrediction intervals often have empirical coverage \\(\\ll\\) nominal coverage\n\ne.g., our 80% predictive intervals in practice cover \\(\\approx\\) 60% of the time\n\n\nRecalibration methods adjust the intervals so that\n\nnominal coverage \\(\\approx\\) empirical coverage"
   },
   {
     "objectID": "slides/lecture4.html#quantile-tracking",
     "href": "slides/lecture4.html#quantile-tracking",
     "title": "EpiData Workshop 2025",
     "section": "Quantile tracking",
-    "text": "Quantile tracking\nQuantile tracking is a method for producing calibrated prediction intervals from base forecasts and scores. In the simplest case, we can take the score to be absolute error of point forecasts:\n\\[e_t = |y_t - \\hat y_{t|t-1}|\\]\n\nLet \\(\\hat q_{t}^{1-\\alpha}\\) be a predicted level \\(1-\\alpha\\) quantile of the distribution of \\(e_t\\)\nDefine \\(I_{t|t-1}^{1-\\alpha} = [\\hat{y}_{t|t-1} - \\hat{q}_t^{1-\\alpha}, \\;     \\hat{y}_{t|t-1} + \\hat{q}_t^{1-\\alpha}]\\). Note that\n\\[\n  e_t \\leq \\hat{q}_t^{1-\\alpha} \\iff y_t \\in I_{t|t-1}^{1-\\alpha}\n  \\]\nTherefore we the reduced the problem of producing prediction intervals \\(I_{t|t-1}^{1-\\alpha}\\) to one of tracking a quantile of \\(e_t\\)"
+    "text": "Quantile tracking\nProduces calibrated prediction intervals from base forecasts and scores.\nIn the simplest case, we can take the score to be absolute error of point forecasts:\n\\[e_t = |y_t - \\hat y_{t|t-1}|\\]\n\nLet \\(\\hat q_{t}^{1-\\alpha}\\) be a predicted level \\(1-\\alpha\\) quantile of the distribution of \\(e_t\\)\nDefine \\(I_{t|t-1}^{1-\\alpha} = [\\hat{y}_{t|t-1} - \\hat{q}_t^{1-\\alpha}, \\;     \\hat{y}_{t|t-1} + \\hat{q}_t^{1-\\alpha}]\\).\nNote that \\(e_t \\leq \\hat{q}_t^{1-\\alpha} \\iff y_t \\in I_{t|t-1}^{1-\\alpha}\\)\nTherefore we the reduced the problem of producing prediction intervals \\(I_{t|t-1}^{1-\\alpha}\\) to one of tracking a quantile of \\(e_t\\)"
   },
   {
     "objectID": "slides/lecture4.html#quantile-updates",
     "href": "slides/lecture4.html#quantile-updates",
     "title": "EpiData Workshop 2025",
     "section": "Quantile updates",
-    "text": "Quantile updates\nWe begin with some estimate \\(\\hat{q}_{t_0+1}^{1-\\alpha}\\) based on a burn-in set. Then repeat the following updates as \\(t\\) increases, for a step size \\(\\eta &gt; 0\\):\n\\[\\hat q_{t+1}^{1-\\alpha} = \\begin{cases}\n\\hat q_{t}^{1-\\alpha} + \\eta(1-\\alpha) \\quad \\text{if } y_t\\notin I_{t|t-1}^{1-\\alpha} \\\\\n\\hat q_{t}^{1-\\alpha} - \\eta\\alpha \\quad \\quad \\quad \\,\\,\\, \\text{if } y_t\\in I_{t|t-1}^{1-\\alpha}\n\\end{cases}\\]\nIn words:\n\nif the latest interval does not cover, then we increase the quantile (make the next interval wider),\notherwise we decrease the quantile by (make the next interval narrower).\n\nThis method has the following guarantee:\n\\[\n\\Bigg| \\frac{1}{T} \\sum_{t=t_0+1}^{t_0+T} 1 \\big\\{ y_t \\in I_{t|t-1}^{1-\\alpha} \\big\\} - (1-\\alpha) \\Bigg| \\leq \\frac{b/\\eta + 1}{T}\n\\]\nwhere \\(b\\) is a bound on the errors (largest error possible/observable)."
-  },
-  {
-    "objectID": "slides/lecture4.html#multi-horizon-smoothing",
-    "href": "slides/lecture4.html#multi-horizon-smoothing",
-    "title": "EpiData Workshop 2025",
-    "section": "Multi-horizon smoothing",
-    "text": "Multi-horizon smoothing"
+    "text": "Quantile updates\n\nbegin with some estimate \\(\\hat{q}_{t_0+1}^{1-\\alpha}\\) based on a burn-in set.\nThen, for a step size \\(\\eta &gt; 0\\), repeat the following updates as \\(t\\) increases:\n\n\\[\\hat q_{t+1}^{1-\\alpha} = \\begin{cases}\n\\hat q_{t}^{1-\\alpha} + \\eta(1-\\alpha) \\quad \\text{if } y_t\\notin I_{t|t-1}^{1-\\alpha} \\\\\n\\hat q_{t}^{1-\\alpha} - \\eta\\alpha \\quad \\quad \\quad \\,\\,\\, \\text{if } y_t\\in I_{t|t-1}^{1-\\alpha}\n\\end{cases}\\]\nIn words:\n\nif the latest interval does not cover, then we increase the quantile (make the next interval wider),\notherwise we decrease the quantile by (make the next interval narrower).\n\n\nThis method has the following guarantee:\n\\[\n\\Bigg| \\frac{1}{T} \\sum_{t=t_0+1}^{t_0+T} 1 \\big\\{ y_t \\in I_{t|t-1}^{1-\\alpha} \\big\\} - (1-\\alpha) \\Bigg| \\leq \\frac{b/\\eta + 1}{T}\n\\]\nwhere \\(b\\) is a bound on the errors (largest error possible/observable)."
   },
   {
     "objectID": "slides/lecture2.html#outline",
@@ -756,11 +777,53 @@
     "text": "Aside on nowcasting\n\nTo many Epis, nowcasting means estimate the instantaneous reproduction number, \\(R_t\\)\nExample: Reported COVID-19 cases in British Columbia (Jan. 2020 – Apr. 2023)\n\n\n\nMore after lunch…"
   },
   {
+    "objectID": "worksheet/index.html",
+    "href": "worksheet/index.html",
+    "title": "Processing and Forecasting with Epidemic Surveillance Data",
+    "section": "",
+    "text": "The goal of this worksheet is to practice some of the techniques discussed during the lectures. The plan is to take a “phased” approach, with 15-30 minutes of work after each of the four lectures. But the idea is to roughly continue on the same problem."
+  },
+  {
+    "objectID": "worksheet/index.html#computer-setup",
+    "href": "worksheet/index.html#computer-setup",
+    "title": "Processing and Forecasting with Epidemic Surveillance Data",
+    "section": "Computer setup",
+    "text": "Computer setup\nThe following are packages needed for this worksheet. With luck, you would need only a few more (perhaps none!) to build all the slides in this workshop. But I make no guarantees.\n\ninstall.packages(\"remotes\")\ninstall.packages(\"tidyverse\")\ninstall.packages(\"tidymodels\")\ninstall.packages(\"glmnet\")\nremotes::install_github(\"cmu-delphi/epidatr\")\nremotes::install_github(\"cmu-delphi/epidatasets\")\nremotes::install_github(\"cmu-delphi/epiprocess@dev\")\nremotes::install_github(\"cmu-delphi/epipredict@dev\")\nremotes::install_github(\"dajmcdon/rtestim\")\n\nNote that both {epiprocess} and {epipredict} are set to install from the development branch rather than from the main branch. So this is the most up-to-date version, but it is also potentially unstable.\nThe best place for package documentation is typically the website rather than the R help files. So some useful links are here:\n\nhttps://cmu-delphi.github.io/epidatr\nhttps://cmu-delphi.github.io/epiprocess\nhttps://cmu-delphi.github.io/epipredict\nhttps://tidyverse.org\nhttps://tidymodels.org\nhttps://dajmcdon.github.io/rtestim"
+  },
+  {
+    "objectID": "worksheet/index.html#lecture-1-introduction-to-panel-data-in-epidemiology",
+    "href": "worksheet/index.html#lecture-1-introduction-to-panel-data-in-epidemiology",
+    "title": "Processing and Forecasting with Epidemic Surveillance Data",
+    "section": "Lecture 1: Introduction to Panel Data in Epidemiology",
+    "text": "Lecture 1: Introduction to Panel Data in Epidemiology\nLet’s examine two different sources of versioned panel data.\n\nSource 1: Respiratory Virus Detection Surveillance System\nNavigate to the Dashboard maintained by the Public Health Agency of Canada: https://health-infobase.canada.ca/respiratory-virus-detections/. Let’s focus on Figure 4.\n\nWhen was it last updated?\nWhat is the reference date for the most recent data?\nWhat geographic regions are available for different data streams?\nAre the revisions tracked?\n\n\n\nSource 2: Delphi Epi Portal\n\nBrowse the table.\nWhat sorts of signals are available?\nFor what regions?\nSelect a signal with at least state-level geographic coverage that is “Ongoing” (For example, “Covid-Related Doctor Visits”)\nAre revisions tracked?\nWhat sort of latency does it have?\n\n\n\nExtra credit\n\nDownload this season’s RVDSS data. This is most easily done by following the instructions at https://github.com/dajmcdon/rvdss-canada. (My team scrapes the data weekly. Just use the R code at the bottom of the README to “Read in data for a single season”)\nDownload the signal from the Delphi Epidata API that you chose above using {epidatr}.\nExplore and examine both signals using graphics or summary statistics."
+  },
+  {
+    "objectID": "worksheet/index.html#lecture-2-data-cleaning-versioning-and-nowcasting",
+    "href": "worksheet/index.html#lecture-2-data-cleaning-versioning-and-nowcasting",
+    "title": "Processing and Forecasting with Epidemic Surveillance Data",
+    "section": "Lecture 2: Data Cleaning, Versioning, and Nowcasting",
+    "text": "Lecture 2: Data Cleaning, Versioning, and Nowcasting\n\nIf you didn’t get a chance earlier, download this season’s RVDSS data.\nFilter to only those rows with geo_type != \"province\". (This is a bit of a misnomer, we’re keeping some provinces and some regions.)\nConvert it to an epi_archive with as_epi_archive().\nExamine the revision behaviour for one of the signals. The best way is with a plot. (Unfortunately, revision_summary() won’t work for the moment.)\nIs there much backfill? Latency?\nUse epix_as_of_current() to get the most recent snapshot.\nLet’s look at just flu_pct_positive. Calculate the average correlation across geographies at lag 7 and lag 14.\nCalculate the correlation between flu_pct_positive and sarscov2_pct_positive over time and plot the result.\n\nIf there’s still time, try to calculate the growth rate for flu_pct_positive."
+  },
+  {
+    "objectID": "worksheet/index.html#lecture-3",
+    "href": "worksheet/index.html#lecture-3",
+    "title": "Processing and Forecasting with Epidemic Surveillance Data",
+    "section": "Lecture 3:",
+    "text": "Lecture 3:\nHere’s a modified version of the SIR simulation function that returns only the new infections:\n\nsim_SIR &lt;- function(TT, N = 1000, beta = .1, gamma = .01) {\n  S &lt;- double(TT)\n  I &lt;- double(TT)\n  R &lt;- double(TT)\n  S[1] &lt;- N - 1\n  I[1] &lt;- 1\n  i &lt;- double(TT)\n  i[1] &lt;- 1\n  for (tt in 2:TT) {\n    contagions &lt;- rbinom(1, size = S[tt - 1], prob = beta * I[tt - 1] / N)\n    removals &lt;- rbinom(1, size = I[tt - 1], prob = gamma)\n    S[tt] &lt;- S[tt - 1] - contagions\n    I[tt] &lt;- I[tt - 1] + contagions - removals\n    R[tt] &lt;- R[tt - 1] + removals\n    i[tt] &lt;- contagions\n  }\n  tibble(infections = i, time = seq(TT))\n}\n\n\nContinuing with the RVDSS data (most recent snapshot), make a plot of flu_positive_tests for your favourite region.\nAdjust the parameters N, beta, and gamma to calibrate an SIR model that fits the data closely.\nUse {rtestim} to estimate \\(R_t\\) for your favourite region."
+  },
+  {
+    "objectID": "worksheet/index.html#lecture-4-forecasting-and-advanced-topics",
+    "href": "worksheet/index.html#lecture-4-forecasting-and-advanced-topics",
+    "title": "Processing and Forecasting with Epidemic Surveillance Data",
+    "section": "Lecture 4: Forecasting and Advanced Topics",
+    "text": "Lecture 4: Forecasting and Advanced Topics\n\nContinuing with the RVDSS data (most recent snapshot), use arx_forecaster() to produce forecasts 1, 2, and 3 weeks after of the most recent data for flu_pct_positive.\nYou can plot them as follows (for example):\n\n\nh1 &lt;- arx_forecaster(rvdss, ..., args_list = arx_args_list(ahead = 7))\nautoplot(h1)\n\n\nAdjust the arguments however you like. You can add other predictors, adjust lags, change forecasting engines, etc.\n\nIf you have time, try “Building a forecaster from scratch” this is more difficult to plot, but you can borrow the code from the lecture slides."
+  },
+  {
     "objectID": "index.html#schedule",
     "href": "index.html#schedule",
     "title": "EpiData Workshop 2025",
     "section": "Schedule",
-    "text": "Schedule\nIn this workshop, we plan to demonstrate how to use R to load, process, inspect, and forecast aggregate epi surveillance data. We will be presenting a few case studies to motivate the entire pipeline from signal discovery to the production of nowcasts and forecasts.\n\nLecture 1: Introduction to Panel Data\nLecture 2: Data Cleaning, Versioning, and Nowcasting\nLecture 3: Compartmental Models, Renewal Equations, and \\(R_t\\) Estimation\nLecture 4: Forecasting and Advanced Topics"
+    "text": "Schedule\nIn this workshop, we plan to demonstrate how to use R to load, process, inspect, and forecast aggregate epi surveillance data. We will be presenting a few case studies to motivate the entire pipeline from signal discovery to the production of nowcasts and forecasts.\n\nLecture 1: Introduction to Panel Data\nLecture 2: Data Cleaning, Versioning, and Nowcasting\nLecture 3: Compartmental Models, Renewal Equations, and \\(R_t\\) Estimation\nLecture 4: Forecasting and Advanced Topics\n\nWorksheet"
   },
   {
     "objectID": "index.html#contributors-and-collaborators",
@@ -844,7 +907,7 @@
     "href": "slides/lecture1.html#system-setup",
     "title": "EpiData Workshop 2025",
     "section": "System setup",
-    "text": "System setup"
+    "text": "System setup\n\ninstall.packages(\"remotes\")\ninstall.packages(\"tidyverse\")\ninstall.packages(\"tidymodels\")\ninstall.packages(\"glmnet\")\nremotes::install_github(\"cmu-delphi/epidatr\")\nremotes::install_github(\"cmu-delphi/epidatasets\")\nremotes::install_github(\"cmu-delphi/epiprocess@dev\")\nremotes::install_github(\"cmu-delphi/epipredict@dev\")\nremotes::install_github(\"dajmcdon/rtestim\")\n\n\nLet’s take a few moments here.\nYou may also navigate to the GitHub repo and Clone/Fork the entire thing."
   },
   {
     "objectID": "slides/lecture1.html#panel-data-1",
@@ -1166,7 +1229,7 @@
     "href": "slides/lecture3.html#r_0-basic-reproduction-number",
     "title": "EpiData Workshop 2025",
     "section": "\\(R_0\\) basic reproduction number",
-    "text": "\\(R_0\\) basic reproduction number\nDates at least to Alfred Lotka (1920s) and others (Feller, Blackwell, etc.)\n\n\nThe expected number of secondary infections due to a primary infection\n\n\n\n\n\n\\(R_0 &lt; 1\\) ⟹ the epidemic will die out\n\n\n\n\\(R_0 &gt; 1\\) ⟹ the epidemic will grow until everyone is infected\n\n\n\n\n\n\n\n\n\n\n\n\nSource: Katelyn Jetelina, “YLE Newsletter,” 17 March 2025."
+    "text": "\\(R_0\\) basic reproduction number\nDates at least to Alfred Lotka (1920s) and others (Feller, Blackwell, etc.)\n\n\nThe expected number of secondary infections due to a primary infection\n\n\n\n\n\n\\(R_0 &lt; 1\\) ⟹ the epidemic will die out\n\n\n\n\\(R_0 &gt; 1\\) ⟹ the epidemic will grow until everyone is infected\n\n\n\n\n\n\n\n\n\n\n\n\nSource: Katelyn Jetelina, “YLE Newsletter,” 21 April 2025."
   },
   {
     "objectID": "slides/lecture3.html#r_0-is-entirely-retrospective",

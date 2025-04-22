@@ -6,8 +6,8 @@
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
 <link href="../site_libs/quarto-html/light-border.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-29e2c20b02301cfff04dc8050bf30c7e.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
-  <meta name="generator" content="quarto-1.6.37">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.6.43">
 
   <meta name="author" content="Daniel J. McDonald">
   <title>EpiData Workshop 2025 – Introduction to Panel Data in Epidemiology</title>
@@ -94,7 +94,7 @@
     code span.vs { color: #20794d; } /* VerbatimString */
     code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
   </style>
-  <link rel="stylesheet" href="../site_libs/revealjs/dist/theme/quarto-b8a16dd1ea485d482d1e73e94a668830.css">
+  <link rel="stylesheet" href="../site_libs/revealjs/dist/theme/quarto-fc99552cc43c2d3fb0244857cdbcd2ac.css">
   <link rel="stylesheet" href="tachyons-minimal.css">
   <link href="../site_libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
   <link href="../site_libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
@@ -309,7 +309,23 @@
 </section>
 <section id="system-setup" class="slide level2">
 <h2>System setup</h2>
-</section></section>
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">install.packages</span>(<span class="st">"remotes"</span>)</span>
+<span id="cb1-2"><a></a><span class="fu">install.packages</span>(<span class="st">"tidyverse"</span>)</span>
+<span id="cb1-3"><a></a><span class="fu">install.packages</span>(<span class="st">"tidymodels"</span>)</span>
+<span id="cb1-4"><a></a><span class="fu">install.packages</span>(<span class="st">"glmnet"</span>)</span>
+<span id="cb1-5"><a></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epidatr"</span>)</span>
+<span id="cb1-6"><a></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epidatasets"</span>)</span>
+<span id="cb1-7"><a></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epiprocess@dev"</span>)</span>
+<span id="cb1-8"><a></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epipredict@dev"</span>)</span>
+<span id="cb1-9"><a></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"dajmcdon/rtestim"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<ul>
+<li>Let’s take a few moments here.</li>
+<li>You may also navigate to the GitHub repo and Clone/Fork the entire thing.</li>
+</ul>
+
+<img data-src="lecture1_files/figure-revealjs/qr-to-github-1.png" class="quarto-figure quarto-figure-center r-stretch"></section></section>
 <section>
 <section id="panel-data" class="title-slide slide level1 inverse center" data-number="3">
 <h1><span class="header-section-number">3</span> Panel Data</h1>
@@ -346,7 +362,7 @@
 <h2>Examples of panel data</h2>
 <p><span class="secondary">JHU CSSE COVID-19 cases per 100k</span></p>
 
-<img data-src="lecture1_files/figure-html/examples-panel-covid2-1.svg" class="quarto-figure quarto-figure-center r-stretch" width="672"><aside class="notes">
+<img data-src="lecture1_files/figure-revealjs/examples-panel-covid2-1.svg" class="quarto-figure quarto-figure-center r-stretch"><aside class="notes">
 <ul>
 <li>WA switch to weekly reporting in 2022</li>
 <li>FL reports “whenever” (weekly, biweekly, three days in a row, then 4 zeros, etc.)</li>
@@ -369,7 +385,7 @@
 <h2>Examples of panel data</h2>
 <p><span class="secondary">Confirmed COVID-19 Hospital Admissions per 100k, 7day average</span></p>
 
-<img data-src="lecture1_files/figure-html/examples-hhs-admissions-1.svg" class="quarto-figure quarto-figure-center r-stretch" width="672"><div class="fragment box-text absolute" style="top: 20%; left: 30%; ">
+<img data-src="lecture1_files/figure-revealjs/examples-hhs-admissions-1.svg" class="quarto-figure quarto-figure-center r-stretch"><div class="fragment box-text absolute" style="top: 20%; left: 30%; ">
 <p>The <span class="math inline">\(x\)</span>-axis is</p>
 <p><span class="secondary">Date of report</span></p>
 <p>Not “date of event”</p>
@@ -462,7 +478,7 @@
 <h2>Versioned panel data</h2>
 <p>Estimated percentage of outpatient visits due to CLI across multiple versions.</p>
 
-<img data-src="lecture1_files/figure-html/versioned-panel-multi-states-ex-2-1.svg" class="quarto-figure quarto-figure-center r-stretch" width="672"></section>
+<img data-src="lecture1_files/figure-revealjs/versioned-panel-multi-states-ex-2-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
 <section id="latency-and-revision-in-signals" class="slide level2">
 <h2>Latency and revision in signals</h2>
 <ul>
@@ -537,7 +553,7 @@
 <li>7-day trailing average to smooth day-of-week effects</li>
 </ul>
 
-<img data-src="lecture1_files/figure-html/revision-triangle-1.png" class="quarto-figure quarto-figure-center r-stretch" width="2100"></section>
+<img data-src="lecture1_files/figure-revealjs/revision-triangle-1.png" class="quarto-figure quarto-figure-center r-stretch"></section>
 <section id="revisions" class="slide level2">
 <h2>Revisions</h2>
 <p>Many data sources are subject to revisions:</p>
@@ -597,7 +613,7 @@
 <li><p><span class="tertiary">JHU CSSE cases (right)</span> remain “as first reported” until a major correction is made on Oct.&nbsp;19</p></li>
 </ul>
 
-<img data-src="lecture1_files/figure-html/fig1-McDonald-1.svg" class="quarto-figure quarto-figure-center r-stretch" width="672"></section>
+<img data-src="lecture1_files/figure-revealjs/fig1-McDonald-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
 <section id="reporting-backlogs---example" class="slide level2">
 <h2>Reporting backlogs - Example</h2>
 <p>Bexar County, Texas, summer of 2020…</p>
@@ -607,7 +623,7 @@
 <li>Reports are not be trustworthy without context</li>
 </ul>
 
-<img data-src="lecture1_files/figure-html/fig4-Reinhart-1.svg" class="quarto-figure quarto-figure-center r-stretch" width="720"></section></section>
+<img data-src="lecture1_files/figure-revealjs/fig4-Reinhart-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section></section>
 <section>
 <section id="epidata-repository-and-api" class="title-slide slide level1 inverse center" data-number="5">
 <h1><span class="header-section-number">5</span> Epidata Repository and API</h1>
@@ -667,42 +683,42 @@
 <p>(you already did this, but just for posterity…)</p>
 <p>Install the CRAN version</p>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a></a><span class="co"># Install the CRAN version</span></span>
-<span id="cb5-2"><a></a><span class="fu">install.packages</span>(<span class="st">"epidatr"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a></a><span class="co"># Install the CRAN version</span></span>
+<span id="cb6-2"><a></a><span class="fu">install.packages</span>(<span class="st">"epidatr"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p><br></p>
 <p>or the development version</p>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a></a><span class="co"># Install the development version from the GitHub dev branch</span></span>
-<span id="cb6-2"><a></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epidatr@dev"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a></a><span class="co"># Install the development version from the GitHub dev branch</span></span>
+<span id="cb7-2"><a></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"cmu-delphi/epidatr@dev"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The CRAN listing is <a href="https://cran.r-project.org/package=epidatr/index.html">here</a>.</p>
 </section>
 <section id="python" class="slide level2">
 <h2>Python</h2>
 <p>In Python, install <a href="https://pypi.org/project/delphi-epidata/"><code>delphi-epidata</code> from PyPI</a> with</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode numberSource sh number-lines code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a></a><span class="ex">pip</span> install delphi-epidata</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode numberSource sh number-lines code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a></a><span class="ex">pip</span> install delphi-epidata</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p><br></p>
 <p><code>delphi-epidata</code> is soon to be replaced with <code>epidatpy</code>.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode numberSource sh number-lines code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a></a><span class="co"># Latest dev version</span></span>
-<span id="cb8-2"><a></a><span class="ex">pip</span> install <span class="at">-e</span> <span class="st">"git+https://github.com/cmu-delphi/epidatpy.git#egg=epidatpy"</span></span>
-<span id="cb8-3"><a></a></span>
-<span id="cb8-4"><a></a><span class="co"># PyPI version (not yet available)</span></span>
-<span id="cb8-5"><a></a><span class="ex">pip</span> install epidatpy</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode numberSource sh number-lines code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a></a><span class="co"># Latest dev version</span></span>
+<span id="cb9-2"><a></a><span class="ex">pip</span> install <span class="at">-e</span> <span class="st">"git+https://github.com/cmu-delphi/epidatpy.git#egg=epidatpy"</span></span>
+<span id="cb9-3"><a></a></span>
+<span id="cb9-4"><a></a><span class="co"># PyPI version (not yet available)</span></span>
+<span id="cb9-5"><a></a><span class="ex">pip</span> install epidatpy</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
 <section id="using-epidatr-and-epidatpy" class="slide level2">
 <h2>Using <code>{epidatr}</code> and <code>{epidatpy}</code></h2>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a></a><span class="fu">library</span>(epidatr)</span>
-<span id="cb9-2"><a></a>hhs_flu_nc <span class="ot">&lt;-</span> <span class="fu">pub_covidcast</span>(</span>
-<span id="cb9-3"><a></a>  <span class="at">source =</span> <span class="st">'hhs'</span>, </span>
-<span id="cb9-4"><a></a>  <span class="at">signals =</span> <span class="st">'confirmed_admissions_influenza_1d'</span>, </span>
-<span id="cb9-5"><a></a>  <span class="at">geo_type =</span> <span class="st">'state'</span>, </span>
-<span id="cb9-6"><a></a>  <span class="at">time_type =</span> <span class="st">'day'</span>, </span>
-<span id="cb9-7"><a></a>  <span class="at">geo_values =</span> <span class="st">'nc'</span>,</span>
-<span id="cb9-8"><a></a>  <span class="at">time_values =</span> <span class="fu">c</span>(<span class="dv">20240401</span>, <span class="dv">20240405</span><span class="sc">:</span><span class="dv">20240414</span>)</span>
-<span id="cb9-9"><a></a>)</span>
-<span id="cb9-10"><a></a><span class="fu">head</span>(hhs_flu_nc, <span class="at">n =</span> <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a></a><span class="fu">library</span>(epidatr)</span>
+<span id="cb10-2"><a></a>hhs_flu_nc <span class="ot">&lt;-</span> <span class="fu">pub_covidcast</span>(</span>
+<span id="cb10-3"><a></a>  <span class="at">source =</span> <span class="st">'hhs'</span>, </span>
+<span id="cb10-4"><a></a>  <span class="at">signals =</span> <span class="st">'confirmed_admissions_influenza_1d'</span>, </span>
+<span id="cb10-5"><a></a>  <span class="at">geo_type =</span> <span class="st">'state'</span>, </span>
+<span id="cb10-6"><a></a>  <span class="at">time_type =</span> <span class="st">'day'</span>, </span>
+<span id="cb10-7"><a></a>  <span class="at">geo_values =</span> <span class="st">'nc'</span>,</span>
+<span id="cb10-8"><a></a>  <span class="at">time_values =</span> <span class="fu">c</span>(<span class="dv">20240401</span>, <span class="dv">20240405</span><span class="sc">:</span><span class="dv">20240414</span>)</span>
+<span id="cb10-9"><a></a>)</span>
+<span id="cb10-10"><a></a><span class="fu">head</span>(hhs_flu_nc, <span class="at">n =</span> <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell" data-layout-align="center">
 <div class="cell-output cell-output-stdout">
@@ -718,8 +734,8 @@
 </div>
 <p><br></p>
 <p>Python equivalent:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a></a>res <span class="op">=</span> Epidata.covidcast(<span class="st">'hhs'</span>, <span class="st">'confirmed_admissions_influenza_1d'</span>, <span class="st">'day'</span>, </span>
-<span id="cb11-2"><a></a>  <span class="st">'state'</span>, [<span class="dv">20240401</span>, Epidata.<span class="bu">range</span>(<span class="dv">20240405</span>, <span class="dv">20240414</span>)], <span class="st">'nc'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a></a>res <span class="op">=</span> Epidata.covidcast(<span class="st">'hhs'</span>, <span class="st">'confirmed_admissions_influenza_1d'</span>, <span class="st">'day'</span>, </span>
+<span id="cb12-2"><a></a>  <span class="st">'state'</span>, [<span class="dv">20240401</span>, Epidata.<span class="bu">range</span>(<span class="dv">20240405</span>, <span class="dv">20240414</span>)], <span class="st">'nc'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
 <section id="api-keys" class="slide level2">
 <h2>API keys</h2>
@@ -752,7 +768,7 @@
 <section id="interactive-tooling-in-r" class="slide level2">
 <h2>Interactive tooling in R</h2>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a></a><span class="fu">avail_endpoints</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a></a><span class="fu">avail_endpoints</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 28 × 2
    Endpoint                          Description                                
@@ -791,15 +807,15 @@
 <section id="fetching-data---covidcast-main-endpoint" class="slide level2">
 <h2>Fetching data - COVIDcast main endpoint</h2>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a></a>jhu_us_cases <span class="ot">&lt;-</span> <span class="fu">pub_covidcast</span>(</span>
-<span id="cb14-2"><a></a>  <span class="at">source =</span> <span class="st">"jhu-csse"</span>,                        <span class="co"># this endpoint contains many different sources</span></span>
-<span id="cb14-3"><a></a>  <span class="at">signals =</span> <span class="st">"confirmed_7dav_incidence_prop"</span>,  <span class="co"># other signals: deaths, cumulative, etc.</span></span>
-<span id="cb14-4"><a></a>  <span class="at">geo_type =</span> <span class="st">"nation"</span>,                        <span class="co"># the geographic resolution (nation, state, hrr, msa, etc.)</span></span>
-<span id="cb14-5"><a></a>  <span class="at">time_type =</span> <span class="st">"day"</span>,                          <span class="co"># or week or year</span></span>
-<span id="cb14-6"><a></a>  <span class="at">geo_values =</span> <span class="st">"us"</span>,                          <span class="co"># optional</span></span>
-<span id="cb14-7"><a></a>  <span class="at">time_values =</span> <span class="fu">epirange</span>(<span class="dv">20210101</span>, <span class="dv">20210401</span>), <span class="co"># optional</span></span>
-<span id="cb14-8"><a></a>  ...                                         <span class="co"># additional arguments</span></span>
-<span id="cb14-9"><a></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a></a>jhu_us_cases <span class="ot">&lt;-</span> <span class="fu">pub_covidcast</span>(</span>
+<span id="cb15-2"><a></a>  <span class="at">source =</span> <span class="st">"jhu-csse"</span>,                        <span class="co"># this endpoint contains many different sources</span></span>
+<span id="cb15-3"><a></a>  <span class="at">signals =</span> <span class="st">"confirmed_7dav_incidence_prop"</span>,  <span class="co"># other signals: deaths, cumulative, etc.</span></span>
+<span id="cb15-4"><a></a>  <span class="at">geo_type =</span> <span class="st">"nation"</span>,                        <span class="co"># the geographic resolution (nation, state, hrr, msa, etc.)</span></span>
+<span id="cb15-5"><a></a>  <span class="at">time_type =</span> <span class="st">"day"</span>,                          <span class="co"># or week or year</span></span>
+<span id="cb15-6"><a></a>  <span class="at">geo_values =</span> <span class="st">"us"</span>,                          <span class="co"># optional</span></span>
+<span id="cb15-7"><a></a>  <span class="at">time_values =</span> <span class="fu">epirange</span>(<span class="dv">20210101</span>, <span class="dv">20210401</span>), <span class="co"># optional</span></span>
+<span id="cb15-8"><a></a>  ...                                         <span class="co"># additional arguments</span></span>
+<span id="cb15-9"><a></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell" data-layout-align="center">
 <div class="cell-output cell-output-stdout">
@@ -817,15 +833,15 @@
 <section id="get-everything-for-a-source-signal" class="slide level2">
 <h2>Get everything for a <code>source + signal</code></h2>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a></a>jhu_us_cases <span class="ot">&lt;-</span> <span class="fu">pub_covidcast</span>(</span>
-<span id="cb16-2"><a></a>  <span class="at">source =</span> <span class="st">"jhu-csse"</span>,                  <span class="co"># this endpoint contains many different sources</span></span>
-<span id="cb16-3"><a></a>  <span class="at">signals =</span> <span class="st">"confirmed_incidence_num"</span>,  <span class="co"># raw cases during the entire pandemic reporting until ~ April 2024</span></span>
-<span id="cb16-4"><a></a>  <span class="at">geo_type =</span> <span class="st">"county"</span>,                  <span class="co"># the geographic resolution (nation, state, hrr, msa, etc.)</span></span>
-<span id="cb16-5"><a></a>  <span class="at">time_type =</span> <span class="st">"day"</span>,                    <span class="co"># lowest resolution</span></span>
-<span id="cb16-6"><a></a>  <span class="at">geo_values =</span> <span class="st">"*"</span>,                     <span class="co"># (default) </span></span>
-<span id="cb16-7"><a></a>  <span class="at">time_values =</span> <span class="st">"*"</span>,                    <span class="co"># (default) </span></span>
-<span id="cb16-8"><a></a>  ...                                   <span class="co"># additional arguments</span></span>
-<span id="cb16-9"><a></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a></a>jhu_us_cases <span class="ot">&lt;-</span> <span class="fu">pub_covidcast</span>(</span>
+<span id="cb17-2"><a></a>  <span class="at">source =</span> <span class="st">"jhu-csse"</span>,                  <span class="co"># this endpoint contains many different sources</span></span>
+<span id="cb17-3"><a></a>  <span class="at">signals =</span> <span class="st">"confirmed_incidence_num"</span>,  <span class="co"># raw cases during the entire pandemic reporting until ~ April 2024</span></span>
+<span id="cb17-4"><a></a>  <span class="at">geo_type =</span> <span class="st">"county"</span>,                  <span class="co"># the geographic resolution (nation, state, hrr, msa, etc.)</span></span>
+<span id="cb17-5"><a></a>  <span class="at">time_type =</span> <span class="st">"day"</span>,                    <span class="co"># lowest resolution</span></span>
+<span id="cb17-6"><a></a>  <span class="at">geo_values =</span> <span class="st">"*"</span>,                     <span class="co"># (default) </span></span>
+<span id="cb17-7"><a></a>  <span class="at">time_values =</span> <span class="st">"*"</span>,                    <span class="co"># (default) </span></span>
+<span id="cb17-8"><a></a>  ...                                   <span class="co"># additional arguments</span></span>
+<span id="cb17-9"><a></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p><br><br></p>
 <ul>
@@ -866,16 +882,16 @@
 <li>I wanted to display a major reporting error.</li>
 </ul>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a></a>versions <span class="ot">&lt;-</span> <span class="fu">as.Date</span>(<span class="fu">c</span>(<span class="st">"2021-02-15"</span>, <span class="st">"2021-02-20"</span>, <span class="st">"2021-02-25"</span>, <span class="st">"2021-03-01"</span>, <span class="st">"2023-01-01"</span>)) </span>
-<span id="cb17-2"><a></a><span class="fu">pub_covidcast</span>(</span>
-<span id="cb17-3"><a></a>  <span class="st">"jhu-csse"</span>, <span class="st">"deaths_7dav_incidence_num"</span>, </span>
-<span id="cb17-4"><a></a>  <span class="at">geo_type =</span> <span class="st">"state"</span>, </span>
-<span id="cb17-5"><a></a>  <span class="at">geo_values =</span> <span class="st">"oh"</span>,</span>
-<span id="cb17-6"><a></a>  <span class="at">time_type =</span> <span class="st">"day"</span>,</span>
-<span id="cb17-7"><a></a>  <span class="at">time_values =</span> <span class="fu">epirange</span>(<span class="dv">20210101</span>,<span class="dv">20210301</span>),</span>
-<span id="cb17-8"><a></a>  <span class="at">issues =</span> versions</span>
-<span id="cb17-9"><a></a>) <span class="sc">|&gt;</span></span>
-<span id="cb17-10"><a></a>  <span class="fu">select</span>(geo_value, time_value, <span class="at">version =</span> issue, <span class="at">deaths =</span> value)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a></a>versions <span class="ot">&lt;-</span> <span class="fu">as.Date</span>(<span class="fu">c</span>(<span class="st">"2021-02-15"</span>, <span class="st">"2021-02-20"</span>, <span class="st">"2021-02-25"</span>, <span class="st">"2021-03-01"</span>, <span class="st">"2023-01-01"</span>)) </span>
+<span id="cb18-2"><a></a><span class="fu">pub_covidcast</span>(</span>
+<span id="cb18-3"><a></a>  <span class="st">"jhu-csse"</span>, <span class="st">"deaths_7dav_incidence_num"</span>, </span>
+<span id="cb18-4"><a></a>  <span class="at">geo_type =</span> <span class="st">"state"</span>, </span>
+<span id="cb18-5"><a></a>  <span class="at">geo_values =</span> <span class="st">"oh"</span>,</span>
+<span id="cb18-6"><a></a>  <span class="at">time_type =</span> <span class="st">"day"</span>,</span>
+<span id="cb18-7"><a></a>  <span class="at">time_values =</span> <span class="fu">epirange</span>(<span class="dv">20210101</span>,<span class="dv">20210301</span>),</span>
+<span id="cb18-8"><a></a>  <span class="at">issues =</span> versions</span>
+<span id="cb18-9"><a></a>) <span class="sc">|&gt;</span></span>
+<span id="cb18-10"><a></a>  <span class="fu">select</span>(geo_value, time_value, <span class="at">version =</span> issue, <span class="at">deaths =</span> value)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 4 × 4
   geo_value time_value version    deaths
@@ -897,21 +913,21 @@
 <section id="correct-as_of-query" class="slide level2">
 <h2>Correct <code>as_of</code> query</h2>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb19" data-code-line-numbers="|1,2,9"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a></a>res <span class="ot">&lt;-</span> <span class="fu">map</span>(versions, <span class="co"># same set as before</span></span>
-<span id="cb19-2"><a></a>           <span class="at">.f =</span> \(v) { </span>
-<span id="cb19-3"><a></a>             <span class="fu">pub_covidcast</span>(</span>
-<span id="cb19-4"><a></a>               <span class="st">"jhu-csse"</span>, <span class="st">"deaths_7dav_incidence_num"</span>, </span>
-<span id="cb19-5"><a></a>               <span class="at">geo_type =</span> <span class="st">"state"</span>, </span>
-<span id="cb19-6"><a></a>               <span class="at">geo_values =</span> <span class="st">"oh"</span>,</span>
-<span id="cb19-7"><a></a>               <span class="at">time_type =</span> <span class="st">"day"</span>,</span>
-<span id="cb19-8"><a></a>               <span class="at">time_values =</span> <span class="fu">epirange</span>(<span class="dv">20210101</span>,<span class="dv">20210301</span>),</span>
-<span id="cb19-9"><a></a>               <span class="at">as_of =</span> v </span>
-<span id="cb19-10"><a></a>             ) <span class="sc">|&gt;</span></span>
-<span id="cb19-11"><a></a>               <span class="fu">select</span>(geo_value, time_value, <span class="at">deaths =</span> value) <span class="sc">|&gt;</span></span>
-<span id="cb19-12"><a></a>               <span class="fu">mutate</span>(<span class="at">version =</span> v)</span>
-<span id="cb19-13"><a></a>           }) <span class="sc">|&gt;</span></span>
-<span id="cb19-14"><a></a>  <span class="fu">list_rbind</span>()</span>
-<span id="cb19-15"><a></a>res <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">7</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb20" data-code-line-numbers="|1,2,9"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a></a>res <span class="ot">&lt;-</span> <span class="fu">map</span>(versions, <span class="co"># same set as before</span></span>
+<span id="cb20-2"><a></a>           <span class="at">.f =</span> \(v) { </span>
+<span id="cb20-3"><a></a>             <span class="fu">pub_covidcast</span>(</span>
+<span id="cb20-4"><a></a>               <span class="st">"jhu-csse"</span>, <span class="st">"deaths_7dav_incidence_num"</span>, </span>
+<span id="cb20-5"><a></a>               <span class="at">geo_type =</span> <span class="st">"state"</span>, </span>
+<span id="cb20-6"><a></a>               <span class="at">geo_values =</span> <span class="st">"oh"</span>,</span>
+<span id="cb20-7"><a></a>               <span class="at">time_type =</span> <span class="st">"day"</span>,</span>
+<span id="cb20-8"><a></a>               <span class="at">time_values =</span> <span class="fu">epirange</span>(<span class="dv">20210101</span>,<span class="dv">20210301</span>),</span>
+<span id="cb20-9"><a></a>               <span class="at">as_of =</span> v </span>
+<span id="cb20-10"><a></a>             ) <span class="sc">|&gt;</span></span>
+<span id="cb20-11"><a></a>               <span class="fu">select</span>(geo_value, time_value, <span class="at">deaths =</span> value) <span class="sc">|&gt;</span></span>
+<span id="cb20-12"><a></a>               <span class="fu">mutate</span>(<span class="at">version =</span> v)</span>
+<span id="cb20-13"><a></a>           }) <span class="sc">|&gt;</span></span>
+<span id="cb20-14"><a></a>  <span class="fu">list_rbind</span>()</span>
+<span id="cb20-15"><a></a>res <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">7</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 7 × 4
   geo_value time_value deaths version   
@@ -937,7 +953,7 @@
 <section id="now-i-can-show-you-why-i-wanted-that-query" class="slide level2">
 <h2>Now I can show you why I wanted that query</h2>
 
-<img data-src="lecture1_files/figure-html/oh-death-spike-1.svg" class="quarto-figure quarto-figure-center r-stretch" width="511"></section>
+<img data-src="lecture1_files/figure-revealjs/oh-death-spike-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
 <section id="versioning-in-nowcasting-and-forecasting" class="slide level2">
 <h2>Versioning in nowcasting and forecasting</h2>
 <ul>
@@ -1183,6 +1199,44 @@
         ]
       });
     </script>
+    
+    <script>
+      // htmlwidgets need to know to resize themselves when slides are shown/hidden.
+      // Fire the "slideenter" event (handled by htmlwidgets.js) when the current
+      // slide changes (different for each slide format).
+      (function () {
+        // dispatch for htmlwidgets
+        function fireSlideEnter() {
+          const event = window.document.createEvent("Event");
+          event.initEvent("slideenter", true, true);
+          window.document.dispatchEvent(event);
+        }
+
+        function fireSlideChanged(previousSlide, currentSlide) {
+          fireSlideEnter();
+
+          // dispatch for shiny
+          if (window.jQuery) {
+            if (previousSlide) {
+              window.jQuery(previousSlide).trigger("hidden");
+            }
+            if (currentSlide) {
+              window.jQuery(currentSlide).trigger("shown");
+            }
+          }
+        }
+
+        // hookup for slidy
+        if (window.w3c_slidy) {
+          window.w3c_slidy.add_observer(function (slide_num) {
+            // slide_num starts at position 1
+            fireSlideChanged(null, w3c_slidy.slides[slide_num - 1]);
+          });
+        }
+
+      })();
+    </script>
+
     <script id="quarto-html-after-body" type="application/javascript">
     window.document.addEventListener("DOMContentLoaded", function (event) {
       const toggleBodyColorMode = (bsSheetEl) => {
