@@ -195,6 +195,12 @@ dt {color: lighten($primary, 10%);}
   background-color: #ffffff;
 }
 
+.codelike-format {
+  border: 2px solid;
+  border-radius: 4px;
+  border-color: darken($body-bg, 10%);
+}
+
 .scrollable-output {
   max-height: 500px; /* Adjust the height as needed */
   overflow-y: auto;  /* Enables vertical scrolling */

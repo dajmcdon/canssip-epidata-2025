@@ -411,7 +411,7 @@ Dates at least to [Alfred Lotka (1920s)]{.tertiary} and others (Feller, Blackwel
 
 ::: {.fragment .box-text .absolute top=50 left=150}
 
-![Source: Katelyn Jetelina, "YLE Newsletter," 17 March 2025.](gfx/yle-measles.jpg){height=600}
+![Source: Katelyn Jetelina, "YLE Newsletter," 21 April 2025.](gfx/yle-measles.jpg){height=600}
 
 :::
 

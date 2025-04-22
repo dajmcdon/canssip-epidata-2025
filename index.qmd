@@ -14,7 +14,7 @@ toc: false
 
 ---
 
-::: {layout-ncol=4}
+::: {layout-ncol=5}
 ![](assets/img/delphi.jpg){width=125}
 
 ![](assets/img/cmu.png){width=125}
@@ -22,6 +22,8 @@ toc: false
 ![](assets/img/berkeley.jpg){width=125}
 
 ![](assets/img/ubc.jpg){width=125}
+
+![](assets/img/canssi-logo.svg){width=125}
 :::
 
 

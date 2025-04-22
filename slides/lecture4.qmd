@@ -12,25 +12,394 @@ format: revealjs
 ```{r setup}
 #| cache: false
 source(here::here("slides", "_code", "setup.R"))
+covid_archive <- read_rds(here::here("_data", "covid_archive.rds"))
+covid_archive_dv <- read_rds(here::here("_data", "covid_archive_dv.rds"))
+ca_archive_dv <- covid_archive_dv$DT |> 
+  filter(geo_value == "ca") |>
+  as_epi_archive()
+usa_archive_dv <- covid_archive_dv$DT |> 
+  as_epi_archive()
+usa_archive <- covid_archive$DT |> 
+  as_epi_archive()
 ```
+
 
 
 ## Outline
 
 
 1. Fundamentals of Forecasting
-
-1. `{epipredict}`
-
-1. Customizing `arx_forecaster()`
-
+1. Evaluation
+1. A Workflow for Forecasting
 1. Advanced Customizations
-
 1. Build a Forecaster from Scratch
-
 1. Advanced Topics
 
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\given}{\ \vert\ }
+\renewcommand{\top}{\mathsf{T}}
+\newcommand{\one}{\mathbf{1}}
+
 # Fundamentals of Forecasting {.inverse}
+(with some review)
+
+## Forecasting is not magic
+
+- Forecasts are generally comprised of two parts: trend and seasonality
+- Methods for detecting and projecting trends are not magic; in general they're
+  not qualitatively that different from what you can do with your eyeballs
+- That said, assimilating information from exogenous features (ideally, leading
+  indicators) can lead highly nontrivial gains, beyond the eyeballs
+- Remember &#8230; good data is just as (more?) important as a good model! 
+- Seasonality can help short-term forecasts. Long-term forecasts, absent of 
+  strong seasonality, are generally not very tractable
+
+## Basics of linear regression 
+
+* Assume we observe a predictor $x_i$ and an outcome $y_i$ for $i = 1, \dots, n$.
+
+* Linear regression supposes
+
+$$\E[y_i\given x_i] \doteq \beta_0 + \beta_1 x_i,\quad i=1,\dots,n.$$
+
+
+* In `R`, run `lm(y ~ x)`, where `y` is the vector 
+of responses and `x` the vector of predictors.
+
+
+. . .
+
+* Given $p$ different predictors
+
+$$
+\begin{aligned}
+\E[y_i\given \mathbf{x}_i] &\doteq \beta_0 + \beta_1 x_{i1} + \dots + \beta_p x_{ip}\\
+&= \mathbf{x}^\top_i\beta &i=1,\dots,n.
+\end{aligned}
+$$
+
+
+## Linear regression with lagged predictor
+
+
+* In time series, outcomes and predictors are usually indexed by time $t$. 
+
+::: {.fragment .fade-in}
+* [Goal]{.secondary}: predict future $y$, given present $x$. 
+
+:::
+
+::: {.fragment .fade-in}
+* [Model]{.secondary}: linear regression with lagged predictor
+
+$$\E[y_t\given x_{t-k}] \doteq \beta + \beta_0 x_{t-k}$$
+
+:::
+
+::: {.fragment .fade-in}
+* [Equivalent]{.secondary} way to write the model: 
+
+$$\E[y_{t+k}\given x_t] \doteq \beta + \beta_0 x_t$$
+
+:::
+
+
+## Autoregressive exogenous input (ARX) model
+
+* Predict the outcome via a linear combination of its (own) lags 
+and exogenous predictors
+
+
+$$\E[y_{t+h}\given \mathbf{y}_{\leq t}, \mathbf{x}_{\leq t}] \doteq 
+\phi + \sum_{i=0}^p \phi_i y_{t-i} + \sum_{j=0}^q \beta_j x_{t-j}$$
+
+* [Notice]{.secondary}: we don't need to include all contiguous lags, and we could estimate e.g.,
+
+$$\E[y_{t+h}\given \mathbf{y}_{\leq t}, \mathbf{x}_{\leq t}] \doteq  \phi + 
+\phi_0 y_{t} + \phi_1 y_{t-7} + \phi_2 y_{t-14} +
+\beta_0 x_{t} + \beta_1 x_{t-7} + \beta_2 x_{t-14}$$
+
+
+## Popular forecasting frameworks
+
+- Autoregressive integrated model average (ARIMA) models
+- Exponential smoothing with trend and seasonality (ETS) 
+- Prophet forecaster
+- DeepAR (neural network)
+
+First two here are classic and standard, second two are more recent. 
+
+None are particularly well-suited for epi forecasting out-of-the-box 
+(ask me about them if you're curious)
+
+I'll briefly mention ARIMA as it's closest to the setup so far.
+
+## Dissecting ARIMA 
+
+AR 
+: autoregressive
+: include lags of response as features
+
+MA 
+: moving average
+: include lags of noise terms 
+: correlated noise model
+
+I
+: integrated
+: model and forecast differences between successive observations rather than levels
+
+## ARIMA vs ARX
+
+### The way lags are handled
+
+* In what you've seen, we can include arbitrary lags
+* Could use a different [engine](.secondary) (regularized linear, or general functional form)
+* Traditional AR models require lags to be contiguous (e.g., all of 0&ndash;14, 
+    instead of 0, 7, 14)
+
+### The way multi-step forecasts are made
+* In what you've seen, we model h-step ahead directly 
+* Traditional AR models only do 1-step ahead prediction, and iterate this 
+to get forecasts at longer horizons
+
+## ARIMA vs ARX
+
+### The way nonstationarity is handled
+
+* In what you've seen, we address nonstationarity via trailing training 
+    windows (or observation weights more generally)
+* Traditional ARIMA models use the I component for this: remove linear or
+    quadratic trends by differences, add them back in at prediction time
+
+### The way exogenous features are included
+
+* In what you've seen, they appear directly as an exogenous predictor
+* Traditional ARIMA models (software, such as `{fable}`) includes them in 
+    a different manner; they are effectively subject to the same lags as the AR
+    and MA terms
+
+## Supplementary time series resources
+
+- Hyndman and Athanasopoulos, [Forecasting: Principles and Practice](https://otexts.com/fpp3/)
+- Ryan Tibshirani's course notes, [Introduction to Time Series](https://stat153.berkeley.edu/fall-2024/)
+
+
+# Evaluation {.inverse}
+
+## Error metrics
+
+* Assume we have predictions $\hat y_{t}$ for the unseen observations 
+$\tilde y_{t}$ over times $t = 1, \dots, N$.
+
+### Four commonly used error metrics for point forecasts:
+1. mean squared error (MSE)
+1. mean absolute error (MAE)
+1. mean absolute percentage error (MAPE)
+1. mean absolute scaled error (MASE)
+    
+### Interval metrics:
+1. coverage
+1. interval score
+1. weighted interval score
+
+## Error metrics: MSE and MAE
+
+$$\textrm{MSE} = \frac{1}{N} \sum_{t=1}^N (\tilde y_{t}- \hat y_{t})^2$$
+$$\textrm{MAE} = \frac{1}{N} \sum_{t=1}^N |\tilde y_{t}- \hat y_{t}|$$
+
+* MAE gives less importance to extreme errors than MSE.
+
+* MSE is not on the same scale as the data (squared units), use RMSE instead.
+
+* [Drawback]{.primary}: both metrics are scale-dependent, so they are not universally 
+interpretable.  
+(For example, if $y$ captures height, MSE and MAE will vary depending on whether we measure in feet or meters.)
+
+## Error metrics: MAPE
+
+Fixing scale-dependence:
+
+$$\textrm{MAPE} = 100 \times \frac{1}{N} \sum_{t=1}^N 
+\left|\frac{\tilde y_{t}- \hat y_{t}}{\tilde y_{t}}\right|$$
+
+
+### Drawbacks
+* Erratic behavior when $\tilde y_{t}$ is close to zero
+* Assumes the unit of measurement has a meaningful zero  
+(e.g. using 
+Fahrenheit or Celsius to measure temperature will lead to different MAPE)
+
+
+## Error metrics: MASE
+
+$$\textrm{MASE} = 100 \times \frac{\frac{1}{N} \sum_{t=1}^N 
+|\tilde y_{t}- \hat y_{t}|}
+{\frac{1}{N-1} \sum_{t=2}^N 
+|\tilde y_{t}- y_{t-1}|}$$
+
+### Advantages
+
+* universally interpretable (not scale dependent)
+
+* avoids the zero-pitfall (unless the first difference is 0&#8230; )
+
+[Heuristic description]{.secondary}: normalize the error of our forecasts by that of a naive method 
+which always predicts the last observation.
+
+
+## Comparing MAE, MSE, MAPE and MASE
+
+```{r mae-mape-mase-example}
+#| fig-width: 7
+#| fig-height: 3
+set.seed(0)
+fake_upswing <- tibble(
+  x = 1:50,
+  y = rpois(n = 50, lambda = c(rep(5, 25), 5 + exp(0:24 * 0.2))),
+  yhat1 = c(rep(6.5, 25), 6.5 + exp(0:24 * 0.2)),
+  yhat2 = c(rep(5, 25), 5 + exp(0:24 * 0.18))
+) 
+
+fake_upswing |>
+  pivot_longer(starts_with("yhat")) |>
+  ggplot(aes(x)) +
+  geom_point(aes(y = y), color = tertiary, shape = 16) +
+  geom_line(aes(y = value, color = name)) +
+  scale_y_continuous(expand = expansion(c(0, 0.05))) +
+  scale_x_continuous(expand = expansion(), name = "Time") +
+  scale_color_delphi(name = "") +
+  theme(legend.position = "inside", legend.position.inside = c(.1, .9),
+        legend.background = element_blank())
+```
+
+```{r mae-mape-mase-error}
+with(fake_upswing, data.frame(
+  "MAE" = c(mean(abs(y - yhat1)), mean(abs(y - yhat2))), 
+  "RMSE" = sqrt(c(mean((y - yhat1)^2), mean((y - yhat2)^2))),
+  "MAPE" = c(mean(abs(y - yhat1) / y), mean(abs(y - yhat2) / y)) * 100, 
+  "MASE" = c(mean(abs(y - yhat1)), 
+             mean(abs(y - yhat2))) / mean(abs(diff(y))) * 100,
+  row.names = c('yhat1', 'yhat2'))
+) |>
+  knitr::kable(digits = 3)
+```
+
+
+## Interval metrics
+
+Given a set of predictive intervals $(l_t^{\alpha_1}, u_t^{\alpha_1}), \dots, (l_t^{\alpha_K}, u_t^{\alpha_K}),\quad t=1,\dots,N$
+
+### Coverage
+
+$$\textrm{Coverage}(\alpha) = \frac{1}{N} \sum_{t=1}^N \one(l_t^{\alpha} \leq \tilde y_{t} \leq u_t^\alpha)$$
+
+### Interval Score
+
+$$\textrm{IS}(\alpha) = \frac{1}{N} \sum_{t=1}^N \alpha|u_t^\alpha - l_t^\alpha| + 2(l_t^\alpha - \tilde y_t)_+ + 2(\tilde y_t - u_t^\alpha)_+$$
+
+### Weighted Interval Score
+
+$$\textrm{WIS} = \sum_{k=1}^K\textrm{IS}(\alpha_k)$$
+
+
+
+## Defining the error metrics in R
+
+```{r error-functions}
+#| echo: true
+MSE <- function(obs, pred) mean((obs - pred)^2)
+
+MAE <- function(obs, pred) mean(abs(obs - pred))
+
+MAPE <- function(obs, pred) 100 * mean(abs(obs - pred) / obs)
+
+MASE <- function(obs, pred) 100 * MAE(obs, pred) / mean(abs(diff(obs)), na.rm = TRUE)
+
+Coverage <- function(obs, ql, qu) mean(obs >= ql & obs <= qu)
+
+IS <- function(obs, ql, qu, alpha) alpha * mean(abs(qu - ql)) + 2 * pmax(ql - obs, obs - qu)
+```
+
+## Estimating the prediction error
+
+Given an error metric, we want to estimate the prediction error under that metric. 
+
+### Methods we'll discuss briefly
+
+1. Training error
+1. Split-sample error
+1. Time series cross-validation error
+
+
+## Training error
+
+* The easiest but [worst]{.secondary} estimate of the prediction error
+
+* The training error is
+
+  1. generally too optimistic as an estimate of prediction error
+  1. [more optimistic the more complex the model!]{.secondary}
+  
+### Training MSE
+
+$$\text{TrainMSE} = \frac{1}{N-h} \sum_{t = 1}^{N-h} (\hat y_{t+h|N} - y_{t+h})^2$$
+
+## Split-sample error 
+
+To compute the split-sample error  
+
+  1. [Split]{.secondary} data into training (up to time $t_0$), and test set (after $t_0$)
+
+  1. [Estimate]{.secondary} the model to the [training]{.primary} data only
+
+  1. Make [predictions]{.secondary} for the [test]{.tertiary} set
+
+  1. Compute the [error]{.primary} metric on the [test]{.tertiary} set only
+
+
+::: {.callout-important icon="false"}
+
+Split-sample estimates of prediction error don't mimic real forecasting.
+
+We would [refit]{.secondary} with new data.
+
+Therefore, split-sample is [pessimistic]{.primary} if the relation between outcome and predictors 
+changes over time.
+:::
+
+## Split-sample MSE 
+
+* Want $h$-step ahead predictions
+* at time $t$, forecast for $t+h$. 
+
+Then, the split-sample MSE is
+
+$$\text{SplitMSE} = \frac{1}{N-h-t_0} \sum_{t = t_0}^{N-h} (\hat y_{t+h|t_0} - y_{t+h})^2$$
+
+* $\hat y_{t+h|t_0}$ is a prediction for $y$ at time $t+h$ 
+* that was made with a model that was estimated on data up to time $t_0$.
+
+## Time series cross-validation (CV)
+#### $h$-step ahead predictions
+
+[Re-estimate]{.primary} once new data are available
+
+To get $h$-step ahead predictions, for each time $t = t_0, t_0+1, \dots$,
+
+  * [Estimate]{.primary} the model using data [up to time $t$]{.primary}
+
+  * Make a [prediction for $t+h$]{.primary} 
+
+  * Record the [prediction error]{.primary}
+
+
+$$\textrm{CVMSE} = \frac{1}{N-h-t_0} \sum_{t = t_0}^{N-h} (\hat y_{t+h|t} - y_{t+h})^2$$
+
+* $\hat y_{t+h|t}$ is the forecast for $y$ at time $t+h$ 
+* that was made with data available up to time $t$.
+
+# A Workflow for Forecasting {.inverse}
 
 ## Care with your data
 
@@ -42,17 +411,19 @@ source(here::here("slides", "_code", "setup.R"))
     * Some data you see. You can use it to create your model: [Training data]{.primary}.
     * Some data you don't see. It may arrive later, or you may hold it out to validate your process.
 
+::: {.fragment}
 2. Only training data can be used to create your model.
     * Much more subtle than it sounds.
     * [Everything]{.primary} about your model must flow from this
-        1. Choosing the model: AR vs ARX, number of lags to use
+        1. Choosing the model: Compartmental vs Time Series, exogenous predictors
         1. Estimates of model parameters
         1. How much regularization to use
         1. Any transformations you make of your data
-        
-We've emphasized most of this already.
+:::
 
+::: {.fragment .box-text .absolute top=30%}
 But that point about transformations is [VERY]{.primary} important. And often overlooked.
+:::
 
 ## Preprocessing correctly
 
@@ -64,21 +435,29 @@ But that point about transformations is [VERY]{.primary} important. And often ov
 ```{r scaling-example}
 #| eval: false
 #| echo: true
-chicago_ell <- modeldata::Chicago |>
-  select(ridership, temp, humidity, percip) |>
+#| code-line-numbers: 1-2|4-7|9-12
+data(Chicago, package = "modeldata") 
+Chicago <- select(Chicago, c(ridership, temp, humidity, percip))
+
+chicago_train <- Chicago |>
+  slice_head(prop = .8) |>
   mutate(across(everything(), scale))
+mod <- lm(ridership ~ ., data = chicago_train)
 
-
-lm(ridership ~ ., data = chicago_ell)
+chicago_test <- Chicago |>
+  slice_tail(prop = .2) |>
+  mutate(across(everything(), scale))
+preds <- predict(mod, chicago_test)
 ```
 
-We didn't save the means and variances.
+::: {.fragment .box-text .absolute top=10%}
+* Scaled the test set with [their own]{.secondary} means and variances.
+* Should have used sample statistics from the [training set]{.secondary}
+* We didn't save the means and variances from the training set.
+* We would also need to invert (postprocess) `preds` to get them in the original units
 
-We need them to process the test data.
-
-We would also need to invert (postprocess) the predictions.
-
-[For example:]{.secondary} undoing scaling to predict [deaths]{.primary} not [deaths per 100K population]{.primary}
+[This is all wrong]{.secondary}
+:::
 
 
 ## `{tidymodels}`
@@ -93,47 +472,32 @@ We would also need to invert (postprocess) the predictions.
 
 * We've been working with their team to develop this functionality.
 
-## Anatomy of a forecaster
+![](gfx/tidymodels.png){fig-align="center"}
 
-::: {.fragment .fade-in-then-semi-out}
+## Anatomy of a forecaster framework
 
-We should build up modular components
-
-Be able to add/remove layers of complexity sequentially, not all at once
-
-We should be able to make preprocessing independent of the model fitting
-
-We should be able to postprocess the predictions
-
-:::
-
-::: {.fragment .fade-in-then-semi-out}
-
-  1. [Preprocessor]{.primary}: do things to the data before model training
-  
-  1. [Trainer]{.primary}: train a model on data, resulting in a fitted model object
-
-  1. [Predictor]{.primary}: make predictions, using a fitted model object
-
-  1. [Postprocessor]{.primary}: do things to the predictions before returning
-  
+::: {.incremental}
+* We should build up modular components
+* Be able to add/remove layers of complexity sequentially, not all at once
+* We should be able to make processing independent of the model
+* Fitting should also be independent (`glm()` vs `lm()` vs `glmnet()`)
+* We should be able to postprocess the predictions
+* The framework shouldn't contaminate test data with training data (data leakage)
+* We should be able to access intermediate portions
 :::
 
 
-
-# [{epipredict}]{.monotype} {.inverse}
-
-## What `{epipredict}` provides (i)
+## What `{epipredict}` provides
 
 Basic and easy to use ["canned" forecasters]{.primary}: 
 
   * Baseline flat forecaster
-  
   * Autoregressive forecaster (ARX)
-  
-  * Autoregressive classifier
-  
+  * Autoregressive classifier (also "ARX")
   * CDC FluSight flatline forecaster
+  * Climatological forecaster
+  
+. . .
   
 These are supposed to work easily
 
@@ -146,28 +510,19 @@ Handle lots of cases we've already seen
 [We'll start here]{.secondary}
 
 
-
-
-  
-## What `{epipredict}` provides (ii)
+## What `{epipredict}` provides
 
 * A framework for creating [custom forecasters]{.primary} out of [modular]{.primary} components. 
-
 * This is highly customizable, extends `{tidymodels}` to panel data
-
 * Good for building a new forecaster from scratch
-
 * We'll do an example at the end
 
-* There are four types of components:
+### There are four of components:
 
-  1. [Preprocessor]{.primary}: do things to the data before model training
-  
-  1. [Trainer]{.primary}: train a model on data, resulting in a fitted model object
-
-  1. [Predictor]{.primary}: make predictions, using a fitted model object
-
-  1. [Postprocessor]{.primary}: do things to the predictions before returning
+1. [Preprocessor]{.primary}: do things to the data before model training
+1. [Trainer]{.primary}: train a model on data, resulting in a fitted model object
+1. [Predictor]{.primary}: make predictions, using a fitted model object
+1. [Postprocessor]{.primary}: do things to the predictions before returning
   
   
 
@@ -197,33 +552,28 @@ Handle lots of cases we've already seen
 
 :::
 
-```{r load-data}
-source(here::here("_code", "cases_deaths.R"))
-cases_deaths <- full_join(cases, deaths, by = c("time_value", "geo_value")) |>
-  as_epi_df()
+```{r ca-archive, warning=FALSE}
+ca_archive <- covid_archive$DT |> 
+  filter(geo_value == "ca") |>
+  as_epi_archive()
+ca <- ca_archive |> epix_as_of_current()
 ```
 
 
 ## Fit `arx_forecaster()` on training set
 
-* [ARX(1)]{.primary} model for COVID deaths:
-$\quad \hat y_{t+28} = \hat\phi + \hat\phi_0 y_{t} + \hat\beta_0 x_{t}$
-
+* [ARX(1)]{.primary} model for COVID Deaths per 100K (7 day average):
+$\quad \E[y_{t+28} | y_t,\ x_t] \doteq \phi + \phi_0 y_{t} + \beta_0 x_{t}$
 * Only focus on California (for now)
-
-* Using `{epipredict}`
 
 ```{r epipredict-arx}
 #| echo: true
-#| code-line-numbers: "|7-13"
-# split into train and test 
-ca <- cases_deaths |> filter(geo_value == "ca")
+#| code-line-numbers: "1-4|6-12"
 t0_date <- as.Date('2021-04-01')
 train <- ca |> filter(time_value <= t0_date)
 test <- ca |> filter(time_value > t0_date)
 
-# fit ARX
-epi_arx <- arx_forecaster(
+ca_arx <- arx_forecaster(
   epi_data = train |> as_epi_df(), 
   outcome = "deaths", 
   predictors = c("cases", "deaths"),
@@ -243,48 +593,46 @@ epi_arx <- arx_forecaster(
 for 28 days after the last available time value in the data (`$predictions`).
 
 
+
+
 ## `arx_forecaster()` output
 
-```{r output-arx}
+```{r output-arx-0}
 #| echo: true
-#| message: true
-#| code-line-numbers: false
-#| collapse: true
-epi_arx 
+ca_arx
 ```
+
+
+![](gfx/ca_arx.png){.codelike-format}
+
 
 
 ## Extract fitted object
 
-<div class="scrollable-output">
-
-```{r epi-workflow-arx}
-#| message: true
-#| code-line-numbers: false
-#| collapse: true
-epi_arx$epi_workflow
+```{r epi-workflow-arx0}
+#| echo: true
+#| eval: false
+ca_arx$epi_workflow
 ```
 
-</div>
+```{r epi-workflow-arx}
+#| echo: false
+#| message: true
+#| collapse: true
+#| comment: ""
+ca_arx$epi_workflow
+```
 
-## `$epi_workflow`
 
-Contains information on 
-
-* [Pre-processing]{.primary} steps automatically performed by `arx_forecaster` (e.g. compute lags of the predictors)
-
-* [Fitted model]{.primary} 
-
-* [Post-processing]{.primary} steps automatically performed by `arx_forecaster` (e.g. compute quantiles)
 
 ## Extract predictions
 
 ```{r epi-pred-arx}
 #| echo: true
-epi_arx$predictions
+ca_arx$predictions
 ```
 
-::: {.callout-important icon="false"}
+::: {.fragment .callout-important icon="false"}
 ## Note 
 
 * `.pred_distn` is actually a “distribution”, parameterized by its quantiles
@@ -292,141 +640,149 @@ epi_arx$predictions
 * `arx_forecaster` estimates the quantiles in a different way than `lm` 
 :::
 
-
-## Extract predictions
-
-We can extract the distribution into a “long” `epi_df`
-
-```{r epi-pred-quantile-longer}
-#| echo: true
-epi_arx$predictions |>
-  pivot_quantiles_longer(.pred_distn)
-```
-
-or into a "wide" `epi_df`
+::: {.fragment}
 
 ```{r epi-pred-quantile-wider}
 #| echo: true
-epi_arx$predictions |>
-  pivot_quantiles_wider(.pred_distn)
+ca_arx$predictions |> pivot_quantiles_wider(.pred_distn)
+```
+
+:::
+
+
+## Plot predictions
+
+
+```{r epi-pred-autoplot}
+#| echo: 1:1
+ca_arx |> autoplot() +
+  scale_y_continuous(expand = expansion(c(0, 0.05))) +
+  geom_vline(xintercept = ca_arx$predictions$forecast_date[1], alpha = .5, color = secondary)
 ```
 
 
-## Predict with fitted ARX (split-sample)
 
-* `arx_forecaster` fits a model to the training set, and outputs only one prediction (for time $t_0+h$).
+## Split sample forecasting
 
-* To get [predictions]{.primary} for the [test]{.primary} set:
+* `arx_forecaster()` estimates a model on the training set
+
+* Outputs only the prediction for time $t_0+h$
+
+* To get predictions for the [test set]{.secondary}:
 
 ```{r arx-test-predict}
 #| echo: true
-predict(epi_arx$epi_workflow, test)
+predict(ca_arx$epi_workflow, test)
 ```
 
-## Predict with ARX (when re-fitting)
+## Time series prediction with ARX (with re-fitting)
 
-* In practice, if we want to [re-train]{.primary} the forecasters as [new data]{.primary} arrive,
-we fit and predict combining `arx_forecaster` with `epix_slide`
-
-* From now on, we will only used [versioned data]{.primary}, and make predictions once a week
+::: {.incremental}
+* To [re-train]{.secondary} the forecaster as [new data]{.secondary} arrives
+* Combine `arx_forecaster()` with `epi_slide()`
+* But that isn't version aware
+* To [REALLY]{.secondary} mimic what forecasts would have looked like
+* Slide on an `epi_archive` with `epix_slide()`
+* This is the only justifiable way to evaluate forecasting models
+* [This is the only justifiable way to evaluate forecasting models]{.secondary}
+* From now on, we will only used [versioned data]{.secondary}
+* For illustration and speed, we'll make predictions once a week (daily data)
+:::
 
 ## Predict with ARX (re-fitting on trailing window)
 
 ```{r source-versioned-data}
-source(here::here("_code/versioned_data.R"))
-```
-
-```{r ca-archive, warning=FALSE}
-ca_archive <- covid_archive$DT |> 
-  filter(geo_value == "ca") |>
-  as_epi_archive()
+source(here::here("_code", "versioned_data.R"))
 ```
 
 ```{r epipredict-cv-trailing}
-#| code-line-numbers: "9-14|"
+#| code-line-numbers: "1,13|3,12|2,6-11|5,14"
 #| echo: true
-h <- 28         # horizon
-w <- 120 + h    # trailing window length
-
-# Specify the forecast dates
 fc_time_values <- seq(from = t0_date, to = as.Date("2023-02-09"), by = "1 week")
+h <- 28         # horizon
+w <- 120 + h    # trailing window length 
 
-# Slide the arx_forecaster over the epi_archive
 pred_arx <- ca_archive |> epix_slide(
   ~ arx_forecaster(epi_data = .x,
                    outcome = "deaths", 
                    predictors = c("cases", "deaths"), 
                    trainer = linear_reg(),
                    args_list = arx_args_list(lags = 0, ahead = h, quantile_levels = c(0.1, 0.9))
-  )$predictions |>
-    pivot_quantiles_wider(.pred_distn),
+  ) |> pluck("predictions") |> pivot_quantiles_wider(.pred_distn),
   .before = w, 
   .versions = fc_time_values
 )
 ```
+
+## Regression on a trailing window
+
+[Fit the model on a window of data of length $w$]{.primary} 
+
+* starting at $t-w$ and ending at $t$.
+
+[Advantage:]{.primary} 
+
+* if the predictor-outcome relation changes over time,
+* training the forecaster on only recent data better captures the recent 
+relationship
+* potentially more relevant for near-term forecasts
+
+<br>
+
+. . .
+
+### Window length [$w$]{.primary} considerations: 
+
+* if $w$ is too [big]{.secondary}, the model [can't adapt]{.primary} to the 
+  recent predictors-outcome relation
+* if $w$ is too [small]{.secondary}, the fitted model may be [too volatile]{.primary} 
+  (trained on too little data)
+  
+
 
 ## Predict with ARX 
 
 ::: {.callout-important icon="false"}
 ## Note (window length)
 
-We set $w = 120 + h$ to match the window size of the ARX model we fitted manually.
+* Setting $w = 120 + h$ actually only uses $N=120$ observations
 
-When considering a window from $t-w$ to $t$, 
-we had access to all outcomes in that window, and to all predictors between 
-$t-w-h$ and $t-h$. 
+* It filters to data within the window, then performs leads/lags
 
-(That's because we lagged $x$ before applying the window.) 
-
-So we were "cheating" by saying that 
-the trailing window had length $w=120$, as its actual size was $120+h$! 
+* To make this explicit, for a horizon $h$, we need to "back" $h$ days
+to see which predictors align with it
 :::
   
 ::: {.callout-important icon="false"}
 ## Note (all past)
 
-The method [fitting on all past data]{.primary} up to the forecasting date can be 
-implemented by setting:
+To [fitting on all past data]{.primary} up to the forecasting date use
 
-`.before = Inf` in `epix_slide()`.
+`epix_slide(...,.before = Inf)`
 :::
 
-```{r epipredict-cv, eval=FALSE}
-# slide an arx_forecaster with appropriate outcome, predictions and lags
-pred_arx <- ca_archive |> epix_slide(
-  ~ arx_forecaster(epi_data = .x,
-                   outcome = "deaths", 
-                   predictors = c("cases", "deaths"), 
-                   trainer = linear_reg() |> set_engine("lm"),
-                   args_list = arx_args_list(lags = 0, ahead = h, quantile_levels = c(0.1, 0.9))
-  )$predictions |>
-    pivot_quantiles_wider(.pred_distn),
-  .before = Inf, 
-  .versions = fc_time_values
-)
-```
 
 
 ## Predict with ARX (re-fitting on trailing window)
 
-<div class="large-output">
 
 ```{r epipredict-cv-trailing-head}
 #| echo: true
 pred_arx 
 ```
 
-</div>
 
 ## Predict with ARX (re-fitting on trailing window)
 
 ```{r arx-plot-cv-predictions}
-#| fig-align: left
+#| fig-width: 7
+#| fig-height: 3
+ca <- epix_as_of_current(ca_archive)
 pred_arx |>
   ggplot(aes(target_date, .pred)) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = secondary) +
   geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_line(col = secondary) +
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
@@ -435,73 +791,28 @@ pred_arx |>
 ```
 
 ```{r function errors}
-MSE <- function(truth, prediction) {
-  mean((truth - prediction)^2)}
-
-MAE <- function(truth, prediction) {
-  mean(abs(truth - prediction))}
-
-MAPE <- function(truth, prediction) {
-  100 * mean(abs(truth - prediction) / truth)}
-
-MASE <- function(truth, prediction) {
-  100 * MAE(truth, prediction) / mean(abs(diff(truth)))}
-
-getErrors <- function(truth, prediction, type) {
-  return(data.frame(#"MSE" = MSE(truth, prediction), 
-                    "MAE"= MAE(truth, prediction), 
-                    #"MAPE" = MAPE(truth, prediction), 
-                    "MASE" = MASE(truth, prediction), 
-                    row.names = type))
-}
-
-getAccuracy = function(finalized, predictions, row_name = "") {
-  observed = (finalized |> 
-                filter(time_value %in% predictions$target_date))$deaths
-  return(cbind(
-    getErrors(observed, predictions$.pred, ""),
-    "Coverage" = mean(observed >= predictions$`0.1` & observed <= predictions$`0.9`), 
-    row.names = row_name))
+getErrors <- function(truth, preds) {
+  df <- inner_join(truth, preds, by = join_by(time_value == target_date))
+  df <- filter(df, !is.na(deaths), !is.na(.pred))
+  tibble("MAE" = MAE(df$deaths, df$.pred),
+         "MASE" = MASE(df$deaths, df$.pred),
+         "Coverage 80" = Coverage(df$deaths, df$`0.1`, df$`0.9`)
+  )
 }
 ```
 
 ```{r error-arx}
-getAccuracy(ca, pred_arx)
+getErrors(ca, pred_arx) |> knitr::kable(digits = 2)
 ```
 
 
-## Customizing `arx_forecaster()`
-
-```{r print-model-1}
-#| echo: true
-#| eval: false
-#| code-line-numbers: "|4"
-arx_forecaster(
-  epi_data = train, 
-  outcome = "deaths", 
-  predictors = c("cases", "deaths"),
-  trainer = linear_reg() |> set_engine("lm"),
-  args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))
-)
-```
-
-::: {.fragment .fade-in}
-* Modify `predictors` to add/drop predictors 
-
-  * <span class="inner-list">e.g. drop `deaths` for regression with a 
-  lagged predictor, or drop `cases` to get AR model</span>
-
-  * <span class="inner-list">default: `predictors = outcome`</span>
-
-:::  
-  
 
 ## Customizing `arx_forecaster()`
 
 ```{r print-model-3}
 #| echo: true
 #| eval: false
-#| code-line-numbers: "6-7"
+#| code-line-numbers: "|4|5|6"
 arx_forecaster(
   epi_data = train, 
   outcome = "deaths", 
@@ -511,9 +822,8 @@ arx_forecaster(
 )
 ```
 
-* Modify `arx_args_list` to change lags, horizon, quantile levels, ...
 
-::: {.fragment .fade-in}
+::: {.fragment}
 ```{r arx_args_list}
 #| echo: true
 #| eval: false
@@ -525,7 +835,7 @@ arx_args_list(
   target_date = NULL,
   adjust_latency = c("none", "extend_ahead", "extend_lags", "locf"),
   warn_latency = TRUE,
-  quantile_levels = c(0.05, 0.95),
+  quantile_levels = c(0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
   symmetrize = TRUE,
   nonneg = TRUE,
   quantile_by_key = character(0L),
@@ -536,68 +846,33 @@ arx_args_list(
 ```
 :::
 
-## Customizing `arx_forecaster()`
 
-### Change predictors: doctor visits instead of cases
-
-```{r get-doctor-visits-data}
-#| echo: true
-#| eval: false
-dv_archive <- pub_covidcast(
-  source = "doctor-visits",
-  signals = "smoothed_adj_cli",
-  time_type = "day",
-  geo_type = "state",
-  time_values = epirange(20200401, 20230401),
-  geo_values = "*",
-  issues = epirange(20200401, 20230401)) |>
-  select(geo_value, time_value, version = issue, doctor_visits = value) |>
-  arrange(geo_value, time_value) |>
-  as_epi_archive(compactify = FALSE)
-```
-
-## Customizing `arx_forecaster()`
-
-### Change predictors: doctor visits instead of cases
-
-```{r get-archives, warning=FALSE}
-ca_archive_dv <- covid_archive_dv$DT |> 
-  filter(geo_value == "ca") |>
-  as_epi_archive()
-
-usa_archive_dv <- covid_archive_dv$DT |> 
-  as_epi_archive()
-
-usa_archive <- covid_archive$DT |> 
-  as_epi_archive()
-```
 
 
 ```{r arx-with-dv}
-#| echo: true
-#| code-line-numbers: "4"
+#| echo: false
 pred_arx_hosp <- ca_archive_dv |> epix_slide(
   ~ arx_forecaster(epi_data = .x,
                    outcome = "deaths", 
                    predictors = c("deaths", "doctor_visits"), 
                    trainer = linear_reg(),
                    args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))
-  )$predictions |>
-    pivot_quantiles_wider(.pred_distn),
+  ) |> pluck("predictions") |> pivot_quantiles_wider(.pred_distn),
   .before = w, 
   .versions = fc_time_values
 )
 ```
 
-## Predictions (doctor visits instead of cases in predictor set)
+## Doctor visits instead of cases in predictor set
 
 ```{r arx-with-dv-plot}
-#| fig-align: left
+#| fig-width: 7
+#| fig-height: 3
 pred_arx_hosp |>
   ggplot(aes(target_date, .pred)) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .5, fill = tertiary) +
   geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_line(col = tertiary) +
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + h, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
@@ -606,52 +881,9 @@ pred_arx_hosp |>
 ```
 
 ```{r error-arx-with-dv}
-getAccuracy(ca, pred_arx_hosp)
+getErrors(ca, pred_arx_hosp) |> knitr::kable(digits = 2)
 ```
 
-
-## Customizing `arx_forecaster()`
-
-### Add more lags
-
-```{r arx-with-more-lags}
-#| echo: true
-#| code-line-numbers: "7"
-pred_arx_more_lags <- ca_archive_dv |> epix_slide(
-  ~ arx_forecaster(epi_data = .x,
-                   outcome = "deaths", 
-                   predictors = c("deaths", "doctor_visits"), 
-                   trainer = linear_reg(),
-                   args_list = arx_args_list(
-                     lags = c(0, 7, 14), 
-                     ahead = 28, quantile_levels = c(0.1, 0.9)
-                   )
-  )$predictions |>
-    pivot_quantiles_wider(.pred_distn),
-  .before = w, 
-  .versions = fc_time_values
-)
-```
-
-## Predictions (more lags)
-
-```{r arx-with-more-lags-plot}
-#| fig-align: left
-pred_arx_more_lags |>
-  ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + h, lty = 2) +
-  labs(x = "", y = "Deaths per 100k people") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.title = element_blank())
-```
-
-```{r error-arx-more-lags}
-getAccuracy(ca, pred_arx_more_lags)
-```
 
 
 
@@ -661,42 +893,36 @@ getAccuracy(ca, pred_arx_more_lags)
 
 ```{r arx-multiple-h}
 #| echo: true
-#| code-line-numbers: "1-2,11,18|19-20"
+#| code-line-numbers: "1-2,12|15"
+h <- c(7, 14, 21, 28)
 forecast_times <- seq(from = t0_date, to = as.Date("2023-02-23"), by = "1 month")
 pred_h_days_ahead <- function(epi_archive, ahead = 7) {
   epi_archive |>
-    epix_slide(
-      ~ arx_forecaster(epi_data = .x,
-                       outcome = "deaths", 
-                       predictors = c("deaths", "doctor_visits"), 
-                       trainer = linear_reg() |> set_engine("lm"),
-                       args_list = arx_args_list(
-                         lags = 0,  
-                         ahead = ahead,
-                         quantile_levels = c(0.1, 0.9))
-      )$predictions |> 
-        pivot_quantiles_wider(.pred_distn),
+    epix_slide(~ arx_forecaster(epi_data = .x,
+                                outcome = "deaths", 
+                                predictors = c("deaths", "doctor_visits"), 
+                                trainer = linear_reg(),
+                                args_list = arx_args_list(lags = 0, ahead = ahead, quantile_levels = c(0.1, 0.9))
+    )|> pluck("predictions") |> pivot_quantiles_wider(.pred_distn),
   .before = w, 
   .versions = forecast_times
   )
 }
-h <- c(7, 14, 21, 28)
 forecasts <- bind_rows(map(h, ~ pred_h_days_ahead(ca_archive_dv, ahead = .x)))
 ```
 
 ## Predictions (multiple horizons)
 
 ```{r arx-multiple-h-plot}
-#| fig-width: 8
-#| fig-height: 5
+#| fig-width: 7
+#| fig-height: 4
 ggplot(data = forecasts, aes(x = target_date, group = forecast_date)) +
+  geom_vline(aes(xintercept = forecast_date, color = factor(forecast_date)), 
+             alpha = .5) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`, fill = factor(forecast_date)), 
               alpha = 0.4) +
-  geom_vline(aes(xintercept = forecast_date, color = factor(forecast_date)), 
-             lty = 2) +
-  geom_line(data = ca,
-    aes(x = time_value, y = deaths),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5
+  geom_line(data = ca, aes(x = time_value, y = deaths),
+    inherit.aes = FALSE, na.rm = TRUE, color = primary
   ) +
   geom_line(aes(y = .pred, color = factor(forecast_date))) +
   geom_point(aes(y = .pred, color = factor(forecast_date))) +
@@ -742,12 +968,8 @@ pred_arx_rf <- ca_archive_dv |>
                      outcome = "deaths", 
                      predictors = c("deaths", "doctor_visits"), 
                      trainer = parsnip::rand_forest(mode = "regression"), # defaults to ranger
-                     args_list = arx_args_list(
-                       lags = 0,
-                       ahead = 28,
-                       quantile_levels = c(0.1, 0.9))
-                     )$predictions |>
-        pivot_quantiles_wider(.pred_distn),
+                     args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))
+    ) |> pluck("predictions") |> pivot_quantiles_wider(.pred_distn),
   .before = w, 
   .versions = fc_time_values
 )
@@ -756,12 +978,13 @@ pred_arx_rf <- ca_archive_dv |>
 ## Predictions (trained using random forest)
 
 ```{r arx-with-random-forests-plot}
-#| fig-align: left
+#| fig-width: 7
+#| fig-height: 3
 pred_arx_rf |>
   ggplot(aes(target_date, .pred)) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = fifth_colour) +
   geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_line(col = fifth_colour) +
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + 28, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
@@ -771,20 +994,19 @@ pred_arx_rf |>
 
 
 ```{r error-arx-random-forests}
-getAccuracy(ca, pred_arx_rf)
+getErrors(ca, pred_arx_rf) |> knitr::kable(digits = 2)
 ```
 
-## Warning!
-
+::: {.absolute .box-text .fragment top=10%}
 * Random forests has really [poor coverage]{.primary} here.
-
 * The reason is the way intervals are calculated.
-
 * Can [change engine]{.primary} to get better coverage: 
 
-specify `engine = "grf_quantiles"` in the `rand_forest` call
+specify `parsnip::rand_forest(mode = "regression", engine = "grf_quantiles")`
+:::
 
-## Predictions from a random forest with `grf_quantiles`
+
+## Predictions from a random forest with `grf_quantiles()`
 
 ```{r arx-with-grf}
 pred_arx_grf <- ca_archive_dv |>
@@ -802,11 +1024,16 @@ pred_arx_grf <- ca_archive_dv |>
   .before = w, 
   .versions = fc_time_values
 )
+```
+
+```{r plot-arx-with-grf}
+#| fig-width: 7
+#| fig-height: 3
 pred_arx_grf |>
   ggplot(aes(target_date, .pred)) +
+  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = secondary) +
   geom_line(data = ca, aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
+  geom_line(col = secondary) +
   geom_vline(xintercept = t0_date) +    
   geom_vline(xintercept = t0_date + 28, lty = 2) +
   labs(x = "", y = "Deaths per 100k people") +
@@ -816,8 +1043,34 @@ pred_arx_grf |>
 
 
 ```{r error-arx-grf}
-getAccuracy(ca, pred_arx_grf)
+getErrors(ca, pred_arx_grf) |> knitr::kable(digits = 2)
 ```
+
+## What are these intervals?
+
+* `{epipredict}` takes quantiles of training residuals to form its prediction intervals
+* In comparison to traditional (parametric) intervals from `lm()`, this is more flexible
+* It can in principle adapt to asymmetric or heavy-tailed error distributions
+
+<br>
+
+Taking quantiles of training residuals can be problematic if the model is overfit. 
+
+<br>
+
+Quantile regression provides an alternative, wherein we estimate these quantiles directly
+
+Technically, `grf_quantiles()` was using Quantile Loss with Random Forests
+
+## Quantile regression
+
+Now we directly target conditional quantiles of the outcome over time. 
+
+Estimating tail quantiles [requires more data]{.primary}, so
+
+  * unsuitable for settings with small training set (e.g. trailing window on one state)
+  
+  * can benefit by combination with geo-pooling (much more data to train on)
 
 
 ## Geo-pooling
@@ -837,65 +1090,45 @@ getAccuracy(ca, pred_arx_grf)
 
 * We will now pool data from [all US states]{.primary} to make predictions.
 
+* Also switch to using (linear) quantile regression (medians and intervals) `quantreg::rq()`
+
 ## Geo-pooling
 
 ```{r arx-geo-pooling}
 #| echo: true
-#| code-line-numbers: "1"
+#| code-line-numbers: "1|5-6"
 pred_arx_geo_pool <- usa_archive_dv |> epix_slide(
   ~ arx_forecaster(epi_data = .x,
                    outcome = "deaths", 
                    predictors = c("deaths", "doctor_visits"), 
-                   args_list = arx_args_list(lags = 0, ahead = 28, quantile_levels = c(0.1, 0.9))
-  )$predictions |>
-    pivot_quantiles_wider(.pred_distn),
+                   trainer = quantile_reg(),
+                   args_list = arx_args_list(ahead = 28, quantile_levels = c(0.1, 0.9))
+  ) |> pluck("predictions") |> pivot_quantiles_wider(.pred_distn),
   .before = w, 
   .versions = fc_time_values
 )
 ```
+
 [Note]{.primary}: geo-pooling is the default in `epipredict`
 
-
-```{r arx-geo-pooling-plot-ca, eval=FALSE}
-## Predictions (geo-pooling): California
-#[Error is worse]{.primary} than without geo-pooling, 
-#but much [better coverage]{.primary} (close to nominal 80%)
-
-#| fig-width: 7
-pred_arx_geo_pool |>
-  filter(geo_value == "ca") |>
-  ggplot(aes(target_date, .pred)) +
-  geom_line(data = ca,
-            aes(x = time_value, y = deaths), inherit.aes = FALSE, col = primary) + 
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + 28, lty = 2) +
-  labs(x = "", y = "Deaths per 100k people") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.title = element_blank())
-```
-
-```{r error-arx-geo-pooling, eval=FALSE}
-pred_ca_geo_pool <- pred_arx_geo_pool |> filter(geo_value == "ca")
-getAccuracy(ca, pred_ca_geo_pool, "CA")
-```
 
 
 ## Predictions (geo-pooling, $h=28$)
 
 ```{r finalized-ma-ny-tx}
-ma <- cases_deaths |> filter(geo_value == "ma")
-ny <- cases_deaths |> filter(geo_value == "ny")
-tx <- cases_deaths |> filter(geo_value == "tx")
+state_selection <- c("ca", "ma", "ny", "tx")
+example_states<- usa_archive |> 
+  epix_as_of_current() |>
+  filter(geo_value %in% state_selection)
 ```
 
 ```{r arx-geo-pooling-plot}
 #| fig-width: 7
+#| fig-height: 3
 pred_arx_geo_pool |>
-  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
+  filter(geo_value %in% state_selection) |>
   ggplot(aes(target_date, .pred)) +
-  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
+  geom_line(data = example_states,  aes(x = time_value, y = deaths),
     inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
   geom_line(col = tertiary) +
   geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = tertiary) +
@@ -908,95 +1141,6 @@ pred_arx_geo_pool |>
 
 ```
 
-
-
-```{r error-geo-pooling-all-states}
-rbind(getAccuracy(ca,
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
-                  "CA"),
-      getAccuracy(ma, 
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
-                  "MA"),
-      getAccuracy(ny,
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
-                  "NY"),
-      getAccuracy(tx,
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
-                  "TX"))
-```
-
-## Predict without geo-pooling
-
-```{r arx-no-geo-pooling}
-#| echo: true
-pred_arx_no_geo_pool <- function(archive, ahead = 28, lags = 0){
-  archive |>
-    epix_slide(
-      ~ group_by(.x, geo_value) |> 
-        group_map(.keep = TRUE, function(group_data, group_key) {
-          arx_forecaster(epi_data = group_data,
-                         outcome = "deaths", 
-                         predictors = c("deaths", "doctor_visits"), 
-                         trainer = linear_reg() |> set_engine("lm"),
-                         args_list = arx_args_list(
-                           lags = lags,
-                           ahead = ahead,
-                           quantile_levels = c(0.1, 0.9))
-                         )$predictions |>
-            pivot_quantiles_wider(.pred_distn)
-        }) |>
-        list_rbind(),
-    .before = w, 
-    .versions = fc_time_values
-    )}
-
-pred_no_geo_pool_28 <- pred_arx_no_geo_pool(usa_archive_dv$DT |> 
-                                              filter(geo_value %in% c("ca", "ma", "ny", "tx")) |> 
-                                              as_epi_archive())
-```
-
-## Predictions (without geo-pooling, $h=28$)
-
-```{r arx-no-geo-pooling-plot}
-#| fig-width: 7
-pred_no_geo_pool_28 |>
-  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
-  ggplot(aes(target_date, .pred)) +
-  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + 28, lty = 2) +
-  facet_wrap(vars(geo_value), scales = 'free_y') +
-  labs(x = "", y = "Deaths per 100k people") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.position = "none")
-
-```
-
-```{r error-no-geo-pooling-all-states}
-rbind(getAccuracy(ca,
-                  pred_no_geo_pool_28 |> 
-                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
-                  "CA"),
-      getAccuracy(ma, 
-                  pred_no_geo_pool_28 |> 
-                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
-                  "MA"),
-      getAccuracy(ny,
-                  pred_no_geo_pool_28 |> 
-                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
-                  "NY"),
-      getAccuracy(tx,
-                  pred_no_geo_pool_28 |> 
-                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
-                  "TX"))
-```
 
 ## Geo-pooling or not?
 
@@ -1004,239 +1148,10 @@ rbind(getAccuracy(ca,
 
 * Generally with [wider intervals]{.primary} (and better coverage)
 
-* Meanwhile, predictions from state-wise models tend to be [more volatile]{.primary}
+* Meanwhile, predictions from state-specific models tend to be [more volatile]{.primary}
 
 The extent to which this occurs differs based on the horizon. 
 
-Previously we studied $h=28$. What happens for $h=7$?
-
-```{r arx-geo-pooling-h7}
-pred_arx_geo_pool_7 <- usa_archive_dv |>
-  epix_slide(
-    ~ arx_forecaster(epi_data = .x,
-                     outcome = "deaths", 
-                     predictors = c("deaths", "doctor_visits"), 
-                     trainer = linear_reg() |> set_engine("lm"),
-                     args_list = arx_args_list(
-                       lags = 0, 
-                       ahead = 7,
-                       quantile_levels = c(0.1, 0.9))
-                     )$predictions |>
-        pivot_quantiles_wider(.pred_distn),
-  .before = w, 
-  .versions = fc_time_values
-)
-
-pred_no_geo_pool_7 <- pred_arx_no_geo_pool(usa_archive_dv$DT |> 
-                                              filter(geo_value %in% c("ca", "ma", "ny", "tx")) |> 
-                                              as_epi_archive(), ahead = 7)
-```
-
-
-## Predictions (geo-pooling, $h = 7$)
-
-```{r arx-geo-pooling-plot-h7}
-#| fig-width: 7
-pred_arx_geo_pool_7 |>
-  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
-  ggplot(aes(target_date, .pred)) +
-  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
-  geom_line(col = tertiary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = tertiary) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + 28, lty = 2) +
-  facet_wrap(vars(geo_value), scales = 'free_y') +
-  labs(x = "", y = "Deaths per 100k people") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.position = "none")
-
-```
-
-```{r error-geo-pooling-all-states-h7}
-rbind(getAccuracy(ca,
-                  pred_arx_geo_pool_7 |> 
-                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
-                  "CA"),
-      getAccuracy(ma, 
-                  pred_arx_geo_pool_7 |> 
-                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
-                  "MA"),
-      getAccuracy(ny,
-                  pred_arx_geo_pool_7 |> 
-                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
-                  "NY"),
-      getAccuracy(tx,
-                  pred_arx_geo_pool_7 |> 
-                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
-                  "TX"))
-```
-
-
-## Predictions (without geo-pooling, $h=7$)
-
-```{r arx-no-geo-pooling-plot-h7}
-#| fig-width: 7
-pred_no_geo_pool_7 |>
-  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
-  ggplot(aes(target_date, .pred)) +
-  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
-  geom_line(col = primary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = primary) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + 28, lty = 2) +
-  facet_wrap(vars(geo_value), scales = 'free_y') +
-  labs(x = "", y = "Deaths per 100k people") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.position = "none")
-
-```
-
-```{r error-no-geo-pooling-all-states-h7}
-rbind(getAccuracy(ca,
-                  pred_no_geo_pool_7 |> 
-                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
-                  "CA"),
-      getAccuracy(ma, 
-                  pred_no_geo_pool_7 |> 
-                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
-                  "MA"),
-      getAccuracy(ny,
-                  pred_no_geo_pool_7 |> 
-                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
-                  "NY"),
-      getAccuracy(tx,
-                  pred_no_geo_pool_7 |> 
-                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
-                  "TX"))
-```
-
-## What are these ARX intervals?
-
-* `{epipredict}` takes quantiles of training residuals to form its prediction intervals
-* In comparison to traditional (parametric) intervals from `lm()`, this is more flexible
-* It can in principle adapt to asymmetric or heavy-tailed error distributions
-
-<br>
-
-Taking quantiles of training residuals can be problematic if the model is overfit. 
-
-<br>
-
-Quantile regression provides an alternative, wherein we estimate these quantiles directly
-
-Technically, `grf_quantiles` was using Quantile Loss with Random Forests
-
-## Quantile regression
-
-Now we directly target conditional quantiles of the outcome over time. 
-
-Estimating tail quantiles [requires more data]{.primary}, so
-
-  * unsuitable for settings with small training set (e.g. trailing window on one state)
-  
-  * can benefit by combination with geo-pooling (much more data to train on)
-
-```{r qr-geo-pooling}
-#| echo: true
-#| code-line-numbers: "|8"
-library(quantreg)
-
-pred_qr_geo_pool <- usa_archive_dv |>
-  epix_slide(
-    ~ arx_forecaster(epi_data = .x,
-                     outcome = "deaths", 
-                     predictors = c("deaths", "doctor_visits"), 
-                     trainer = quantile_reg(),
-                     args_list = arx_args_list(
-                       lags = 0, 
-                       ahead = 28,
-                       quantile_levels = c(0.1, 0.9))
-                     )$predictions |>
-        pivot_quantiles_wider(.pred_distn),
-  .before = w, 
-  .versions = fc_time_values
-)
-```
-
-## Predictions (geo-pooling + quantile regression, $h=28$)
-
-```{r qr-geo-pooling-plot}
-#| fig-width: 7
-pred_qr_geo_pool |>
-  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
-  ggplot(aes(target_date, .pred)) +
-  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
-  geom_line(col = tertiary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = tertiary) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + 28, lty = 2) +
-  facet_wrap(vars(geo_value), scales = 'free_y') +
-  labs(x = "", y = "Deaths per 100k people") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.position = "none")
-
-```
-
-```{r error-qr-geo-pooling-all-states}
-rbind(getAccuracy(ca,
-                  pred_qr_geo_pool |> 
-                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
-                  "CA"),
-      getAccuracy(ma, 
-                  pred_qr_geo_pool |> 
-                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
-                  "MA"),
-      getAccuracy(ny,
-                  pred_qr_geo_pool |> 
-                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
-                  "NY"),
-      getAccuracy(tx,
-                  pred_qr_geo_pool |> 
-                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
-                  "TX"))
-```
-
-## Predictions (geo-pooling + linear regression, $h=28$)
-
-```{r arx-geo-pooling-plot-lm}
-#| fig-width: 7
-pred_arx_geo_pool |>
-  filter(geo_value %in% c("ca", "ma", "ny", "tx")) |>
-  ggplot(aes(target_date, .pred)) +
-  geom_line(data = rbind(ca, ma, ny, tx),  aes(x = time_value, y = deaths),
-    inherit.aes = FALSE, na.rm = TRUE, alpha = .5) +
-  geom_line(col = tertiary) +
-  geom_ribbon(aes(ymin = `0.1`, ymax = `0.9`), alpha = .3, fill = tertiary) +
-  geom_vline(xintercept = t0_date) +    
-  geom_vline(xintercept = t0_date + 28, lty = 2) +
-  facet_wrap(vars(geo_value), scales = 'free_y') +
-  labs(x = "", y = "Deaths per 100k people") +
-  scale_y_continuous(expand = expansion(c(0, .05))) +
-  theme(legend.position = "none")
-
-```
-
-```{r error-geo-pooling-all-states-lm}
-rbind(getAccuracy(ca,
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "ca" & target_date %in% ca$time_value), 
-                  "CA"),
-      getAccuracy(ma, 
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "ma" & target_date %in% ma$time_value), 
-                  "MA"),
-      getAccuracy(ny,
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "ny" & target_date %in% ny$time_value), 
-                  "NY"),
-      getAccuracy(tx,
-                  pred_arx_geo_pool |> 
-                    filter(geo_value == "tx" & target_date %in% tx$time_value), 
-                  "TX"))
-```
 
 
 # Build a Forecaster from Scratch {.inverse}
@@ -1255,7 +1170,7 @@ rbind(getAccuracy(ca,
 
 :::
 
-## Under the hood of `arx_forecaster()`
+## Under the hood of `arx_forecaster()` (roughly)
 
 ```{r forecaster-from-scratch}
 #| echo: true
@@ -1290,224 +1205,140 @@ trained_ewf <- fit(ewf, data = ca)
 fcasts <- forecast(trained_ewf)
 ```
 
-## Predicting influenza hospitalizations
+## Predicting influenza test positivity 
 
-* Current task: predict influenza hospitalizations for all states + DC + PR.
-* Forecasts submitted to [CDC Flusight Forecast Hub](https://github.com/cdcepi/FluSight-forecast-hub)
+* Predict test positivity for 3 pathogens (flu, RSV, covid)
+* 6 regions (ON, BC, QC, Prairies, Atlantic, Territories) + National
+* Worked with UGuelph to build [AI4Casting Hub](https://4castinghub.uoguelph.ca/respiratory-virus-detections/)
 
-Specifically:
-
-1. From November 20, 2024 until May 31, 2025
-2. Every Wednesday at 11pm EDT
-3. Predict 0, 1, 2, 3 epiweeks ahead
-4. Point forecast + 23 quantiles
-5. Response is [NHSN Weekly Hospitalizations](https://data.cdc.gov/Public-Health-Surveillance/Weekly-Hospital-Respiratory-Data-HRD-Metrics-by-Ju/mpgq-jmmr/about_data)
-
-From here on, the emphasis is "how" to make these adjustments. Ran out of time to evaluate!
-
-## Aside: data issues
-
-* Hospital reporting was down for a period over the summer.
-
-* The current data doesn't seem to match the historical data very well.
-
-```{r}
-#| fig-width: 7
-hhs_v_nhsn <- read_rds(here::here("_data", "hhs_v_nhsn.rds"))
-hhs_v_nhsn |>
-  filter(geo_value %in% c("la", "tx")) |>
-  pivot_longer(cols = c(old_source, new_source)) |>
-  ggplot(aes(time_value, value, color = name)) +
-  geom_line(key_glyph = "timeseries") +
-  labs(x = "", y = "Weekly incident hospitalizations") +
-  facet_wrap(~ geo_value, scales = "free_y") +
-  scale_color_delphi(name = "") +
-  scale_y_continuous(expand = expansion(c(0, 0.05)))
-```
-
-## We don't know if we trust the data yet enough
-
-* It may get revised significantly
-
-* Let's do something super simple, until we're more confident
-
-Climatological forecaster
-: For a given epiweek, predict the historical quantiles
-: Make adjustments to address the fact that we have some new data
-: Privledge the history
-
-Think like the weather: "what is the typical weather in February in Georgia, that's our forecast"
+. . .
 
 
+1. From November 25, 2024 until May 31, 2025
+2. Every Saturday by 11pm EDT
+3. Predict -1, 0, 1, 2, 3 epiweeks ahead
+4. Point forecast + 7 quantiles
+5. Response is [RVDSS % Test Positivity from PHAC](https://www.canada.ca/en/public-health/services/surveillance/respiratory-virus-detections-canada.html)
 
-## Climatological forecaster
-
-```{r}
-`%nin%` <- function(x, y) !(x %in% y)
-climate_data <- read_rds(here::here("_data", "climatological_model_data.rds")) |>
-  mutate(geo_value = substr(geo_value, 1, 2)) |>
-  filter(geo_value %nin% c("as", "gu", "mp", "vi"))
-```
-
-```{r}
-#| echo: true
-climatological_model <- function(epi_data, forecast_date, ahead, window_size = 3, geo_agg = FALSE) {
-  forecast_week <- epiweek(forecast_date)
-  last_date_data <- max(epi_data$time_value)
-  probs <- c(.1, .5, .9)
-  filtered <- epi_data |> 
-    filter(
-      (season != "2020/21") & (season != "2021/22"), # drop weird years
-      # keep data either within the window, or within the past window weeks
-      (abs(forecast_week + ahead - epiweek) <= window_size) |
-        (last_date_data - time_value <= window_size * 7)
-    )
-  if (geo_agg) {
-    filtered <- filtered |>
-      left_join(state_census |> select(geo_value = abbr, pop), by = "geo_value") |>
-      mutate(nhsn = nhsn / pop * 1e5) %>%
-      select(geo_value, epiweek, epiyear, season, season_week, nhsn, pop)
-  } else {
-    filtered <- filtered |> group_by(geo_value)
-  }
-  naive_preds <- filtered |> reframe(enframe(
-    quantile(nhsn, probs = probs, na.rm = TRUE, type = 8), name = "quantile"
-  )) |>
-    mutate(
-      forecast_date = forecast_date,
-      target_end_date = forecast_date + ahead * 7,
-      quantile = as.numeric(sub("%", "", quantile)) / 100,
-      value = pmax(0, value)
-    )
-  if (geo_agg) {
-    naive_preds <- naive_preds |>
-      expand_grid(filtered |> distinct(geo_value, pop)) |>
-      mutate(value = value * pop / 1e5) |>
-      select(-pop) |>
-      select(geo_value, forecast_date, target_end_date, quantile, value) |>
-      arrange(geo_value, forecast_date, target_end_date)
-  }
-  naive_preds |> ungroup() |> mutate(value = pmax(0, value))
-}
-```
-
-## Climate predictions for this week
-
-```{r}
-geos <- c("ca", "ma", "ny", "tx")
-climate_preds <- map(
-  0:3, 
-  ~ climatological_model(climate_data, ymd("2024-12-14"), .x, geo_agg = TRUE) |>
-    filter(geo_value %in% geos)
-) |> list_rbind() |> pivot_wider(names_from = quantile, values_from = value)
-
-td <- climate_data |> filter(geo_value %in% geos, time_value >= ymd("2024-09-01"))
-ggplot() +
-  geom_ribbon(data = climate_preds, aes(x = target_end_date, ymin = `0.1`, ymax = `0.9`), fill = primary, alpha = 0.3) +
-  geom_line(data = climate_preds, aes(x = target_end_date, y = `0.5`), color = primary) +
-  geom_line(data = td, aes(x = time_value, y = nhsn), color = primary) +
-  geom_vline(xintercept = ymd("2024-12-14")) +
-  facet_wrap(~ geo_value, scales = "free_y") +
-  scale_y_continuous(name = "Weekly incident flu hospitalizations", expand = expansion(c(0, .05))) +
-  xlab("Reference date")
-```
+::: {.fragment .absolute .box-text top=10%}
+* Thanks to Christine Chuong (UBC MSc Student)
+* Built and ran this forecaster
+* Scraped RVDSS data, updates every week: <https://github.com/dajmcdon/rvdss-canada/>
+:::
 
 
-## Almost our production forecaster (data munging)
 
 ```{r prod-munging}
-#| echo: true
 #| eval: false
-climate <- climatological_feature(climate_data |> select(nhsn, epiweek, season, geo_value))
-nssp <- pub_covidcast( # time_value is first day of the epiweek
-  source = "nssp",
-  signal = "pct_ed_visits_influenza",
-  time_type = "week",
-  geo_type = "state",
-  geo_values = "*"
-) |>
-  select(geo_value, time_value, nssp = value)
+base_url <- "https://raw.githubusercontent.com/dajmcdon/rvdss-canada/main/data/"
+historic_years <- 2013:2023
+all_seasons <- paste0(historic_years, "_", historic_years + 1)
+historic_data <- lapply(all_seasons, function(x) {
+  read.csv(
+    paste0(base_url,"season_",  x, "/positive_tests.csv"),
+    colClasses = c("geo_value" = "factor", "geo_type" = "factor", "issue" = "Date", "time_value" = "Date")
+  ) |> mutate(season = x) |> filter(issue == max(issue)) # only get the last version of each season
+}) |> 
+  bind_rows() |>
+  filter(geo_type != 'province') |>
+  mutate(flu_pct_positive = flua_pct_positive + flub_pct_positive) |>
+  select(epiweek, geo_value, flu_pct_positive) |> 
+  mutate(
+    yyyy = as.numeric(substr(epiweek, 1, 4)),
+    ww = as.numeric(substr(epiweek, 5, 6)),
+    time_value = ymd(MMWRweek::MMWRweek2Date(yyyy, ww))
+  ) |>
+  select(-c(yyyy, ww, epiweek)) |>
+  as_epi_df() |>
+  mutate(version = max(time_value))
 
-flu_data <- hhs_v_nhsn |>
-  select(time_value, geo_value, hhs = new_source) |>
-  left_join(nssp |> mutate(time_value = time_value + 6), by = join_by(geo_value, time_value))
+current_season <- read.csv(paste0(base_url,"season_2024_2025","/positive_tests.csv"),
+  colClasses = c("geo_value" = "factor", "geo_type" = "factor", "issue" = "Date", "time_value" = "Date")
+  ) |> 
+  filter(geo_type != "province") |>
+  select(time_value, geo_value, version = issue, flu_pct_positive) 
 
-n_geos <- n_distinct(flu_data$geo_value)
-max_time_value <- max(flu_data$time_value)
-empty_data <- tibble(
-  time_value = rep(max_time_value + days(1:3 * 7), each = n_geos),
-  geo_value = rep(unique(flu_data$geo_value), times = 3),
-  nssp = NA, hhs = NA
-)
-
-flu_data <- flu_data |>
-  filter(month(time_value) %in% 8:12, year(time_value) %nin% c(2020, 2021)) |>
-  add_row(empty_data) |>
-  mutate(epiweek = epiweek(time_value)) |>
-  left_join(climate, by = join_by(geo_value, epiweek)) |>
-  select(!epiweek) |>
-  filter(geo_value %nin% c("as", "vi", "gu", "mp", "usa")) |>
-  arrange(geo_value, time_value) |>
-  as_epi_df()
+rvdss_data <- bind_rows(historic_data, current_season) |>
+  as_epi_archive()
+write_rds(rvdss_data$dt, here::here("_data", "rvdss_data_dt.rds"))
 ```
 
-## Almost our production forecaster (workflow)
+```{r load-rvdss}
+rvdss_data <- read_rds(here::here("_data", "rvdss_data_dt.rds")) |>
+  as_epi_archive()
+```
+
+## Almost our production forecaster
 
 ```{r prod-fcaster}
 #| echo: true
-#| eval: false
-r <- epi_recipe(flu_data) |>
-  step_population_scaling(
-    hhs, nssp,
-    df = epidatasets::state_census,
-    df_pop_col = "pop",
-    create_new = FALSE,
-    rate_rescaling = 1e5,
-    by = c("geo_value" = "abbr")) |>
-  recipes::step_mutate(hhs = hhs^(1/4), nssp = nssp^(1/4), climate_pred = climate_pred^(1/4)) |>
-  step_epi_lag(hhs, lag = c(0, 7, 14)) |>
-  step_epi_lag(nssp, lag = c(0, 7, 14)) |>
-  step_epi_ahead(hhs, ahead = 21) |>
-  step_epi_ahead(climate_pred, ahead = 21, role = "predictor") |>
-  step_epi_naomit()
+prod_forecaster <- function(epidata, ahead) {
+  Logit <- function(x, a = 0.01) log((x + a) / (1 - x + a))
+  Sigmd <- function(y, a = 0.01) (exp(y) * (1 + a) - a) / (1 + exp(y))
 
-e <- quantile_reg(quantile_levels = c(0.1, 0.25, 0.5, 0.75, 0.9)) 
+  quantile_levels <- c(0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975)
+  forecast_date <- attr(epidata, "metadata")$as_of
+  target_date <- forecast_date + ahead - 7
+  r <- epi_recipe(epidata) |>
+    step_adjust_latency(recipes::all_outcomes(), fixed_forecast_date = forecast_date, method = "extend_ahead") |>
+    recipes::step_mutate(flu_pct_positive =  Logit(flu_pct_positive / 100)) |>
+    step_epi_lag(flu_pct_positive, lag = c(0, 7, 14)) |>
+    step_epi_ahead(flu_pct_positive, ahead = ahead) |>
+    step_climate(flu_pct_positive, forecast_ahead = ahead / 7, time_type = "epiweek", window_size = 3L) |>
+    step_training_window(n_recent = 12) |>
+    step_epi_naomit()
+  
+  e <- quantile_reg(quantile_levels = c(0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975))
+  f <- frosting() |> layer_predict() |> 
+    layer_quantile_distn(quantile_levels = quantile_levels) %>% 
+    layer_point_from_distn() |>
+    layer_add_forecast_date(forecast_date = forecast_date) |>
+    layer_add_target_date()
+  
+  ewf <- epi_workflow(r, e, f)
+  trained_ewf <- ewf |> fit(epidata)
+  
+  preds <- forecast(trained_ewf) |>
+    pivot_quantiles_wider(.pred_distn) |>
+    mutate(across(c(.pred, `0.025`:`0.975`), ~ Sigmd(.x) * 100)) |>
+    select(-time_value)
 
-f <- frosting() |>
-  layer_predict() |>
-  layer_threshold(.pred, lower = 0)
-ewf <- epi_workflow(r, e, f)
-trained_ewf <- ewf |> fit(flu_data)
-
-preds <- forecast(trained_ewf) |>
-  left_join(epidatasets::state_census |> select(pop, abbr), join_by(geo_value == abbr)) |>
-  mutate(
-    .pred = .pred^4 * pop / 1e5,
-    forecast_date = time_value + days(7),
-    target_date = forecast_date + days(14),
-    time_value = NULL,
-    pop = NULL
-  )
+  preds
+}
 ```
 
-## Plot our forecasts
+## Make the forecasts for all dates this season
+
+```{r rvdss-fcasts}
+#| echo: true
+aheads <- 1:4 * 7
+fcast_dates <- seq(ymd("2024-11-23"), ymd("2025-04-12"), by = "1 week")
+rvdss_forecasts <- function(archive, .ahead) {
+  epix_slide(archive, ~ prod_forecaster(.x, .ahead), .versions = fcast_dates)
+}
+all_forecasts <- bind_rows(map(aheads, ~ rvdss_forecasts(rvdss_data, .ahead = .x)))
+```
 
 ```{r plot-prod}
 #| fig-width: 7
-#| eval: false
-preds_wide <- preds |> pivot_quantiles_wider(.pred) |>
-  filter(geo_value %in% geos)
-ggplot() +
-  geom_linerange(data = preds_wide, aes(x = target_date, ymin = `0.1`, ymax = `0.9`),
-                 color = primary, alpha = .2, linewidth = 2) +
-  geom_linerange(data = preds_wide, aes(x = target_date, ymin = `0.25`, ymax = `0.75`),
-                 color = primary, alpha = .4, linewidth = 2) +
-  geom_line(data = flu_data |> filter(time_value > "2024-09-01", geo_value %in% geos),
-            aes(time_value, hhs)) +
-  geom_point(data = preds_wide, aes(x = target_date, y = `0.5`), color = primary) +
-  facet_wrap(~geo_value, scales = "free_y") +
-  geom_vline(xintercept = max_time_value + days(7), color = "grey40") +
-  scale_y_continuous(expand = expansion(c(0, .05)))
+#| fig-height: 3
+all_forecasts |>
+  filter(geo_value != "territories") |>
+  ggplot() +
+  geom_ribbon(aes(target_date, ymin = `0.1`, ymax = `0.9`, fill = geo_value, group = forecast_date), alpha = .2) +
+  geom_ribbon(aes(target_date, ymin = `0.25`, ymax = `0.75`, fill = geo_value, group = forecast_date), alpha = .4) +
+  geom_line(aes(target_date, .pred, color = geo_value, group = forecast_date)) +
+  geom_line(
+    data = rvdss_data |> epix_as_of_current() |> filter(geo_value != "territories", time_value > "2024-10-15"),
+    aes(time_value, flu_pct_positive)
+  ) +
+  facet_wrap(~ geo_value) +
+  scale_fill_delphi() +
+  scale_color_delphi() +
+  scale_x_date(date_breaks = "2 months", date_labels = "%b %Y") +
+  scale_y_continuous(labels = scales::label_percent(scale = 1), expand = expansion(0), limits = c(0, 100)) +
+  labs(y = "Influenza test positivity", x = "Date") +
+  theme(legend.position = "none")
 ```
 
 
@@ -1515,7 +1346,7 @@ ggplot() +
 
 ## Ensembling
 
-Instead of choosing one model, we can [combine]{.primary} the predictions from multiple base models. Ensemble types:
+Instead of choosing one model, we can [combine]{.primary} the predictions from multiple base models.
 
 * [untrained]{.primary}: combine base models, agnostic to past performance 
   
@@ -1535,28 +1366,45 @@ $$
 
 ## Example from the Covid-19 Forecast Hub  
   
-![](gfx/cramer.png)
+![](gfx/cramer.png){fig-align="center"}
 
 ## Two key goals of ensembling
 
-1 [Compete-with-best]{.primary}: ensemble should have accuracy competitive with best individual constituent model
+<br>
 
-2. [Robustness-over-all]{.primary}: ensemble should have greater robustness than any individual constituent model  
+#### 1. Compete-with-best: 
+ensemble should have accuracy competitive with best individual constituent model
 
-Typically these are hard to accomplish simultaneously, and untrained methods excel at point 2, whereas trained methods can achieve point 1
+<br>
 
-## Linear stacking
+#### 2. Robustness-over-all: 
+ensemble should have greater robustness than any individual constituent model  
 
-One of the simplest trained ensemble methods is to directly fit a weighted 
-combination of base forecasts to optimize accuracy (MSE, MAE, etc.), often 
-called linear stacking: e.g., to form the forecast at time $t$, we solve
+<br><br>
 
-\begin{alignat*}{2}
-&\min_{w \in \R^p} && \hspace{-6pt} \sum_{s=t_0+1}^t \bigg( y_s - \sum_{j=1}^p
+::: {.fragment}
+Typically these are hard to accomplish simultaneously, 
+
+* untrained methods excel at point 2, 
+* trained methods can achieve point 1
+:::
+
+
+## Linear stacking (trained ensemble)
+
+\newcommand{\R}{\mathbb{R}}
+
+* directly fit a weighted combination of base forecasts to optimize accuracy (MSE, MAE, etc.), 
+* often called linear stacking: e.g., to form the forecast at time $t$, we solve
+
+$$
+\begin{aligned}
+&\minimize_{w \in \R^p} \sum_{s=t_0+1}^t \bigg( y_s - \sum_{j=1}^p
 w_j \cdot \hat{y}^j_{s|s-h} \bigg)^2 \\   
-&\st \quad && \sum_{j=1}^p w_j = 1, \;\;\text{and} \;\; w_j \geq 0, \;
-j=1,\dots,p   
-\end{alignat*}
+&\text{subject to} \quad \sum_{j=1}^p w_j = 1, \;\;\text{and} \;\; w_j \geq 0, \;
+j=1,\dots,p
+\end{aligned}
+$$
 
 then use
 
@@ -1565,36 +1413,46 @@ $$
 \hat{y}^j_{t+h|t} 
 $$
 
-Note that the stacking optimization problem uses forward-looking predictions (as
-in time series cross-validation)
+::: {.box-text .absolute .fragment top=30%}
+The stacking optimization problem uses forward-looking predictions 
+
+(as in time series cross-validation)
+:::
 
 ## Recalibration
 
-* We have seen that prediction intervals often have [empirical coverage << nominal coverage]{.primary}, e.g., our 80% predictive intervals in practice cover $\approx$ 60% of the time
+<br>
 
-* Recalibration methods aim at adjusting the intervals so that nominal coverage $\approx$ empirical coverage
+Prediction intervals often have [empirical coverage $\ll$ nominal coverage]{.secondary}
+
+* e.g., our 80% predictive intervals in practice cover $\approx$ 60% of the time
+
+<br>
+
+Recalibration methods adjust the intervals so that 
+
+* nominal coverage $\approx$ empirical coverage
 
 ## Quantile tracking
 
-Quantile tracking is a method for producing calibrated prediction intervals 
-from base forecasts and scores. In the simplest case, we can take the score
-to be absolute error of point forecasts:
+Produces calibrated prediction intervals from base forecasts and scores. 
+
+In the simplest case, we can take the score to be absolute error of point forecasts:
 
 $$e_t = |y_t - \hat y_{t|t-1}|$$
 
 * Let $\hat q_{t}^{1-\alpha}$ be a predicted level $1-\alpha$ quantile of the distribution of $e_t$
 
-* Define $I_{t|t-1}^{1-\alpha} = [\hat{y}_{t|t-1} - \hat{q}_t^{1-\alpha}, \;     \hat{y}_{t|t-1} + \hat{q}_t^{1-\alpha}]$. Note that 
-    
-    $$
-    e_t \leq \hat{q}_t^{1-\alpha} \iff y_t \in I_{t|t-1}^{1-\alpha}
-    $$
+* Define $I_{t|t-1}^{1-\alpha} = [\hat{y}_{t|t-1} - \hat{q}_t^{1-\alpha}, \;     \hat{y}_{t|t-1} + \hat{q}_t^{1-\alpha}]$. 
+
+* Note that $e_t \leq \hat{q}_t^{1-\alpha} \iff y_t \in I_{t|t-1}^{1-\alpha}$
+
 * Therefore we the reduced the problem of producing prediction intervals $I_{t|t-1}^{1-\alpha}$ to one of tracking a quantile of $e_t$
 
 ## Quantile updates
 
-We begin with some estimate $\hat{q}_{t_0+1}^{1-\alpha}$ based on a burn-in set.
-Then repeat the following updates as $t$ increases, for a step size $\eta > 0$: 
+1. begin with some estimate $\hat{q}_{t_0+1}^{1-\alpha}$ based on a burn-in set.
+2. Then, for a step size $\eta > 0$, repeat the following updates as $t$ increases:
 
 $$\hat q_{t+1}^{1-\alpha} = \begin{cases} 
 \hat q_{t}^{1-\alpha} + \eta(1-\alpha) \quad \text{if } y_t\notin I_{t|t-1}^{1-\alpha} \\
@@ -1606,6 +1464,8 @@ In words:
 * if the latest interval does not cover, then we increase the quantile (make the next interval wider), 
 * otherwise we decrease the quantile by (make the next interval narrower).
 
+::: {.fragment .box-text .absolute top=10%}
+
 This method has the following guarantee: 
 
 $$
@@ -1614,4 +1474,5 @@ $$
 
 where $b$ is a bound on the errors (largest error possible/observable).
 
-## Multi-horizon smoothing
+:::
+
