@@ -409,11 +409,15 @@ Dates at least to [Alfred Lotka (1920s)]{.tertiary} and others (Feller, Blackwel
 :::
 :::
 
-::: {.fragment .box-text .absolute top=50 left=150}
 
-![Source: Katelyn Jetelina, "YLE Newsletter," 21 April 2025.](gfx/yle-measles.jpg){height=600}
-
+::: {.fragment .box-text .absolute top=0% left=10%}
+![Source: Katelyn Jetelina, "YLE Newsletter," 21 April 2025.](gfx/yle-measles.jpg){width=600}
 :::
+
+::: {.fragment .box-text .absolute top=0% left=10%}
+![Source: Public Health Ontario, 21 April 2025.](gfx/pho-measles.png){width=800}
+:::
+
 
 ## $R_0$ is entirely retrospective
 
@@ -1269,3 +1273,15 @@ ggplot(can_tvar_ci, aes(x = Date)) +
   theme(legend.position = "bottom")
 ```
 
+## Wrapup and practice
+
+* Basic compartmental modelling
+* Difficulties in estimating compartmental models
+* Standard epidemic parameters, $R_0$
+* Discussion of $R_t$ (model based vs nonparametric estimation)
+* Some custom $R_t$ software
+
+```{r wksheet}
+#| dev: png
+wkshtqr
+```
