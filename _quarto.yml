@@ -17,7 +17,7 @@ editor: source
 website:
   title: "EpiData Workshop 2025"
   page-footer:
-    left: "This work by the [Delphi Research Group](https://delphi.cmu.edu) is licensed under the [MIT license](LICENSE.md)."
+    left: "This work by the [Delphi Research Group](https://delphi.cmu.edu) is licensed under the [MIT license](/LICENSE.md)."
     right: "Supported in part by [NSERC](https://www.nserc-crsng.gc.ca), the [CSTE](https://www.cste.org), and the [CDC](https://www.cdc.gov)."
   navbar:
     pinned: false

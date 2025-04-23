@@ -56,10 +56,7 @@ With help from:
 * Logan C. Brooks
 * Rachel Lobay
 * Alice Clima
-* Olivia Liu
-* Paul Gustafson
-* Elvis Cai
-
+* Olivia Liu, Elvis Cai, and Paul Gustafson
 
 :::
 
