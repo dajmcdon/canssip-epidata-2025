@@ -2,6 +2,7 @@
 _site
 
 *_files/
+
 # History files
 .Rhistory
 .Rapp.history

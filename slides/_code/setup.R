@@ -53,3 +53,26 @@ options(
     text          = c(grDevices::col2rgb("#00162e"))
   )
 )
+
+
+qrdat <- function(text, ecl = c("L", "M", "Q", "H")) {
+  x <- qrcode::qr_code(text, ecl)
+  n <- nrow(x)
+  s <- seq_len(n)
+  tib <- tidyr::expand_grid(x = s, y = rev(s))
+  tib$z <- c(x)
+  tib
+}
+
+wkshtqr <- qrdat("https://dajmcdon.github.io/canssip-epidata-2025/worksheet") |>
+  ggplot(aes(x, y, fill = z, alpha = z)) +
+  geom_raster() +
+  coord_equal(expand = FALSE) +
+  scale_fill_manual(values = c("white", primary), guide = "none") +
+  scale_alpha_manual(values = c(0, 1), guide = "none") +
+  theme_void() +
+  theme(
+    text = element_text(
+      color = primary, size = 36,
+      margin = margin(3,0,3,0))
+  )

@@ -524,7 +524,7 @@ where $x(t)$ are infections at time $t$.
 In discrete time, 
 
 $$
-x_t = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
+x_{t+1} = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
 $$
 
 . . .
@@ -534,14 +534,14 @@ $$
 And stochasticly,
 
 $$
-\mathbb{E}\big[x_t\ |\ x_1,\ldots,x_{t-1}\big] = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
+\mathbb{E}\big[x_{t+1}\ |\ x_1,\ldots,x_{t}\big] = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
 $$
 
 
 ::: {.fragment .box-text .absolute top=50}
 Most estimators start here:
 $$
-\mathbb{E}\big[x_t\ |\ x_1,\ldots,x_{t-1}\big] = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a.
+\mathbb{E}\big[x_{t+1}\ |\ x_1,\ldots,x_{t}\big] = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a.
 $$
 
 * Assume $\widetilde{g}$ is known
@@ -563,28 +563,25 @@ There is an equivalence between a compartmental model and the renewal equation.
 $$
 \begin{aligned}
 R_0 &= \beta / \gamma\\
-i_t &= R_0 S_{t-1} \sum_{k = 1}^t \big[\gamma (1-\gamma)^{k-1}\big] i_{t-k}
-= R_t\sum_{k = 1}^t (1-\gamma)^{k-1} i_{t-k}
+x_{t+1} &= \beta S_{t} \sum_{k = 0}^t \big[(1-\gamma)^{k}\big] x_{t-k}
+= R_0 S_{t} \sum_{k = 0}^t \big[\gamma(1-\gamma)^{k}\big] x_{t-k} = R_{t}\sum_{k = 0}^t g(k)x_{t-k}
 \end{aligned}
 $$
 
 ```{r show-sir-Rt}
 #| fig-width: 10
-set.seed(123)
-sir_sim <- sim_SIR(100, beta = 0.2)
-sir_sim <- mutate(sir_sim, it = lag(S) - S, Rt = lag(S) * 0.2) |>
-  pivot_longer(c(S, I, R, Rt, it)) |>
+set.seed(12345)
+sir_sim <- sim_SIR(100, beta = .4, gamma = .2)
+sir_sim <- mutate(sir_sim, xt = lag(S) - S, Rt = S * 0.4 / 0.2 ) |>
+  pivot_longer(c(S, I, R, Rt, xt)) |>
   mutate(type = case_when(
     name %in% c("S", "I", "R") ~ "compartmental model",
     name == "Rt" ~ "Rt",
-    name == "it" ~ "incident infections"
+    name == "xt" ~ "incident infections"
   ))
-xint <- filter(sir_sim, name == "Rt") |> mutate(end = (value - 1)^2) |>
-  filter(end == min(end, na.rm = TRUE)) |> pull(time)
 sir_sim |>
   ggplot(aes(time, value, color = name)) +
   geom_line() +
-  geom_vline(xintercept = max(xint), alpha = 0.5) +
   facet_wrap(~type, nrow = 1, scales = "free_y") +
   scale_color_delphi() +
   scale_y_continuous(expand = expansion(c(0, 0.05)), name = "") +

@@ -40,7 +40,14 @@ load(here::here("_data", "day1m_queries.rda"))
 
 ## Daniel J. McDonald
 
-
+* PhD in Statistics from Carnegie Mellon University
+* Risk Bounds for Time series, esp. macroeconomic forecasting
+* Subsequent research and teaching on machine learning (model selection, optimization, regularization, nonparametrics)
+* Began working on epidemiology in mid-2020 with Delphi Research Group
+* Focus is largely on forecasting and nowcasting epidemic aggregates
+* Funding from US CDC (ongoing?), CSTE, NSERC, CANSSI
+* This work is based on similar workshop for the InsightNet Consortium funded 
+by the Center for Forecasting Analytics within CDC
 
 ## About Delphi
 
@@ -84,17 +91,20 @@ load(here::here("_data", "day1m_queries.rda"))
 
 ## Goals part I
 
-- Expose you to a statistical way of thinking about now/forecasting
-- Certain basic mindsets (e.g., the importance of empirical validation
-  using techniques like time series cross-validation) are ubiquitous
-- Certain basic modeling considerations (e.g., starting simple and
-  building up complexity, taming variance through regularization,
-  addressing nonstationarity with trailing training windows) are also
-  ubiquitous
+Present a statistical way of thinking about now/forecasting
+
+Basic mindsets
+: - data versioning and structure
+: - the importance of empirical validation using techniques like time series cross-validation are ubiquitous
+
+Certain basic modeling considerations
+: - starting simple and building up complexity
+: - taming variance through regularization,
+: - addressing nonstationarity with trailing training windows
 
 ## Goals part II
 
-- Expose you to software packages which aid processing, tracking,
+- Present software whichs aid processing, tracking,
   nowcasting, and forecasting with panel data 
 - These tools are still in development and we welcome your feedback
 - We have tried hard to get the framework right; but many individual
@@ -112,13 +122,12 @@ load(here::here("_data", "day1m_queries.rda"))
 - Ask me at any point if
   you have a question about why I'm doing things a certain way
   
-## One last slide
-
+::: {.fragment .box-text .absolute top=10%}
 - This workshop is supposed to be useful for YOU. Ask questions if
   you have them, don't be shy
 - We may not (likely won't?) cover everything. Hopefully the materials
   will be a resource for you beyond this workshop
-  
+:::
 
 ## System setup
 
@@ -141,14 +150,6 @@ remotes::install_github("dajmcdon/rtestim")
 
 ```{r qr-to-github}
 #| dev: png
-qrdat <- function(text, ecl = c("L", "M", "Q", "H")) {
-  x <- qrcode::qr_code(text, ecl)
-  n <- nrow(x)
-  s <- seq_len(n)
-  tib <- tidyr::expand_grid(x = s, y = rev(s))
-  tib$z <- c(x)
-  tib
-}
 ggplot(qrdat("https://dajmcdon.github.io/canssip-epidata-2025"), aes(x, y, fill = z, alpha = z)) +
   geom_raster() +
   coord_equal(expand = FALSE) +
@@ -160,7 +161,6 @@ ggplot(qrdat("https://dajmcdon.github.io/canssip-epidata-2025"), aes(x, y, fill 
       color = primary, size = 36,
       margin = margin(3,0,3,0))
   )
-
 ```
 
 
@@ -198,7 +198,7 @@ as_epi_df(panel_data[[1]]) %>%
   scale_color_delphi() +
   theme(legend.title = element_blank()) +
   xlab("Date") + ylab(units[1]) +
-  scale_y_continuous(expand = expansion(c(0, 0.05)))
+  geom_hline(yintercept = 0)
 ```
 
 ::: {.notes}
@@ -957,20 +957,20 @@ res |>
 
 ## Wrapup and worksheet discussion
 
-* [**Delphi Epidata:**]{.primary} platform for real-time epidemic data
-    * provides (aggregated) signals for tracking and forecasting
-    * sources like [**health records**]{.secondary}, [**mobility patterns**]{.tertiary}, and [**more**]{.fourth-colour}.
+* [Versioned Data and Latency]{.primary}
+    1. `as_of`:  One version; the specific date when the data was last updated 
+    1. `issues`: Multiple versions; with different `as_of` dates
 
-
-* [**Epidata API:**]{.primary} delivers up-to-date, granular epidemiological data + historical versions.
-
+* [Epidata API:]{.primary} delivers up-to-date, granular epidemiological data + historical versions.
 
 * `{epidatr}`: Client package for R
 
+* Versioning and panel structure are key first steps for analysis
 
-* [**Versioned Data and Latency:**]{.primary}
-    1. `as_of`:  One version; the specific date when the data was last updated 
-    1. `issues`: Multiple versions; with different `as_of` dates
     
-Manages the record of revisions for transparency and accuracy in data analysis.
+```{r wksheet}
+#| dev: png
+wkshtqr
+```
+
 
