@@ -12,13 +12,6 @@ source(here::here("slides", "_code", "setup.R"))
 library(epidatr)
 library(epipredict)
 library(epidatasets)
-asciicast::init_knitr_engine(
-  startup = quote({
-    suppressPackageStartupMessages(library(epiprocess))
-  }),
-  echo = TRUE,
-  echo_input = FALSE
-)
 ```
 
 
@@ -482,8 +475,10 @@ cowplot::plot_grid(gr1, gr2, align = "v", ncol = 1, axis = "lr")
 
 ## Outlier detection
 
+MAKE OFFLINE
 
 ```{r outlier-query}
+#| eval: false
 outliers <- pub_covidcast("jhu-csse", "confirmed_incidence_num", "state", "day",
                           geo_values = "fl,nj", as_of = "20210601") |>
   select(time_value, geo_value, cases = value) |>
@@ -491,6 +486,7 @@ outliers <- pub_covidcast("jhu-csse", "confirmed_incidence_num", "state", "day",
 ```
 
 ```{r outlier-ex}
+#| eval: false
 #| echo: true
 outliers <- outliers |>
   mutate(detect_outlr_rm(time_value, cases), .by = geo_value)
@@ -498,6 +494,7 @@ outliers <- outliers |>
 
 
 ```{r plot-outlier-ex}
+#| eval: false
 #| fig-width: 7
 outp1 <- outliers |> 
   ggplot(aes(x = time_value)) +
@@ -677,19 +674,26 @@ Epidemiology data gets revised frequently.
 
 Subset of daily COVID-19 doctor visits (Optum) and cases (JHU CSSE) from all U.S. states in `archive` format:
 
-```{asciicast archive-ex-ascii}
+```{r archive-ex}
+#| echo: true
+#| eval: false
 archive_cases_dv_subset_all_states
 ```
+
+![](gfx/archive_cases_dv.png){.codelike-format}
 
 ## Summarize revision behaviour
 
 
 
-```{asciicast epiprocess-revision-summary-demo}
+```{r epiprocess-revision-summary-demo}
+#| echo: true
+#| eval: false
 revision_data <- revision_summary(archive_cases_dv_subset, case_rate_7d_av)
 revision_data
 ```
 
+![](gfx/revision_data.png){.codelike-format}
 
 
 
@@ -1221,8 +1225,8 @@ nowcast_comparison <-
                             prediction_locf = "Baseline",
                             prediction_reg1 = "LinReg",
                             prediction_reg2 = "LinReg + hosp",
-                            prediction_reg3 = "QuantReg",
-                            prediction_reg4 = "QuantReg + hosp",
+                            prediction_reg3 = "QntReg",
+                            prediction_reg4 = "QntReg + hosp",
                             .default = Nowcaster))
 ```
 
@@ -1233,7 +1237,7 @@ nowcast_comparison <-
 #| fig-height: 3.5
 nowcast_comparison |>
   filter(target_date >= min(all_nowcast_dates) - 35,
-         !(Nowcaster %in% c("QuantReg", "QuantReg + hosp"))) |>
+         str_detect(Nowcaster, "LinReg") | Nowcaster == "Baseline") |>
   ggplot() +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
   geom_line(aes(target_date, mortality), linewidth = 1) +
@@ -1253,7 +1257,7 @@ nowcast_comparison |>
 #| fig-height: 3.5
 nowcast_comparison |>
   filter(target_date >= min(all_nowcast_dates) - 35,
-         !(Nowcaster %in% c("LinReg", "LinReg + hosp"))) |>
+         str_detect(Nowcaster, "QntReg") | Nowcaster == "Baseline") |>
   ggplot() +
   geom_line(aes(target_date, prediction, color = Nowcaster)) +
   geom_line(aes(target_date, mortality), linewidth = 1) +
@@ -1317,3 +1321,19 @@ cowplot::plot_grid(p1, p2)
 ```
 
 * More after lunch...
+
+## More practice with the worksheet
+
+* Signal processing and exploratory data analysis
+
+* Examining revision and latency patterns
+
+* Thinking about the revision triangle and how to use it
+
+* Basics of statistical nowcasting 
+
+
+```{r wksheet}
+#| dev: png
+wkshtqr
+```
