@@ -556,12 +556,12 @@ bc_linelist |>
 <img data-src="lecture2_files/figure-revealjs/plot-growth-rates-ex-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
 <section id="outlier-detection" class="slide level2">
 <h2>Outlier detection</h2>
+<p>MAKE OFFLINE</p>
 <div class="cell" data-layout-align="center">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a></a>outliers <span class="ot">&lt;-</span> outliers <span class="sc">|&gt;</span></span>
 <span id="cb16-2"><a></a>  <span class="fu">mutate</span>(<span class="fu">detect_outlr_rm</span>(time_value, cases), <span class="at">.by =</span> geo_value)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-
-<img data-src="lecture2_files/figure-revealjs/plot-outlier-ex-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+</section>
 <section id="advanced-sliding-on-an-epi_df" class="slide level2">
 <h2>Advanced sliding on an <code>epi_df</code></h2>
 <ul>
@@ -697,17 +697,17 @@ bc_linelist |>
 <p>Subset of daily COVID-19 doctor visits (Optum) and cases (JHU CSSE) from all U.S. states in <code>archive</code> format:</p>
 <div class="cell" data-layout-align="center">
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a></a>archive_cases_dv_subset_all_states</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-
 </div>
-<img data-src="lecture2_files/figure-revealjs//archive-ex-ascii.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+
+<img data-src="gfx/archive_cases_dv.png" class="codelike-format r-stretch"></section>
 <section id="summarize-revision-behaviour" class="slide level2">
 <h2>Summarize revision behaviour</h2>
 <div class="cell" data-layout-align="center">
 <div class="sourceCode cell-code" id="cb22"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a></a>revision_data <span class="ot">&lt;-</span> <span class="fu">revision_summary</span>(archive_cases_dv_subset, case_rate_7d_av)</span>
 <span id="cb22-2"><a></a>revision_data</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-
 </div>
-<img data-src="lecture2_files/figure-revealjs//epiprocess-revision-summary-demo.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+
+<img data-src="gfx/revision_data.png" class="codelike-format r-stretch"></section>
 <section id="visualize-revision-patterns" class="slide level2">
 <h2>Visualize revision patterns</h2>
 
@@ -1071,9 +1071,19 @@ the characteristics of updates after initial report (typical positive)
 <img data-src="lecture2_files/figure-revealjs/rtestim-1.svg" class="quarto-figure quarto-figure-center r-stretch"><ul>
 <li>More after lunch…</li>
 </ul>
+</section>
+<section id="more-practice-with-the-worksheet" class="slide level2">
+<h2>More practice with the worksheet</h2>
+<ul>
+<li><p>Signal processing and exploratory data analysis</p></li>
+<li><p>Examining revision and latency patterns</p></li>
+<li><p>Thinking about the revision triangle and how to use it</p></li>
+<li><p>Basics of statistical nowcasting</p></li>
+</ul>
 
 
-</section></section>
+
+<img data-src="lecture2_files/figure-revealjs/wksheet-1.png" class="quarto-figure quarto-figure-center r-stretch"></section></section>
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">

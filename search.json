@@ -476,6 +476,13 @@
     "text": "Quantile updates\n\nbegin with some estimate \\(\\hat{q}_{t_0+1}^{1-\\alpha}\\) based on a burn-in set.\nThen, for a step size \\(\\eta &gt; 0\\), repeat the following updates as \\(t\\) increases:\n\n\\[\\hat q_{t+1}^{1-\\alpha} = \\begin{cases}\n\\hat q_{t}^{1-\\alpha} + \\eta(1-\\alpha) \\quad \\text{if } y_t\\notin I_{t|t-1}^{1-\\alpha} \\\\\n\\hat q_{t}^{1-\\alpha} - \\eta\\alpha \\quad \\quad \\quad \\,\\,\\, \\text{if } y_t\\in I_{t|t-1}^{1-\\alpha}\n\\end{cases}\\]\nIn words:\n\nif the latest interval does not cover, then we increase the quantile (make the next interval wider),\notherwise we decrease the quantile by (make the next interval narrower).\n\n\nThis method has the following guarantee:\n\\[\n\\Bigg| \\frac{1}{T} \\sum_{t=t_0+1}^{t_0+T} 1 \\big\\{ y_t \\in I_{t|t-1}^{1-\\alpha} \\big\\} - (1-\\alpha) \\Bigg| \\leq \\frac{b/\\eta + 1}{T}\n\\]\nwhere \\(b\\) is a bound on the errors (largest error possible/observable)."
   },
   {
+    "objectID": "slides/lecture4.html#summary-and-more-worksheet",
+    "href": "slides/lecture4.html#summary-and-more-worksheet",
+    "title": "EpiData Workshop 2025",
+    "section": "Summary and more worksheet?",
+    "text": "Summary and more worksheet?\n\nBasics of time series\nEvaluating forecasts\nCreating forecasters with {epipredict}\nWhilrwind of advanced ideas"
+  },
+  {
     "objectID": "slides/lecture2.html#outline",
     "href": "slides/lecture2.html#outline",
     "title": "EpiData Workshop 2025",
@@ -606,7 +613,7 @@
     "href": "slides/lecture2.html#outlier-detection",
     "title": "EpiData Workshop 2025",
     "section": "Outlier detection",
-    "text": "Outlier detection\n\noutliers &lt;- outliers |&gt;\n  mutate(detect_outlr_rm(time_value, cases), .by = geo_value)"
+    "text": "Outlier detection\nMAKE OFFLINE\n\noutliers &lt;- outliers |&gt;\n  mutate(detect_outlr_rm(time_value, cases), .by = geo_value)"
   },
   {
     "objectID": "slides/lecture2.html#advanced-sliding-on-an-epi_df",
@@ -777,6 +784,13 @@
     "text": "Aside on nowcasting\n\nTo many Epis, nowcasting means estimate the instantaneous reproduction number, \\(R_t\\)\nExample: Reported COVID-19 cases in British Columbia (Jan. 2020 – Apr. 2023)\n\n\n\nMore after lunch…"
   },
   {
+    "objectID": "slides/lecture2.html#more-practice-with-the-worksheet",
+    "href": "slides/lecture2.html#more-practice-with-the-worksheet",
+    "title": "EpiData Workshop 2025",
+    "section": "More practice with the worksheet",
+    "text": "More practice with the worksheet\n\nSignal processing and exploratory data analysis\nExamining revision and latency patterns\nThinking about the revision triangle and how to use it\nBasics of statistical nowcasting"
+  },
+  {
     "objectID": "worksheet/index.html",
     "href": "worksheet/index.html",
     "title": "Processing and Forecasting with Epidemic Surveillance Data",
@@ -830,21 +844,21 @@
     "href": "index.html#contributors-and-collaborators",
     "title": "EpiData Workshop 2025",
     "section": "Contributors and collaborators",
-    "text": "Contributors and collaborators\nInstructor: Daniel J. McDonald\nWith help from:\n\nRyan J. Tibshirani\nLogan C. Brooks\nRachel Lobay\nAlice Clima\nOlivia Liu\nPaul Gustafson\nElvis Cai"
+    "text": "Contributors and collaborators\nInstructor: Daniel J. McDonald\nWith help from:\n\nRyan J. Tibshirani\nLogan C. Brooks\nRachel Lobay\nAlice Clima\nOlivia Liu, Elvis Cai, and Paul Gustafson"
   },
   {
     "objectID": "slides/lecture1.html#outline",
     "href": "slides/lecture1.html#outline",
     "title": "EpiData Workshop 2025",
     "section": "Outline",
-    "text": "Outline\n\nAbout Me\nWorkshop Overview and System Setup\nPanel Data\nVersioned Data\nEpidata Repository and API\n{epidatr} and Other Data\nVersioning in {epidatr}"
+    "text": "Outline\n\nAbout\nWorkshop Overview and System Setup\nPanel Data\nVersioned Data\nEpidata Repository and API\n{epidatr} and Other Data\nVersioning in {epidatr}"
   },
   {
     "objectID": "slides/lecture1.html#daniel-j.-mcdonald",
     "href": "slides/lecture1.html#daniel-j.-mcdonald",
     "title": "EpiData Workshop 2025",
     "section": "Daniel J. McDonald",
-    "text": "Daniel J. McDonald"
+    "text": "Daniel J. McDonald\n\nPhD in Statistics from Carnegie Mellon University\nRisk Bounds for Time series, esp. macroeconomic forecasting\nSubsequent research and teaching on machine learning (model selection, optimization, regularization, nonparametrics)\nBegan working on epidemiology in mid-2020 with Delphi Research Group\nFocus is largely on forecasting and nowcasting epidemic aggregates\nFunding from US CDC (ongoing?), CSTE, NSERC, CANSSI"
   },
   {
     "objectID": "slides/lecture1.html#about-delphi",
@@ -868,6 +882,13 @@
     "text": "What we provide"
   },
   {
+    "objectID": "slides/lecture1.html#acknowledgements",
+    "href": "slides/lecture1.html#acknowledgements",
+    "title": "EpiData Workshop 2025",
+    "section": "Acknowledgements",
+    "text": "Acknowledgements\nMost of this material was developed for the InsightNet Tooling Workshop in December 2024.\n\n\n\nThanks to major contributors\n\nRyan J. Tibshirani\n\n\nRachel Lobay\n\n\nAlice Clima\n\n\nLogan Brooks\n\n\nDelphi Tooling and Forecasting Team\n\n\nElvis Cai, Olivia Liu, Paul Gustafson\n\n\n\n\n\nFunding\n\nCenter for Forecasting and Outbreak Analytics\n\n\nCouncil of State and Territorial Epidemiologists\n\n\nNSERC\n\n\nCANSSI"
+  },
+  {
     "objectID": "slides/lecture1.html#what-we-will-cover",
     "href": "slides/lecture1.html#what-we-will-cover",
     "title": "EpiData Workshop 2025",
@@ -879,28 +900,21 @@
     "href": "slides/lecture1.html#goals-part-i",
     "title": "EpiData Workshop 2025",
     "section": "Goals part I",
-    "text": "Goals part I\n\nExpose you to a statistical way of thinking about now/forecasting\nCertain basic mindsets (e.g., the importance of empirical validation using techniques like time series cross-validation) are ubiquitous\nCertain basic modeling considerations (e.g., starting simple and building up complexity, taming variance through regularization, addressing nonstationarity with trailing training windows) are also ubiquitous"
+    "text": "Goals part I\nPresent a statistical way of thinking about now/forecasting\n\nBasic mindsets\n\n\ndata versioning and structure\n\n\n\n\nthe importance of empirical validation using techniques like time series cross-validation are ubiquitous\n\n\nCertain basic modeling considerations\n\n\nstarting simple and building up complexity\n\n\n\n\ntaming variance through regularization,\n\n\n\n\naddressing nonstationarity with trailing training windows"
   },
   {
     "objectID": "slides/lecture1.html#goals-part-ii",
     "href": "slides/lecture1.html#goals-part-ii",
     "title": "EpiData Workshop 2025",
     "section": "Goals part II",
-    "text": "Goals part II\n\nExpose you to software packages which aid processing, tracking, nowcasting, and forecasting with panel data\nThese tools are still in development and we welcome your feedback\nWe have tried hard to get the framework right; but many individual pieces themselves could still be improved\nIf these aren’t working for you, then we want to hear from you!\nWe welcome collaboration, and everything we do is open source"
+    "text": "Goals part II\n\nPresent software whichs aid processing, tracking, nowcasting, and forecasting with panel data\nThese tools are still in development and we welcome your feedback\nWe have tried hard to get the framework right; but many individual pieces themselves could still be improved\nIf these aren’t working for you, then we want to hear from you!\nWe welcome collaboration, and everything we do is open source"
   },
   {
     "objectID": "slides/lecture1.html#a-disclaimer",
     "href": "slides/lecture1.html#a-disclaimer",
     "title": "EpiData Workshop 2025",
     "section": "A disclaimer",
-    "text": "A disclaimer\n\nMy background is primarily in statistics and computer science\nThis obviously influences my way of thinking and my approach to nowcasting and forecasting\nI don’t have nearly as much experience with traditional epi models, but I do have opinions about the pros/cons.\nAsk me at any point if you have a question about why I’m doing things a certain way"
-  },
-  {
-    "objectID": "slides/lecture1.html#one-last-slide",
-    "href": "slides/lecture1.html#one-last-slide",
-    "title": "EpiData Workshop 2025",
-    "section": "One last slide",
-    "text": "One last slide\n\nThis workshop is supposed to be useful for YOU. Ask questions if you have them, don’t be shy\nWe may not (likely won’t?) cover everything. Hopefully the materials will be a resource for you beyond this workshop"
+    "text": "A disclaimer\n\nMy background is primarily in statistics and computer science\nThis obviously influences my way of thinking and my approach to nowcasting and forecasting\nI don’t have nearly as much experience with traditional epi models, but I do have opinions about the pros/cons.\nAsk me at any point if you have a question about why I’m doing things a certain way\n\n\n\nThis workshop is supposed to be useful for YOU. Ask questions if you have them, don’t be shy\nWe may not (likely won’t?) cover everything. Hopefully the materials will be a resource for you beyond this workshop"
   },
   {
     "objectID": "slides/lecture1.html#system-setup",
@@ -1124,7 +1138,7 @@
     "href": "slides/lecture1.html#wrapup-and-worksheet-discussion",
     "title": "EpiData Workshop 2025",
     "section": "Wrapup and worksheet discussion",
-    "text": "Wrapup and worksheet discussion\n\nDelphi Epidata: platform for real-time epidemic data\n\nprovides (aggregated) signals for tracking and forecasting\nsources like health records, mobility patterns, and more.\n\nEpidata API: delivers up-to-date, granular epidemiological data + historical versions.\n{epidatr}: Client package for R\nVersioned Data and Latency:\n\nas_of: One version; the specific date when the data was last updated\nissues: Multiple versions; with different as_of dates\n\n\nManages the record of revisions for transparency and accuracy in data analysis."
+    "text": "Wrapup and worksheet discussion\n\nVersioned Data and Latency\n\nas_of: One version; the specific date when the data was last updated\nissues: Multiple versions; with different as_of dates\n\nEpidata API: delivers up-to-date, granular epidemiological data + historical versions.\n{epidatr}: Client package for R\nVersioning and panel structure are key first steps for analysis"
   },
   {
     "objectID": "slides/lecture3.html#outline",
@@ -1229,7 +1243,7 @@
     "href": "slides/lecture3.html#r_0-basic-reproduction-number",
     "title": "EpiData Workshop 2025",
     "section": "\\(R_0\\) basic reproduction number",
-    "text": "\\(R_0\\) basic reproduction number\nDates at least to Alfred Lotka (1920s) and others (Feller, Blackwell, etc.)\n\n\nThe expected number of secondary infections due to a primary infection\n\n\n\n\n\n\\(R_0 &lt; 1\\) ⟹ the epidemic will die out\n\n\n\n\\(R_0 &gt; 1\\) ⟹ the epidemic will grow until everyone is infected\n\n\n\n\n\n\n\n\n\n\n\n\nSource: Katelyn Jetelina, “YLE Newsletter,” 21 April 2025."
+    "text": "\\(R_0\\) basic reproduction number\nDates at least to Alfred Lotka (1920s) and others (Feller, Blackwell, etc.)\n\n\nThe expected number of secondary infections due to a primary infection\n\n\n\n\n\n\\(R_0 &lt; 1\\) ⟹ the epidemic will die out\n\n\n\n\\(R_0 &gt; 1\\) ⟹ the epidemic will grow until everyone is infected\n\n\n\n\n\n\n\n\n\n\n\n\nSource: Katelyn Jetelina, “YLE Newsletter,” 21 April 2025.\n\n\n\n\n\n\n\nSource: Public Health Ontario, 21 April 2025."
   },
   {
     "objectID": "slides/lecture3.html#r_0-is-entirely-retrospective",
@@ -1264,7 +1278,7 @@
     "href": "slides/lecture3.html#rt-and-r_t-renewal-equation",
     "title": "EpiData Workshop 2025",
     "section": "\\(R(t)\\) and \\(R_t\\) — renewal equation",
-    "text": "\\(R(t)\\) and \\(R_t\\) — renewal equation\n\\(R(t)\\) is defined implicitly through the renewal equation\n\\[\nx(t) = R(t)\\int_0^\\infty x(t-a)g(a)\\mathsf{d}a,\n\\]\nwhere \\(x(t)\\) are infections at time \\(t\\).\n\n\nIn discrete time,\n\\[\nx_t = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a = R_t (x * \\widetilde{g}).\n\\]\n\n\n\nAnd stochasticly,\n\\[\n\\mathbb{E}\\big[x_t\\ |\\ x_1,\\ldots,x_{t-1}\\big] = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a = R_t (x * \\widetilde{g}).\n\\]\n\nMost estimators start here: \\[\n\\mathbb{E}\\big[x_t\\ |\\ x_1,\\ldots,x_{t-1}\\big] = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a.\n\\]\n\nAssume \\(\\widetilde{g}\\) is known\nModel \\(x_t\\ |\\ x_1,\\ldots,x_{t-1}\\) as Poisson or Negative Binomial\nTurn some inferential crank"
+    "text": "\\(R(t)\\) and \\(R_t\\) — renewal equation\n\\(R(t)\\) is defined implicitly through the renewal equation\n\\[\nx(t) = R(t)\\int_0^\\infty x(t-a)g(a)\\mathsf{d}a,\n\\]\nwhere \\(x(t)\\) are infections at time \\(t\\).\n\n\nIn discrete time,\n\\[\nx_{t+1} = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a = R_t (x * \\widetilde{g}).\n\\]\n\n\n\nAnd stochasticly,\n\\[\n\\mathbb{E}\\big[x_{t+1}\\ |\\ x_1,\\ldots,x_{t}\\big] = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a = R_t (x * \\widetilde{g}).\n\\]\n\nMost estimators start here: \\[\n\\mathbb{E}\\big[x_{t+1}\\ |\\ x_1,\\ldots,x_{t}\\big] = R_t\\sum_{a=0}^\\infty x_{t-a}\\widetilde{g}_a.\n\\]\n\nAssume \\(\\widetilde{g}\\) is known\nModel \\(x_t\\ |\\ x_1,\\ldots,x_{t-1}\\) as Poisson or Negative Binomial\nTurn some inferential crank"
   },
   {
     "objectID": "slides/lecture3.html#r_t-for-covid-19-in-the-us",
@@ -1278,7 +1292,7 @@
     "href": "slides/lecture3.html#r_t-in-compartmental-models",
     "title": "EpiData Workshop 2025",
     "section": "\\(R_t\\) in compartmental models",
-    "text": "\\(R_t\\) in compartmental models\nThere is an equivalence between a compartmental model and the renewal equation.\n\\[\n\\begin{aligned}\nR_0 &= \\beta / \\gamma\\\\\ni_t &= R_0 S_{t-1} \\sum_{k = 1}^t \\big[\\gamma (1-\\gamma)^{k-1}\\big] i_{t-k}\n= R_t\\sum_{k = 1}^t (1-\\gamma)^{k-1} i_{t-k}\n\\end{aligned}\n\\]"
+    "text": "\\(R_t\\) in compartmental models\nThere is an equivalence between a compartmental model and the renewal equation.\n\\[\n\\begin{aligned}\nR_0 &= \\beta / \\gamma\\\\\nx_{t+1} &= \\beta S_{t} \\sum_{k = 0}^t \\big[(1-\\gamma)^{k}\\big] x_{t-k}\n= R_0 S_{t} \\sum_{k = 0}^t \\big[\\gamma(1-\\gamma)^{k}\\big] x_{t-k} = R_{t}\\sum_{k = 0}^t g(k)x_{t-k}\n\\end{aligned}\n\\]"
   },
   {
     "objectID": "slides/lecture3.html#data-issues-1",
@@ -1433,5 +1447,12 @@
     "title": "EpiData Workshop 2025",
     "section": "{rtestim} software",
     "text": "{rtestim} software"
+  },
+  {
+    "objectID": "slides/lecture3.html#wrapup-and-practice",
+    "href": "slides/lecture3.html#wrapup-and-practice",
+    "title": "EpiData Workshop 2025",
+    "section": "Wrapup and practice",
+    "text": "Wrapup and practice\n\nBasic compartmental modelling\nDifficulties in estimating compartmental models\nStandard epidemic parameters, \\(R_0\\)\nDiscussion of \\(R_t\\) (model based vs nonparametric estimation)\nSome custom \\(R_t\\) software"
   }
 ]

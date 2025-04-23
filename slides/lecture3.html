@@ -518,11 +518,19 @@ y_{t+1} &amp;= \textrm{NegBinom}(\textrm{mean} = g(x_t),\ \kappa)
 <script src="_code/infections.js"></script>
 </div>
 </div>
-<div class="fragment box-text absolute" style="top: 50px; left: 150px; ">
+<div class="fragment box-text absolute" style="top: 0%; left: 10%; ">
 <div class="quarto-figure quarto-figure-center">
 <figure>
-<p><img data-src="gfx/yle-measles.jpg" height="600"></p>
+<p><img data-src="gfx/yle-measles.jpg" width="600"></p>
 <figcaption>Source: Katelyn Jetelina, “YLE Newsletter,” 21 April 2025.</figcaption>
+</figure>
+</div>
+</div>
+<div class="fragment box-text absolute" style="top: 0%; left: 10%; ">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="gfx/pho-measles.png" width="800"></p>
+<figcaption>Source: Public Health Ontario, 21 April 2025.</figcaption>
 </figure>
 </div>
 </div>
@@ -621,18 +629,18 @@ x(t) = R(t)\int_0^\infty x(t-a)g(a)\mathsf{d}a,
 <hr>
 <p>In discrete time,</p>
 <p><span class="math display">\[
-x_t = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
+x_{t+1} = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
 \]</span></p>
 </div>
 <div class="fragment">
 <hr>
 <p>And stochasticly,</p>
 <p><span class="math display">\[
-\mathbb{E}\big[x_t\ |\ x_1,\ldots,x_{t-1}\big] = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
+\mathbb{E}\big[x_{t+1}\ |\ x_1,\ldots,x_{t}\big] = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
 \]</span></p>
 <div class="fragment box-text absolute" style="top: 50px; ">
 <p>Most estimators start here: <span class="math display">\[
-\mathbb{E}\big[x_t\ |\ x_1,\ldots,x_{t-1}\big] = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a.
+\mathbb{E}\big[x_{t+1}\ |\ x_1,\ldots,x_{t}\big] = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a.
 \]</span></p>
 <ul>
 <li>Assume <span class="math inline">\(\widetilde{g}\)</span> is known</li>
@@ -654,8 +662,8 @@ x_t = R_t\sum_{a=0}^\infty x_{t-a}\widetilde{g}_a = R_t (x * \widetilde{g}).
 <p><span class="math display">\[
 \begin{aligned}
 R_0 &amp;= \beta / \gamma\\
-i_t &amp;= R_0 S_{t-1} \sum_{k = 1}^t \big[\gamma (1-\gamma)^{k-1}\big] i_{t-k}
-= R_t\sum_{k = 1}^t (1-\gamma)^{k-1} i_{t-k}
+x_{t+1} &amp;= \beta S_{t} \sum_{k = 0}^t \big[(1-\gamma)^{k}\big] x_{t-k}
+= R_0 S_{t} \sum_{k = 0}^t \big[\gamma(1-\gamma)^{k}\big] x_{t-k} = R_{t}\sum_{k = 0}^t g(k)x_{t-k}
 \end{aligned}
 \]</span></p>
 
@@ -1087,9 +1095,20 @@ u &amp;\longleftarrow u + D^{(k)}\theta - \alpha
 <section id="rtestim-software-4" class="slide level2">
 <h2><code>{rtestim}</code> software</h2>
 
+<img data-src="lecture3_files/figure-revealjs/plot-tvar-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="wrapup-and-practice" class="slide level2">
+<h2>Wrapup and practice</h2>
+<ul>
+<li>Basic compartmental modelling</li>
+<li>Difficulties in estimating compartmental models</li>
+<li>Standard epidemic parameters, <span class="math inline">\(R_0\)</span></li>
+<li>Discussion of <span class="math inline">\(R_t\)</span> (model based vs nonparametric estimation)</li>
+<li>Some custom <span class="math inline">\(R_t\)</span> software</li>
+</ul>
 
 
-<img data-src="lecture3_files/figure-revealjs/plot-tvar-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section></section>
+
+<img data-src="lecture3_files/figure-revealjs/wksheet-1.png" class="quarto-figure quarto-figure-center r-stretch"></section></section>
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">

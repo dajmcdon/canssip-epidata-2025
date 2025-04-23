@@ -213,7 +213,7 @@
 <section id="outline" class="slide level2">
 <h2>Outline</h2>
 <ol type="1">
-<li><p>About Me</p></li>
+<li><p>About</p></li>
 <li><p>Workshop Overview and System Setup</p></li>
 <li><p>Panel Data</p></li>
 <li><p>Versioned Data</p></li>
@@ -223,12 +223,20 @@
 </ol>
 </section>
 <section>
-<section id="about-me" class="title-slide slide level1 inverse center" data-number="1">
-<h1><span class="header-section-number">1</span> About Me</h1>
+<section id="about" class="title-slide slide level1 inverse center" data-number="1">
+<h1><span class="header-section-number">1</span> About</h1>
 
 </section>
 <section id="daniel-j.-mcdonald" class="slide level2">
 <h2>Daniel J. McDonald</h2>
+<ul>
+<li>PhD in Statistics from Carnegie Mellon University</li>
+<li>Risk Bounds for Time series, esp.&nbsp;macroeconomic forecasting</li>
+<li>Subsequent research and teaching on machine learning (model selection, optimization, regularization, nonparametrics)</li>
+<li>Began working on epidemiology in mid-2020 with Delphi Research Group</li>
+<li>Focus is largely on forecasting and nowcasting epidemic aggregates</li>
+<li>Funding from US CDC (ongoing?), CSTE, NSERC, CANSSI</li>
+</ul>
 </section>
 <section id="about-delphi" class="slide level2">
 <h2>About Delphi</h2>
@@ -257,7 +265,72 @@
 <section id="what-we-provide" class="slide level2">
 <h2>What we provide</h2>
 
-<img data-src="gfx/web_of_parts.svg" class="quarto-figure quarto-figure-center r-stretch"></section></section>
+<img data-src="gfx/web_of_parts.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="acknowledgements" class="slide level2">
+<h2>Acknowledgements</h2>
+<p>Most of this material was developed for the <a href="https://cmu-delphi.github.io/insightnet-workshop-2024/">InsightNet Tooling Workshop in December 2024</a>.</p>
+<div class="flex">
+<div class="w-45">
+<dl>
+<dt>Thanks to major contributors</dt>
+<dd>
+Ryan J. Tibshirani
+</dd>
+<dd>
+Rachel Lobay
+</dd>
+<dd>
+Alice Clima
+</dd>
+<dd>
+Logan Brooks
+</dd>
+<dd>
+Delphi Tooling and Forecasting Team
+</dd>
+<dd>
+Elvis Cai, Olivia Liu, Paul Gustafson
+</dd>
+</dl>
+</div>
+<div class="w-55">
+<dl>
+<dt>Funding</dt>
+<dd>
+Center for Forecasting and Outbreak Analytics
+</dd>
+<dd>
+Council of State and Territorial Epidemiologists
+</dd>
+<dd>
+NSERC
+</dd>
+<dd>
+CANSSI
+</dd>
+</dl>
+</div>
+</div>
+<div>
+
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="4">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 25.0%;justify-content: center;">
+<p><img data-src="../assets/img/delphi.jpg"></p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 25.0%;justify-content: center;">
+<p><img data-src="../assets/img/cmu.png"></p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 25.0%;justify-content: center;">
+<p><img data-src="../assets/img/berkeley.jpg"></p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 25.0%;justify-content: center;">
+<p><img data-src="../assets/img/ubc.jpg"></p>
+</div>
+</div>
+</div>
+</section></section>
 <section>
 <section id="workshop-overview-and-system-setup" class="title-slide slide level1 inverse center" data-number="2">
 <h1><span class="header-section-number">2</span> Workshop Overview and System Setup</h1>
@@ -275,16 +348,41 @@
 </section>
 <section id="goals-part-i" class="slide level2">
 <h2>Goals part I</h2>
+<p>Present a statistical way of thinking about now/forecasting</p>
+<dl>
+<dt>Basic mindsets</dt>
+<dd>
 <ul>
-<li>Expose you to a statistical way of thinking about now/forecasting</li>
-<li>Certain basic mindsets (e.g., the importance of empirical validation using techniques like time series cross-validation) are ubiquitous</li>
-<li>Certain basic modeling considerations (e.g., starting simple and building up complexity, taming variance through regularization, addressing nonstationarity with trailing training windows) are also ubiquitous</li>
+<li>data versioning and structure</li>
 </ul>
+</dd>
+<dd>
+<ul>
+<li>the importance of empirical validation using techniques like time series cross-validation are ubiquitous</li>
+</ul>
+</dd>
+<dt>Certain basic modeling considerations</dt>
+<dd>
+<ul>
+<li>starting simple and building up complexity</li>
+</ul>
+</dd>
+<dd>
+<ul>
+<li>taming variance through regularization,</li>
+</ul>
+</dd>
+<dd>
+<ul>
+<li>addressing nonstationarity with trailing training windows</li>
+</ul>
+</dd>
+</dl>
 </section>
 <section id="goals-part-ii" class="slide level2">
 <h2>Goals part II</h2>
 <ul>
-<li>Expose you to software packages which aid processing, tracking, nowcasting, and forecasting with panel data</li>
+<li>Present software whichs aid processing, tracking, nowcasting, and forecasting with panel data</li>
 <li>These tools are still in development and we welcome your feedback</li>
 <li>We have tried hard to get the framework right; but many individual pieces themselves could still be improved</li>
 <li>If these aren’t working for you, then we want to hear from you!</li>
@@ -299,13 +397,12 @@
 <li>I don’t have nearly as much experience with traditional epi models, but I do have opinions about the pros/cons.</li>
 <li>Ask me at any point if you have a question about why I’m doing things a certain way</li>
 </ul>
-</section>
-<section id="one-last-slide" class="slide level2">
-<h2>One last slide</h2>
+<div class="fragment box-text absolute" style="top: 10%; ">
 <ul>
 <li>This workshop is supposed to be useful for YOU. Ask questions if you have them, don’t be shy</li>
 <li>We may not (likely won’t?) cover everything. Hopefully the materials will be a resource for you beyond this workshop</li>
 </ul>
+</div>
 </section>
 <section id="system-setup" class="slide level2">
 <h2>System setup</h2>
@@ -967,23 +1064,19 @@
 <section id="wrapup-and-worksheet-discussion" class="slide level2">
 <h2>Wrapup and worksheet discussion</h2>
 <ul>
-<li><p><span class="primary"><strong>Delphi Epidata:</strong></span> platform for real-time epidemic data</p>
-<ul>
-<li>provides (aggregated) signals for tracking and forecasting</li>
-<li>sources like <span class="secondary"><strong>health records</strong></span>, <span class="tertiary"><strong>mobility patterns</strong></span>, and <span class="fourth-colour"><strong>more</strong></span>.</li>
-</ul></li>
-<li><p><span class="primary"><strong>Epidata API:</strong></span> delivers up-to-date, granular epidemiological data + historical versions.</p></li>
-<li><p><code>{epidatr}</code>: Client package for R</p></li>
-<li><p><span class="primary"><strong>Versioned Data and Latency:</strong></span></p>
+<li><p><span class="primary">Versioned Data and Latency</span></p>
 <ol type="1">
 <li><code>as_of</code>: One version; the specific date when the data was last updated</li>
 <li><code>issues</code>: Multiple versions; with different <code>as_of</code> dates</li>
 </ol></li>
+<li><p><span class="primary">Epidata API:</span> delivers up-to-date, granular epidemiological data + historical versions.</p></li>
+<li><p><code>{epidatr}</code>: Client package for R</p></li>
+<li><p>Versioning and panel structure are key first steps for analysis</p></li>
 </ul>
-<p>Manages the record of revisions for transparency and accuracy in data analysis.</p>
 
 
-</section></section>
+
+<img data-src="lecture1_files/figure-revealjs/wksheet-1.png" class="quarto-figure quarto-figure-center r-stretch"></section></section>
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
