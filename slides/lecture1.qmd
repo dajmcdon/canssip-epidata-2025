@@ -21,7 +21,7 @@ load(here::here("_data", "day1m_queries.rda"))
 
 ## Outline
 
-1. About Me
+1. About
 
 1. Workshop Overview and System Setup
 
@@ -36,7 +36,7 @@ load(here::here("_data", "day1m_queries.rda"))
 1. Versioning in `{epidatr}`
 
 
-# About Me {.inverse}
+# About {.inverse}
 
 ## Daniel J. McDonald
 
@@ -46,8 +46,6 @@ load(here::here("_data", "day1m_queries.rda"))
 * Began working on epidemiology in mid-2020 with Delphi Research Group
 * Focus is largely on forecasting and nowcasting epidemic aggregates
 * Funding from US CDC (ongoing?), CSTE, NSERC, CANSSI
-* This work is based on similar workshop for the InsightNet Consortium funded 
-by the Center for Forecasting Analytics within CDC
 
 ## About Delphi
 
@@ -78,6 +76,41 @@ by the Center for Forecasting Analytics within CDC
 ## What we provide
 
 ![](gfx/web_of_parts.svg){fig-align=center}
+
+## Acknowledgements
+
+Most of this material was developed for the [InsightNet Tooling Workshop in December 2024](https://cmu-delphi.github.io/insightnet-workshop-2024/).
+
+::: flex
+
+::: w-45
+Thanks to major contributors
+: Ryan J. Tibshirani
+: Rachel Lobay
+: Alice Clima
+: Logan Brooks
+: Delphi Tooling and Forecasting Team
+: Elvis Cai, Olivia Liu, Paul Gustafson
+:::
+
+::: w-55
+Funding
+: Center for Forecasting and Outbreak Analytics 
+: Council of State and Territorial Epidemiologists
+: NSERC
+: CANSSI
+:::
+:::
+
+::: {layout-ncol=4}
+![](/assets/img/delphi.jpg)
+
+![](/assets/img/cmu.png)
+
+![](/assets/img/berkeley.jpg)
+
+![](/assets/img/ubc.jpg)
+:::
 
 # Workshop Overview and System Setup {.inverse}
 

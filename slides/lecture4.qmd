@@ -1124,7 +1124,7 @@ example_states<- usa_archive |>
 
 ```{r arx-geo-pooling-plot}
 #| fig-width: 7
-#| fig-height: 3
+#| fig-height: 4
 pred_arx_geo_pool |>
   filter(geo_value %in% state_selection) |>
   ggplot(aes(target_date, .pred)) +
@@ -1476,3 +1476,16 @@ where $b$ is a bound on the errors (largest error possible/observable).
 
 :::
 
+
+## Summary and more worksheet?
+
+* Basics of time series
+* Evaluating forecasts
+* Creating forecasters with `{epipredict}`
+* Whilrwind of advanced ideas
+
+
+```{r wksheet}
+#| dev: png
+wkshtqr
+```
