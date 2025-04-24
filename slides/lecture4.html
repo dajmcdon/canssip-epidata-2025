@@ -812,7 +812,7 @@ Coefficients:
 <div class="callout-content">
 <ul>
 <li><p><code>.pred_distn</code> is actually a “distribution”, parameterized by its quantiles</p></li>
-<li><p><code>arx_forecaster</code> estimates the quantiles in a different way than <code>lm</code></p></li>
+<li><p><code>arx_forecaster()</code> estimates the quantiles in a different way than <code>lm()</code></p></li>
 </ul>
 </div>
 </div>
@@ -1329,7 +1329,7 @@ Coefficients:
 <section id="almost-our-production-forecaster" class="slide level2">
 <h2>Almost our production forecaster</h2>
 <div class="cell" data-layout-align="center">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a></a>prod_forecaster <span class="ot">&lt;-</span> <span class="cf">function</span>(epidata, ahead) {</span>
+<div class="sourceCode cell-code" id="cb24" data-code-line-numbers="8-15|9|2,3,10|13|14|17|29"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a></a>prod_forecaster <span class="ot">&lt;-</span> <span class="cf">function</span>(epidata, ahead) {</span>
 <span id="cb24-2"><a></a>  Logit <span class="ot">&lt;-</span> <span class="cf">function</span>(x, <span class="at">a =</span> <span class="fl">0.01</span>) <span class="fu">log</span>((x <span class="sc">+</span> a) <span class="sc">/</span> (<span class="dv">1</span> <span class="sc">-</span> x <span class="sc">+</span> a))</span>
 <span id="cb24-3"><a></a>  Sigmd <span class="ot">&lt;-</span> <span class="cf">function</span>(y, <span class="at">a =</span> <span class="fl">0.01</span>) (<span class="fu">exp</span>(y) <span class="sc">*</span> (<span class="dv">1</span> <span class="sc">+</span> a) <span class="sc">-</span> a) <span class="sc">/</span> (<span class="dv">1</span> <span class="sc">+</span> <span class="fu">exp</span>(y))</span>
 <span id="cb24-4"><a></a></span>
@@ -1347,7 +1347,7 @@ Coefficients:
 <span id="cb24-16"><a></a>  </span>
 <span id="cb24-17"><a></a>  e <span class="ot">&lt;-</span> <span class="fu">quantile_reg</span>(<span class="at">quantile_levels =</span> <span class="fu">c</span>(<span class="fl">0.025</span>, <span class="fl">0.1</span>, <span class="fl">0.25</span>, <span class="fl">0.5</span>, <span class="fl">0.75</span>, <span class="fl">0.9</span>, <span class="fl">0.975</span>))</span>
 <span id="cb24-18"><a></a>  f <span class="ot">&lt;-</span> <span class="fu">frosting</span>() <span class="sc">|&gt;</span> <span class="fu">layer_predict</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb24-19"><a></a>    <span class="fu">layer_quantile_distn</span>(<span class="at">quantile_levels =</span> quantile_levels) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-19"><a></a>    <span class="fu">layer_quantile_distn</span>(<span class="at">quantile_levels =</span> quantile_levels) <span class="sc">|&gt;</span></span>
 <span id="cb24-20"><a></a>    <span class="fu">layer_point_from_distn</span>() <span class="sc">|&gt;</span></span>
 <span id="cb24-21"><a></a>    <span class="fu">layer_add_forecast_date</span>(<span class="at">forecast_date =</span> forecast_date) <span class="sc">|&gt;</span></span>
 <span id="cb24-22"><a></a>    <span class="fu">layer_add_target_date</span>()</span>
@@ -1505,7 +1505,7 @@ j=1,\dots,p
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Forecasting — <a href="https://github.com/dajmcdon/epidata-workshop-2025">dajmcdon/epidata-workshop-2025</a></p>
+<p>Forecasting — <a href="https://github.com/dajmcdon/canssip-epidata-2025">dajmcdon/canssip-epidata-2025</a></p>
 </div>
 </div></div>
 
