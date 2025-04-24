@@ -637,7 +637,7 @@ ca_arx$predictions
 
 * `.pred_distn` is actually a “distribution”, parameterized by its quantiles
 
-* `arx_forecaster` estimates the quantiles in a different way than `lm` 
+* `arx_forecaster()` estimates the quantiles in a different way than `lm()` 
 :::
 
 ::: {.fragment}
@@ -1272,6 +1272,7 @@ rvdss_data <- read_rds(here::here("_data", "rvdss_data_dt.rds")) |>
 
 ```{r prod-fcaster}
 #| echo: true
+#| code-line-numbers: 8-15|9|2,3,10|13|14|17|29
 prod_forecaster <- function(epidata, ahead) {
   Logit <- function(x, a = 0.01) log((x + a) / (1 - x + a))
   Sigmd <- function(y, a = 0.01) (exp(y) * (1 + a) - a) / (1 + exp(y))
@@ -1290,7 +1291,7 @@ prod_forecaster <- function(epidata, ahead) {
   
   e <- quantile_reg(quantile_levels = c(0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975))
   f <- frosting() |> layer_predict() |> 
-    layer_quantile_distn(quantile_levels = quantile_levels) %>% 
+    layer_quantile_distn(quantile_levels = quantile_levels) |>
     layer_point_from_distn() |>
     layer_add_forecast_date(forecast_date = forecast_date) |>
     layer_add_target_date()

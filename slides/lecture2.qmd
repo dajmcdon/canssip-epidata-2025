@@ -87,6 +87,7 @@ hr_crosswalk <- read_rds(here::here("_data", "can_hr_crosswalk.rds"))
 nchs_archive <- read_rds(here::here("_data", "nchs_archive_dt.rds")) |> as_epi_archive()
 hhs_hosp_archive <- read_rds(here::here("_data", "hhs_hosp_archive_dt.rds")) |> as_epi_archive()
 corrections_df <- read_rds(here::here("_data", "corrections_df.rds"))
+outliers <- read_rds(here::here("_data", "outliers.rds"))
 prov_pop <- summarise(hr_crosswalk, pop = sum(pop), .by = region)
 cases_df <- cases_df_api |> 
   select(time_value, geo_value, raw_cases = value)
@@ -475,7 +476,6 @@ cowplot::plot_grid(gr1, gr2, align = "v", ncol = 1, axis = "lr")
 
 ## Outlier detection
 
-MAKE OFFLINE
 
 ```{r outlier-query}
 #| eval: false
@@ -486,7 +486,6 @@ outliers <- pub_covidcast("jhu-csse", "confirmed_incidence_num", "state", "day",
 ```
 
 ```{r outlier-ex}
-#| eval: false
 #| echo: true
 outliers <- outliers |>
   mutate(detect_outlr_rm(time_value, cases), .by = geo_value)
@@ -494,7 +493,6 @@ outliers <- outliers |>
 
 
 ```{r plot-outlier-ex}
-#| eval: false
 #| fig-width: 7
 outp1 <- outliers |> 
   ggplot(aes(x = time_value)) +
